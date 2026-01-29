@@ -27,6 +27,15 @@ pub struct SavedSession {
     /// Chemin vers la clé SSH (pas un secret, OK en JSON)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub key_path: Option<String>,
+    /// ID du dossier parent (None = racine)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub folder_id: Option<String>,
+    /// Tags associés à la session
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+    /// Couleur personnalisée (format hex: #RRGGBB)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
 }
 
 /// Récupère le chemin du fichier de configuration

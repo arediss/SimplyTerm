@@ -39,6 +39,18 @@ export interface SavedSession {
   username: string;
   auth_type: "password" | "key";
   key_path?: string;
+  folder_id?: string;
+  tags: string[];
+  color?: string;
+}
+
+export interface SessionFolder {
+  id: string;
+  name: string;
+  color?: string;
+  parent_id?: string;
+  order: number;
+  expanded: boolean;
 }
 
 export interface RecentSession {
@@ -65,6 +77,7 @@ export interface Tab {
 function App() {
   const [sessions] = useState<Session[]>([]);
   const [savedSessions, setSavedSessions] = useState<SavedSession[]>([]);
+  const [folders, setFolders] = useState<SessionFolder[]>([]);
   const [recentSessions, setRecentSessions] = useState<RecentSession[]>([]);
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
@@ -103,6 +116,16 @@ function App() {
     }
   }, []);
 
+  // Charger les dossiers au démarrage
+  const loadFolders = useCallback(async () => {
+    try {
+      const loadedFolders = await invoke<SessionFolder[]>("get_folders");
+      setFolders(loadedFolders);
+    } catch (error) {
+      console.error("Failed to load folders:", error);
+    }
+  }, []);
+
   // Charger les sessions récentes au démarrage
   const loadRecentSessions = useCallback(async () => {
     try {
@@ -135,9 +158,10 @@ function App() {
 
   useEffect(() => {
     loadSavedSessions();
+    loadFolders();
     loadRecentSessions();
     loadAppSettings();
-  }, [loadSavedSessions, loadRecentSessions, loadAppSettings]);
+  }, [loadSavedSessions, loadFolders, loadRecentSessions, loadAppSettings]);
 
   const handleNewLocalTab = () => {
     const ptySessionId = `pty-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -401,6 +425,47 @@ function App() {
       await loadSavedSessions();
     } catch (error) {
       console.error("Failed to delete session:", error);
+    }
+  };
+
+  // Créer un dossier
+  const handleCreateFolder = async (name: string, color?: string, parentId?: string) => {
+    try {
+      await invoke("create_folder", { name, color, parentId });
+      await loadFolders();
+    } catch (error) {
+      console.error("Failed to create folder:", error);
+    }
+  };
+
+  // Mettre à jour un dossier
+  const handleUpdateFolder = async (id: string, name?: string, color?: string, expanded?: boolean) => {
+    try {
+      await invoke("update_folder", { id, name, color, expanded });
+      await loadFolders();
+    } catch (error) {
+      console.error("Failed to update folder:", error);
+    }
+  };
+
+  // Supprimer un dossier
+  const handleDeleteFolder = async (id: string) => {
+    try {
+      await invoke("delete_folder", { id });
+      await loadFolders();
+      await loadSavedSessions(); // Sessions may have been moved to root
+    } catch (error) {
+      console.error("Failed to delete folder:", error);
+    }
+  };
+
+  // Déplacer une session dans un dossier
+  const handleMoveSessionToFolder = async (sessionId: string, folderId: string | null) => {
+    try {
+      await invoke("update_session_folder", { sessionId, folderId });
+      await loadSavedSessions();
+    } catch (error) {
+      console.error("Failed to move session to folder:", error);
     }
   };
 
@@ -1029,6 +1094,7 @@ function App() {
         onClose={() => setIsSidebarOpen(false)}
         sessions={sessions}
         savedSessions={savedSessions}
+        folders={folders}
         recentSessions={recentSessions}
         onLocalTerminal={handleNewLocalTab}
         onSessionSelect={() => {}}
@@ -1041,6 +1107,10 @@ function App() {
         onClearRecentSessions={handleClearRecentSessions}
         onNewConnection={handleOpenConnectionModal}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onCreateFolder={handleCreateFolder}
+        onUpdateFolder={handleUpdateFolder}
+        onDeleteFolder={handleDeleteFolder}
+        onMoveSessionToFolder={handleMoveSessionToFolder}
       />
 
       {/* Connection Modal */}

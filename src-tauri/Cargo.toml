@@ -38,6 +38,8 @@ parking_lot = "0.12"
 # Storage & Credentials
 keyring = "3"
 dirs = "5"
+chrono = "0.4"
+rand = "0.8"
 
 # System info (debug)
 sysinfo = "0.32"

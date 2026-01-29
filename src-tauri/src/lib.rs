@@ -20,6 +20,9 @@ use storage::{
     store_credential, get_credential, delete_credential, CredentialType,
     load_recent_sessions, add_recent_session, remove_recent_session, clear_recent_sessions, RecentSession,
     load_settings as load_app_settings, save_settings as save_app_settings, AppSettings,
+    load_folders, save_folders, create_folder as storage_create_folder,
+    update_folder as storage_update_folder, delete_folder as storage_delete_folder,
+    reorder_folders as storage_reorder_folders, SessionFolder,
 };
 
 /// État global de l'application
@@ -268,6 +271,9 @@ struct SavedSessionResponse {
     username: String,
     auth_type: String,
     key_path: Option<String>,
+    folder_id: Option<String>,
+    tags: Vec<String>,
+    color: Option<String>,
 }
 
 impl From<SavedSession> for SavedSessionResponse {
@@ -283,6 +289,9 @@ impl From<SavedSession> for SavedSessionResponse {
                 AuthType::Key => "key".to_string(),
             },
             key_path: s.key_path,
+            folder_id: s.folder_id,
+            tags: s.tags,
+            color: s.color,
         }
     }
 }
@@ -304,6 +313,9 @@ fn save_session(
     key_path: Option<String>,
     password: Option<String>,
     key_passphrase: Option<String>,
+    folder_id: Option<String>,
+    tags: Option<Vec<String>>,
+    color: Option<String>,
 ) -> Result<(), String> {
     // Charger les sessions existantes
     let mut sessions = load_sessions()?;
@@ -325,6 +337,9 @@ fn save_session(
         username,
         auth_type: auth.clone(),
         key_path,
+        folder_id,
+        tags: tags.unwrap_or_default(),
+        color,
     };
 
     sessions.push(session);
@@ -382,6 +397,120 @@ fn get_session_credentials(id: String) -> Result<SessionCredentials, String> {
 struct SessionCredentials {
     password: Option<String>,
     key_passphrase: Option<String>,
+}
+
+// ============================================================================
+// Commandes Storage (Dossiers)
+// ============================================================================
+
+#[derive(serde::Serialize)]
+struct FolderResponse {
+    id: String,
+    name: String,
+    color: Option<String>,
+    parent_id: Option<String>,
+    order: i32,
+    expanded: bool,
+}
+
+impl From<SessionFolder> for FolderResponse {
+    fn from(f: SessionFolder) -> Self {
+        Self {
+            id: f.id,
+            name: f.name,
+            color: f.color,
+            parent_id: f.parent_id,
+            order: f.order,
+            expanded: f.expanded,
+        }
+    }
+}
+
+#[tauri::command]
+fn get_folders() -> Result<Vec<FolderResponse>, String> {
+    let folders = load_folders()?;
+    Ok(folders.into_iter().map(|f| f.into()).collect())
+}
+
+#[tauri::command]
+fn create_folder(name: String, color: Option<String>, parent_id: Option<String>) -> Result<FolderResponse, String> {
+    let folder = storage_create_folder(name, color, parent_id)?;
+    Ok(folder.into())
+}
+
+#[tauri::command]
+fn update_folder(
+    id: String,
+    name: Option<String>,
+    color: Option<String>,
+    parent_id: Option<Option<String>>,
+    expanded: Option<bool>,
+) -> Result<FolderResponse, String> {
+    let folder = storage_update_folder(id, name, color, parent_id, expanded)?;
+    Ok(folder.into())
+}
+
+#[tauri::command]
+fn delete_folder(id: String) -> Result<(), String> {
+    // Déplacer les sessions du dossier à la racine
+    let mut sessions = load_sessions()?;
+    for session in sessions.iter_mut() {
+        if session.folder_id.as_ref() == Some(&id) {
+            session.folder_id = None;
+        }
+    }
+    save_sessions(&sessions)?;
+
+    // Supprimer le dossier
+    storage_delete_folder(id)?;
+    Ok(())
+}
+
+#[tauri::command]
+fn reorder_folders(folder_ids: Vec<String>, parent_id: Option<String>) -> Result<(), String> {
+    storage_reorder_folders(folder_ids, parent_id)
+}
+
+/// Met à jour le dossier d'une session
+#[tauri::command]
+fn update_session_folder(session_id: String, folder_id: Option<String>) -> Result<(), String> {
+    let mut sessions = load_sessions()?;
+
+    if let Some(session) = sessions.iter_mut().find(|s| s.id == session_id) {
+        session.folder_id = folder_id;
+    } else {
+        return Err(format!("Session not found: {}", session_id));
+    }
+
+    save_sessions(&sessions)
+}
+
+/// Met à jour les tags d'une session
+#[tauri::command]
+fn update_session_tags(session_id: String, tags: Vec<String>) -> Result<(), String> {
+    let mut sessions = load_sessions()?;
+
+    if let Some(session) = sessions.iter_mut().find(|s| s.id == session_id) {
+        session.tags = tags;
+    } else {
+        return Err(format!("Session not found: {}", session_id));
+    }
+
+    save_sessions(&sessions)
+}
+
+/// Met à jour la couleur d'une session
+#[tauri::command]
+fn update_session_color(session_id: String, color: Option<String>) -> Result<(), String> {
+    let mut sessions = load_sessions()?;
+
+    if let Some(session) = sessions.iter_mut().find(|s| s.id == session_id) {
+        session.color = color;
+    } else {
+        return Err(format!("Session not found: {}", session_id));
+    }
+
+    save_sessions(&sessions)
 }
 
 // ============================================================================
@@ -714,6 +843,15 @@ pub fn run() {
             save_session,
             delete_saved_session,
             get_session_credentials,
+            // Folders
+            get_folders,
+            create_folder,
+            update_folder,
+            delete_folder,
+            reorder_folders,
+            update_session_folder,
+            update_session_tags,
+            update_session_color,
             // Recent sessions
             get_recent_sessions,
             add_to_recent,
