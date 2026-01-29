@@ -479,12 +479,29 @@ function SavedSessionItem({
       onClick={onClick}
       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors text-left group cursor-pointer"
     >
-      <span className="text-accent">
+      <span style={{ color: session.color || undefined }} className={session.color ? "" : "text-accent"}>
         <Monitor size={16} />
       </span>
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-text truncate">
-          {session.name}
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-text truncate">
+            {session.name}
+          </span>
+          {session.tags && session.tags.length > 0 && (
+            <div className="flex gap-1">
+              {session.tags.slice(0, 2).map((tag, i) => (
+                <span
+                  key={i}
+                  className="px-1.5 py-0.5 text-[9px] rounded bg-surface-0/50 text-text-muted"
+                >
+                  {tag}
+                </span>
+              ))}
+              {session.tags.length > 2 && (
+                <span className="text-[9px] text-text-muted">+{session.tags.length - 2}</span>
+              )}
+            </div>
+          )}
         </div>
         <div className="text-[11px] text-text-muted truncate">
           {session.username}@{session.host}:{session.port}
