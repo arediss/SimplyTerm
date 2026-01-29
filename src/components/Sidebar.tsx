@@ -15,6 +15,8 @@ import {
   ChevronRight,
   ChevronDown,
   FolderPlus,
+  FolderInput,
+  Home,
 } from "lucide-react";
 import { Session, SavedSession, RecentSession, SessionFolder } from "../App";
 
@@ -327,6 +329,8 @@ function Sidebar({
                     onSessionEdit={onSavedSessionEdit}
                     onSessionDelete={onSavedSessionDelete}
                     onSessionSftp={onSavedSessionSftp}
+                    allFolders={folders}
+                    onMoveSessionToFolder={_onMoveSessionToFolder}
                   />
                 ))}
 
@@ -339,6 +343,8 @@ function Sidebar({
                     onEdit={() => onSavedSessionEdit(session)}
                     onDelete={() => onSavedSessionDelete(session.id)}
                     onSftp={() => onSavedSessionSftp(session)}
+                    folders={folders}
+                    onMoveToFolder={(folderId) => _onMoveSessionToFolder(session.id, folderId)}
                   />
                 ))}
               </>
@@ -447,6 +453,8 @@ interface SavedSessionItemProps {
   onEdit: () => void;
   onDelete: () => void;
   onSftp: () => void;
+  folders?: SessionFolder[];
+  onMoveToFolder?: (folderId: string | null) => void;
 }
 
 function SavedSessionItem({
@@ -455,7 +463,11 @@ function SavedSessionItem({
   onEdit,
   onDelete,
   onSftp,
+  folders = [],
+  onMoveToFolder,
 }: SavedSessionItemProps) {
+  const [showFolderMenu, setShowFolderMenu] = useState(false);
+
   const handleEdit = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
@@ -472,6 +484,19 @@ function SavedSessionItem({
     e.stopPropagation();
     e.preventDefault();
     onSftp();
+  };
+
+  const handleFolderClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setShowFolderMenu(!showFolderMenu);
+  };
+
+  const handleMoveToFolder = (folderId: string | null) => {
+    if (onMoveToFolder) {
+      onMoveToFolder(folderId);
+    }
+    setShowFolderMenu(false);
   };
 
   return (
@@ -507,7 +532,7 @@ function SavedSessionItem({
           {session.username}@{session.host}:{session.port}
         </div>
       </div>
-      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all relative">
         <button
           onClick={handleSftp}
           className="p-1.5 rounded-md hover:bg-blue/20 text-text-muted hover:text-blue transition-all"
@@ -515,6 +540,40 @@ function SavedSessionItem({
         >
           <FolderOpen size={14} />
         </button>
+        {folders.length > 0 && onMoveToFolder && (
+          <div className="relative">
+            <button
+              onClick={handleFolderClick}
+              className={`p-1.5 rounded-md hover:bg-mauve/20 text-text-muted hover:text-mauve transition-all ${showFolderMenu ? 'bg-mauve/20 text-mauve' : ''}`}
+              title="Déplacer vers dossier"
+            >
+              <FolderInput size={14} />
+            </button>
+            {showFolderMenu && (
+              <div className="absolute right-0 top-full mt-1 z-50 min-w-[150px] bg-crust border border-surface-0/50 rounded-lg shadow-xl py-1">
+                {session.folder_id && (
+                  <button
+                    onClick={() => handleMoveToFolder(null)}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-text hover:bg-surface-0/50 transition-colors"
+                  >
+                    <Home size={12} />
+                    <span>Racine</span>
+                  </button>
+                )}
+                {folders.filter(f => f.id !== session.folder_id).map((folder) => (
+                  <button
+                    key={folder.id}
+                    onClick={() => handleMoveToFolder(folder.id)}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-text hover:bg-surface-0/50 transition-colors"
+                  >
+                    <Folder size={12} style={{ color: folder.color || undefined }} />
+                    <span className="truncate">{folder.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <button
           onClick={handleEdit}
           className="p-1.5 rounded-md hover:bg-accent/20 text-text-muted hover:text-accent transition-all"
@@ -544,6 +603,8 @@ interface FolderItemProps {
   onSessionEdit: (session: SavedSession) => void;
   onSessionDelete: (sessionId: string) => void;
   onSessionSftp: (session: SavedSession) => void;
+  allFolders: SessionFolder[];
+  onMoveSessionToFolder: (sessionId: string, folderId: string | null) => void;
 }
 
 function FolderItem({
@@ -556,6 +617,8 @@ function FolderItem({
   onSessionEdit,
   onSessionDelete,
   onSessionSftp,
+  allFolders,
+  onMoveSessionToFolder,
 }: FolderItemProps) {
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -602,6 +665,8 @@ function FolderItem({
               onEdit={() => onSessionEdit(session)}
               onDelete={() => onSessionDelete(session.id)}
               onSftp={() => onSessionSftp(session)}
+              folders={allFolders}
+              onMoveToFolder={(folderId) => onMoveSessionToFolder(session.id, folderId)}
             />
           ))}
         </div>
