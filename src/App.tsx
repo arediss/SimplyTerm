@@ -479,6 +479,29 @@ function App() {
     [tabs, activeTabId]
   );
 
+  // Split a specific pane by ID (used by toolbar buttons)
+  const handleSplitPaneById = useCallback(
+    (paneId: string, direction: "horizontal" | "vertical") => {
+      const activeTab = tabs.find((t) => t.id === activeTabId);
+      if (!activeTab) return;
+
+      const { tree: newPaneTree, pendingPaneId } = splitPaneWithPending(
+        activeTab.paneTree,
+        paneId,
+        direction
+      );
+
+      setTabs(
+        tabs.map((t) =>
+          t.id === activeTabId
+            ? { ...t, paneTree: newPaneTree, focusedPaneId: pendingPaneId }
+            : t
+        )
+      );
+    },
+    [tabs, activeTabId]
+  );
+
   const handleClosePane = useCallback(
     (paneId: string) => {
       const activeTab = tabs.find((t) => t.id === activeTabId);
@@ -823,6 +846,7 @@ function App() {
                 focusedPaneId={tab.focusedPaneId}
                 onFocusPane={handleFocusPane}
                 onClosePane={handleClosePane}
+                onSplitPane={handleSplitPaneById}
                 renderTerminal={(_paneId, ptySessionId, isFocused) => (
                   <TerminalPane
                     key={ptySessionId}

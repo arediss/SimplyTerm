@@ -1,4 +1,5 @@
 import { useRef, useCallback, useEffect } from "react";
+import { Columns2, Rows2, X } from "lucide-react";
 
 // ============================================================================
 // Types
@@ -17,7 +18,56 @@ export interface SplitPaneProps {
   focusedPaneId: string | null;
   onFocusPane: (paneId: string) => void;
   onClosePane: (paneId: string) => void;
+  onSplitPane?: (paneId: string, direction: "horizontal" | "vertical") => void;
   depth?: number;
+}
+
+// ============================================================================
+// Pane Toolbar Component
+// ============================================================================
+
+interface PaneToolbarProps {
+  paneId: string;
+  onSplitHorizontal: () => void;
+  onSplitVertical: () => void;
+  onClose: () => void;
+}
+
+function PaneToolbar({ onSplitHorizontal, onSplitVertical, onClose }: PaneToolbarProps) {
+  return (
+    <div className="absolute top-1 right-1 z-10 flex items-center gap-0.5 bg-crust/80 backdrop-blur-sm rounded-md p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onSplitVertical();
+        }}
+        className="w-6 h-6 flex items-center justify-center rounded hover:bg-surface-0/50 text-subtext-0 hover:text-text transition-colors"
+        title="Split vertical (Ctrl+Shift+D)"
+      >
+        <Columns2 size={14} />
+      </button>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onSplitHorizontal();
+        }}
+        className="w-6 h-6 flex items-center justify-center rounded hover:bg-surface-0/50 text-subtext-0 hover:text-text transition-colors"
+        title="Split horizontal (Ctrl+Shift+E)"
+      >
+        <Rows2 size={14} />
+      </button>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+        className="w-6 h-6 flex items-center justify-center rounded hover:bg-red/20 text-subtext-0 hover:text-red transition-colors"
+        title="Close pane (Ctrl+Shift+W)"
+      >
+        <X size={14} />
+      </button>
+    </div>
+  );
 }
 
 // ============================================================================
@@ -91,19 +141,30 @@ export function SplitPane({
   focusedPaneId,
   onFocusPane,
   onClosePane,
+  onSplitPane,
   depth = 0,
 }: SplitPaneProps) {
+  const isFocused = focusedPaneId === node.id;
+
   // Terminal node - render the terminal
   if (node.type === "terminal") {
     return (
       <div
         className={`
-          w-full h-full relative
-          ${focusedPaneId === node.id ? "ring-1 ring-blue/50 ring-inset" : ""}
+          w-full h-full relative group
+          ${isFocused ? "ring-1 ring-blue/50 ring-inset" : ""}
         `}
         onClick={() => onFocusPane(node.id)}
       >
-        {renderTerminal(node.id, node.ptySessionId, focusedPaneId === node.id)}
+        {renderTerminal(node.id, node.ptySessionId, isFocused)}
+        {onSplitPane && (
+          <PaneToolbar
+            paneId={node.id}
+            onSplitHorizontal={() => onSplitPane(node.id, "horizontal")}
+            onSplitVertical={() => onSplitPane(node.id, "vertical")}
+            onClose={() => onClosePane(node.id)}
+          />
+        )}
       </div>
     );
   }
@@ -113,12 +174,20 @@ export function SplitPane({
     return (
       <div
         className={`
-          w-full h-full relative
-          ${focusedPaneId === node.id ? "ring-1 ring-blue/50 ring-inset" : ""}
+          w-full h-full relative group
+          ${isFocused ? "ring-1 ring-blue/50 ring-inset" : ""}
         `}
         onClick={() => onFocusPane(node.id)}
       >
         {renderPending ? renderPending(node.id) : <div className="w-full h-full bg-base" />}
+        {onSplitPane && (
+          <PaneToolbar
+            paneId={node.id}
+            onSplitHorizontal={() => onSplitPane(node.id, "horizontal")}
+            onSplitVertical={() => onSplitPane(node.id, "vertical")}
+            onClose={() => onClosePane(node.id)}
+          />
+        )}
       </div>
     );
   }
@@ -190,6 +259,7 @@ export function SplitPane({
               focusedPaneId={focusedPaneId}
               onFocusPane={onFocusPane}
               onClosePane={onClosePane}
+              onSplitPane={onSplitPane}
               depth={depth + 1}
             />
           </div>
