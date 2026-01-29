@@ -1,0 +1,38 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="#1e1e2e"/>
+
+  <!-- Terminal window frame -->
+  <rect x="64" y="80" width="384" height="352" rx="16" fill="#11111b" stroke="#313244" stroke-width="4"/>
+
+  <!-- Title bar -->
+  <rect x="64" y="80" width="384" height="40" rx="16" fill="#181825"/>
+  <rect x="64" y="104" width="384" height="16" fill="#181825"/>
+
+  <!-- Window buttons -->
+  <circle cx="96" cy="100" r="8" fill="#f38ba8"/>
+  <circle cx="124" cy="100" r="8" fill="#f9e2af"/>
+  <circle cx="152" cy="100" r="8" fill="#a6e3a1"/>
+
+  <!-- Terminal prompt line 1 -->
+  <text x="88" y="168" font-family="monospace" font-size="24" font-weight="bold" fill="#a6e3a1">$</text>
+  <text x="116" y="168" font-family="monospace" font-size="24" fill="#cdd6f4">ssh</text>
+  <text x="172" y="168" font-family="monospace" font-size="24" fill="#89b4fa">user@server</text>
+
+  <!-- Terminal prompt line 2 -->
+  <text x="88" y="216" font-family="monospace" font-size="24" fill="#6c7086">Connected to server</text>
+
+  <!-- Terminal prompt line 3 -->
+  <text x="88" y="264" font-family="monospace" font-size="24" font-weight="bold" fill="#a6e3a1">~</text>
+  <text x="112" y="264" font-family="monospace" font-size="24" fill="#cdd6f4">$</text>
+
+  <!-- Cursor -->
+  <rect x="136" y="244" width="14" height="24" fill="#89b4fa">
+    <animate attributeName="opacity" values="1;0;1" dur="1s" repeatCount="indefinite"/>
+  </rect>
+
+  <!-- Decorative connection lines -->
+  <path d="M 400 320 Q 420 350 400 380" stroke="#89b4fa" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <circle cx="400" cy="320" r="6" fill="#89b4fa"/>
+  <circle cx="400" cy="380" r="6" fill="#a6e3a1"/>
+</svg>

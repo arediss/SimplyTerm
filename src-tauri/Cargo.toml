@@ -1,0 +1,45 @@
+[package]
+name = "simplyterm"
+version = "0.1.0"
+description = "A modern, fast, cross-platform terminal"
+authors = ["SimplyTerm"]
+edition = "2021"
+
+[lib]
+name = "simplyterm_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# SSH
+russh = "0.46"
+russh-keys = "0.46"
+
+# Pour PTY local
+portable-pty = "0.8"
+
+# Utils
+async-trait = "0.1"
+thiserror = "2"
+uuid = { version = "1", features = ["v4"] }
+parking_lot = "0.12"
+
+# Storage & Credentials
+keyring = "3"
+dirs = "5"
+
+# System info (debug)
+sysinfo = "0.32"
+
+# Plugins (file watching for hot reload - optional)
+# notify = "6"

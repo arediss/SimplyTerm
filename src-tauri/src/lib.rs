@@ -1,0 +1,608 @@
+//! SimplyTerm - Terminal moderne multi-connecteurs
+//!
+//! Architecture modulaire :
+//! - session/ : Gestion des sessions et trait commun
+//! - connectors/ : Implémentations (SSH, Local, etc.)
+
+use std::sync::Arc;
+use tauri::{AppHandle, Emitter, Manager};
+
+mod connectors;
+mod plugins;
+mod session;
+mod storage;
+
+use connectors::{connect_ssh, create_local_session, ssh_exec::ssh_exec, SshAuth, SshConfig};
+use plugins::{PluginManager, PluginState};
+use session::SessionManager;
+use storage::{
+    load_sessions, save_sessions, SavedSession, AuthType,
+    store_credential, get_credential, delete_credential, CredentialType,
+    load_recent_sessions, add_recent_session, remove_recent_session, clear_recent_sessions, RecentSession,
+};
+
+/// État global de l'application
+struct AppState {
+    session_manager: Arc<SessionManager>,
+    plugin_manager: Arc<PluginManager>,
+}
+
+// ============================================================================
+// Commandes Tauri
+// ============================================================================
+
+#[tauri::command]
+async fn create_pty_session(app: AppHandle, session_id: String) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let output_tx = state.session_manager.output_sender();
+
+    let app_clone = app.clone();
+    let session_id_clone = session_id.clone();
+
+    let session = create_local_session(session_id.clone(), output_tx, move || {
+        let _ = app_clone.emit(&format!("pty-exit-{}", session_id_clone), ());
+    })?;
+
+    state
+        .session_manager
+        .register(session_id, Box::new(session));
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn create_ssh_session(
+    app: AppHandle,
+    session_id: String,
+    host: String,
+    port: u16,
+    username: String,
+    password: Option<String>,
+    key_path: Option<String>,
+    key_passphrase: Option<String>,
+) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let output_tx = state.session_manager.output_sender();
+
+    // Déterminer la méthode d'authentification
+    let auth = if let Some(key) = key_path {
+        SshAuth::KeyFile {
+            path: key,
+            passphrase: key_passphrase,
+        }
+    } else if let Some(pass) = password {
+        SshAuth::Password(pass)
+    } else {
+        return Err("No authentication method provided".to_string());
+    };
+
+    let config = SshConfig {
+        host,
+        port,
+        username,
+        auth,
+    };
+
+    let app_clone = app.clone();
+    let session_id_clone = session_id.clone();
+
+    // Store config for background commands (stats, etc.)
+    state.session_manager.store_ssh_config(session_id.clone(), config.clone());
+
+    let session = connect_ssh(config, session_id.clone(), output_tx, move || {
+        let _ = app_clone.emit(&format!("pty-exit-{}", session_id_clone), ());
+    })
+    .await?;
+
+    state
+        .session_manager
+        .register(session_id, Box::new(session));
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn write_to_pty(app: AppHandle, session_id: String, data: String) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    state.session_manager.write(&session_id, data.as_bytes())
+}
+
+#[tauri::command]
+async fn resize_pty(
+    app: AppHandle,
+    session_id: String,
+    rows: u16,
+    cols: u16,
+) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    state
+        .session_manager
+        .resize(&session_id, cols as u32, rows as u32)
+}
+
+#[tauri::command]
+async fn close_pty_session(app: AppHandle, session_id: String) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    state.session_manager.close(&session_id)
+}
+
+/// Execute a command on an SSH session in background (doesn't pollute the visible terminal)
+/// Returns the command output as a string
+#[tauri::command]
+async fn ssh_exec_command(app: AppHandle, session_id: String, command: String) -> Result<String, String> {
+    let state = app.state::<AppState>();
+    let config = state
+        .session_manager
+        .get_ssh_config(&session_id)
+        .ok_or_else(|| "SSH session not found or not an SSH session".to_string())?;
+
+    ssh_exec(&config, &command).await
+}
+
+#[tauri::command]
+fn get_home_dir() -> Result<String, String> {
+    std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .map_err(|_| "Could not determine home directory".to_string())
+}
+
+// ============================================================================
+// Commandes Storage (Sessions sauvegardées)
+// ============================================================================
+
+/// Structure pour la réponse frontend (inclut les métadonnées uniquement)
+#[derive(serde::Serialize)]
+struct SavedSessionResponse {
+    id: String,
+    name: String,
+    host: String,
+    port: u16,
+    username: String,
+    auth_type: String,
+    key_path: Option<String>,
+}
+
+impl From<SavedSession> for SavedSessionResponse {
+    fn from(s: SavedSession) -> Self {
+        Self {
+            id: s.id,
+            name: s.name,
+            host: s.host,
+            port: s.port,
+            username: s.username,
+            auth_type: match s.auth_type {
+                AuthType::Password => "password".to_string(),
+                AuthType::Key => "key".to_string(),
+            },
+            key_path: s.key_path,
+        }
+    }
+}
+
+#[tauri::command]
+fn load_saved_sessions() -> Result<Vec<SavedSessionResponse>, String> {
+    let sessions = load_sessions()?;
+    Ok(sessions.into_iter().map(|s| s.into()).collect())
+}
+
+#[tauri::command]
+fn save_session(
+    id: String,
+    name: String,
+    host: String,
+    port: u16,
+    username: String,
+    auth_type: String,
+    key_path: Option<String>,
+    password: Option<String>,
+    key_passphrase: Option<String>,
+) -> Result<(), String> {
+    // Charger les sessions existantes
+    let mut sessions = load_sessions()?;
+
+    // Supprimer l'ancienne session si elle existe
+    sessions.retain(|s| s.id != id);
+
+    // Créer la nouvelle session
+    let auth = match auth_type.as_str() {
+        "key" => AuthType::Key,
+        _ => AuthType::Password,
+    };
+
+    let session = SavedSession {
+        id: id.clone(),
+        name,
+        host,
+        port,
+        username,
+        auth_type: auth.clone(),
+        key_path,
+    };
+
+    sessions.push(session);
+
+    // Sauvegarder le fichier JSON
+    save_sessions(&sessions)?;
+
+    // Stocker les credentials de manière sécurisée
+    if let Some(pwd) = password {
+        if !pwd.is_empty() {
+            store_credential(&id, CredentialType::Password, &pwd)?;
+        }
+    }
+
+    if let Some(passphrase) = key_passphrase {
+        if !passphrase.is_empty() {
+            store_credential(&id, CredentialType::KeyPassphrase, &passphrase)?;
+        }
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+fn delete_saved_session(id: String) -> Result<(), String> {
+    // Charger les sessions
+    let mut sessions = load_sessions()?;
+
+    // Supprimer la session
+    sessions.retain(|s| s.id != id);
+
+    // Sauvegarder
+    save_sessions(&sessions)?;
+
+    // Supprimer les credentials associés
+    let _ = delete_credential(&id, CredentialType::Password);
+    let _ = delete_credential(&id, CredentialType::KeyPassphrase);
+
+    Ok(())
+}
+
+/// Récupère les credentials pour une session (pour connexion)
+#[tauri::command]
+fn get_session_credentials(id: String) -> Result<SessionCredentials, String> {
+    let password = get_credential(&id, CredentialType::Password)?;
+    let key_passphrase = get_credential(&id, CredentialType::KeyPassphrase)?;
+
+    Ok(SessionCredentials {
+        password,
+        key_passphrase,
+    })
+}
+
+#[derive(serde::Serialize)]
+struct SessionCredentials {
+    password: Option<String>,
+    key_passphrase: Option<String>,
+}
+
+// ============================================================================
+// Commandes Storage (Sessions récentes)
+// ============================================================================
+
+#[derive(serde::Serialize)]
+struct RecentSessionResponse {
+    id: String,
+    name: String,
+    host: String,
+    port: u16,
+    username: String,
+    auth_type: String,
+    key_path: Option<String>,
+    last_used: u64,
+}
+
+impl From<RecentSession> for RecentSessionResponse {
+    fn from(s: RecentSession) -> Self {
+        Self {
+            id: s.id,
+            name: s.name,
+            host: s.host,
+            port: s.port,
+            username: s.username,
+            auth_type: s.auth_type,
+            key_path: s.key_path,
+            last_used: s.last_used,
+        }
+    }
+}
+
+#[tauri::command]
+fn get_recent_sessions() -> Result<Vec<RecentSessionResponse>, String> {
+    let sessions = load_recent_sessions()?;
+    Ok(sessions.into_iter().map(|s| s.into()).collect())
+}
+
+#[tauri::command]
+fn add_to_recent(
+    name: String,
+    host: String,
+    port: u16,
+    username: String,
+    auth_type: String,
+    key_path: Option<String>,
+) -> Result<(), String> {
+    let session = RecentSession {
+        id: format!("recent-{}-{}", host, std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0)),
+        name,
+        host,
+        port,
+        username,
+        auth_type,
+        key_path,
+        last_used: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0),
+    };
+
+    add_recent_session(session)
+}
+
+#[tauri::command]
+fn remove_from_recent(id: String) -> Result<(), String> {
+    remove_recent_session(&id)
+}
+
+#[tauri::command]
+fn clear_recent() -> Result<(), String> {
+    clear_recent_sessions()
+}
+
+// ============================================================================
+// Commandes Plugins
+// ============================================================================
+
+/// Response format for plugin list
+#[derive(serde::Serialize)]
+struct PluginResponse {
+    id: String,
+    name: String,
+    version: String,
+    author: Option<String>,
+    description: Option<String>,
+    status: String,
+    permissions: Vec<String>,
+    panels: Vec<PanelResponse>,
+    commands: Vec<CommandResponse>,
+}
+
+#[derive(serde::Serialize)]
+struct PanelResponse {
+    id: String,
+    title: String,
+    icon: Option<String>,
+    position: String,
+}
+
+#[derive(serde::Serialize)]
+struct CommandResponse {
+    id: String,
+    title: String,
+    shortcut: Option<String>,
+}
+
+impl From<PluginState> for PluginResponse {
+    fn from(state: PluginState) -> Self {
+        Self {
+            id: state.manifest.id,
+            name: state.manifest.name,
+            version: state.manifest.version,
+            author: state.manifest.author,
+            description: state.manifest.description,
+            status: match state.status {
+                plugins::PluginStatus::Disabled => "disabled".to_string(),
+                plugins::PluginStatus::Enabled => "enabled".to_string(),
+                plugins::PluginStatus::Error => "error".to_string(),
+            },
+            permissions: state.manifest.permissions.iter().map(|p| p.to_string()).collect(),
+            panels: state.manifest.panels.into_iter().map(|p| PanelResponse {
+                id: p.id,
+                title: p.title,
+                icon: p.icon,
+                position: match p.position {
+                    plugins::PanelPosition::Right => "right".to_string(),
+                    plugins::PanelPosition::Left => "left".to_string(),
+                    plugins::PanelPosition::Bottom => "bottom".to_string(),
+                    plugins::PanelPosition::FloatingLeft => "floating-left".to_string(),
+                    plugins::PanelPosition::FloatingRight => "floating-right".to_string(),
+                },
+            }).collect(),
+            commands: state.manifest.commands.into_iter().map(|c| CommandResponse {
+                id: c.id,
+                title: c.title,
+                shortcut: c.shortcut,
+            }).collect(),
+        }
+    }
+}
+
+#[tauri::command]
+fn list_plugins(app: AppHandle) -> Result<Vec<PluginResponse>, String> {
+    let state = app.state::<AppState>();
+    let plugins = state.plugin_manager.list_plugins();
+    Ok(plugins.into_iter().map(|p| p.into()).collect())
+}
+
+#[tauri::command]
+fn get_plugin_manifest(app: AppHandle, id: String) -> Result<PluginResponse, String> {
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&id)
+        .ok_or_else(|| format!("Plugin not found: {}", id))?;
+    Ok(plugin.into())
+}
+
+#[tauri::command]
+fn enable_plugin(app: AppHandle, id: String) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    state.plugin_manager.enable_plugin(&id)
+}
+
+#[tauri::command]
+fn disable_plugin(app: AppHandle, id: String) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    state.plugin_manager.disable_plugin(&id)
+}
+
+#[tauri::command]
+fn get_plugin_file(app: AppHandle, plugin_id: String, file_path: String) -> Result<String, String> {
+    let state = app.state::<AppState>();
+    state.plugin_manager.get_plugin_file(&plugin_id, &file_path)
+}
+
+#[tauri::command]
+fn refresh_plugins(app: AppHandle) -> Result<Vec<PluginResponse>, String> {
+    let state = app.state::<AppState>();
+    state.plugin_manager.refresh()?;
+    let plugins = state.plugin_manager.list_plugins();
+    Ok(plugins.into_iter().map(|p| p.into()).collect())
+}
+
+#[tauri::command]
+fn plugin_storage_get(app: AppHandle, plugin_id: String, key: String) -> Result<Option<serde_json::Value>, String> {
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    let api = plugins::PluginApi::new(plugin_id, plugin.manifest.permissions)?;
+    api.storage_get(&key)
+}
+
+#[tauri::command]
+fn plugin_storage_set(app: AppHandle, plugin_id: String, key: String, value: serde_json::Value) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    let api = plugins::PluginApi::new(plugin_id, plugin.manifest.permissions)?;
+    api.storage_set(&key, value)
+}
+
+#[tauri::command]
+fn plugin_storage_delete(app: AppHandle, plugin_id: String, key: String) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    let api = plugins::PluginApi::new(plugin_id, plugin.manifest.permissions)?;
+    api.storage_delete(&key)
+}
+
+#[tauri::command]
+fn plugin_invoke(
+    app: AppHandle,
+    plugin_id: String,
+    command: String,
+    args: std::collections::HashMap<String, serde_json::Value>,
+) -> Result<serde_json::Value, String> {
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    let api = plugins::PluginApi::new(plugin_id, plugin.manifest.permissions)?;
+    api.invoke(&command, args)
+}
+
+// ============================================================================
+// Debug: System Stats
+// ============================================================================
+
+use sysinfo::{System, Pid, ProcessRefreshKind};
+
+#[derive(serde::Serialize)]
+struct ProcessStats {
+    memory_mb: f64,
+    cpu_percent: f32,
+}
+
+#[tauri::command]
+fn get_process_stats() -> ProcessStats {
+    let mut sys = System::new();
+    let pid = Pid::from_u32(std::process::id());
+
+    let refresh_kind = ProcessRefreshKind::new()
+        .with_cpu()
+        .with_memory();
+
+    // Refresh CPU info first
+    sys.refresh_processes_specifics(
+        sysinfo::ProcessesToUpdate::Some(&[pid]),
+        true,
+        refresh_kind,
+    );
+
+    // Small delay for CPU measurement accuracy
+    std::thread::sleep(std::time::Duration::from_millis(100));
+
+    // Refresh again to get CPU usage
+    sys.refresh_processes_specifics(
+        sysinfo::ProcessesToUpdate::Some(&[pid]),
+        true,
+        refresh_kind,
+    );
+
+    if let Some(process) = sys.process(pid) {
+        ProcessStats {
+            memory_mb: process.memory() as f64 / 1024.0 / 1024.0,
+            cpu_percent: process.cpu_usage(),
+        }
+    } else {
+        ProcessStats {
+            memory_mb: 0.0,
+            cpu_percent: 0.0,
+        }
+    }
+}
+
+// ============================================================================
+// Point d'entrée
+// ============================================================================
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .plugin(tauri_plugin_shell::init())
+        .setup(|app| {
+            let session_manager = SessionManager::new(app.handle().clone());
+            let plugin_manager = Arc::new(PluginManager::default());
+            app.manage(AppState { session_manager, plugin_manager });
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            create_pty_session,
+            create_ssh_session,
+            write_to_pty,
+            resize_pty,
+            close_pty_session,
+            ssh_exec_command,
+            get_home_dir,
+            // Saved sessions
+            load_saved_sessions,
+            save_session,
+            delete_saved_session,
+            get_session_credentials,
+            // Recent sessions
+            get_recent_sessions,
+            add_to_recent,
+            remove_from_recent,
+            clear_recent,
+            // Plugins
+            list_plugins,
+            get_plugin_manifest,
+            enable_plugin,
+            disable_plugin,
+            get_plugin_file,
+            refresh_plugins,
+            plugin_storage_get,
+            plugin_storage_set,
+            plugin_storage_delete,
+            plugin_invoke,
+            // Debug
+            get_process_stats,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}
