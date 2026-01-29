@@ -12,11 +12,13 @@ import {
   SplitPane,
   type PaneNode,
   createTerminalNode,
-  splitPane,
+  splitPaneWithPending,
+  replacePendingWithTerminal,
   closePane,
   getAllTerminalPaneIds,
   getAllPtySessionIds,
 } from "./components/SplitPane";
+import { PanePicker } from "./components/PanePicker";
 
 export interface Session {
   id: string;
@@ -459,13 +461,17 @@ function App() {
       const activeTab = tabs.find((t) => t.id === activeTabId);
       if (!activeTab || !activeTab.focusedPaneId) return;
 
-      const newPtySessionId = `pty-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const newPaneTree = splitPane(activeTab.paneTree, activeTab.focusedPaneId, direction, newPtySessionId);
+      // Create a pending pane that will show the picker
+      const { tree: newPaneTree, pendingPaneId } = splitPaneWithPending(
+        activeTab.paneTree,
+        activeTab.focusedPaneId,
+        direction
+      );
 
       setTabs(
         tabs.map((t) =>
           t.id === activeTabId
-            ? { ...t, paneTree: newPaneTree }
+            ? { ...t, paneTree: newPaneTree, focusedPaneId: pendingPaneId }
             : t
         )
       );
@@ -540,6 +546,184 @@ function App() {
       );
     },
     [tabs, activeTabId]
+  );
+
+  // Handler to convert a pending pane to a local terminal
+  const handlePendingSelectLocal = useCallback(
+    (pendingPaneId: string) => {
+      const activeTab = tabs.find((t) => t.id === activeTabId);
+      if (!activeTab) return;
+
+      const newPtySessionId = `pty-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const newPaneTree = replacePendingWithTerminal(activeTab.paneTree, pendingPaneId, newPtySessionId);
+
+      setTabs(
+        tabs.map((t) =>
+          t.id === activeTabId
+            ? { ...t, paneTree: newPaneTree }
+            : t
+        )
+      );
+    },
+    [tabs, activeTabId]
+  );
+
+  // Handler to duplicate the current SSH session in a pending pane
+  const handlePendingSelectDuplicate = useCallback(
+    async (pendingPaneId: string) => {
+      const activeTab = tabs.find((t) => t.id === activeTabId);
+      if (!activeTab || !activeTab.sshConfig) return;
+
+      const config = activeTab.sshConfig;
+      const ptySessionId = `ssh-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      try {
+        let keyPath = config.keyPath;
+        if (keyPath?.startsWith("~")) {
+          const home = await invoke<string>("get_home_dir").catch(() => "");
+          if (home) {
+            keyPath = keyPath.replace("~", home);
+          }
+        }
+
+        await invoke("create_ssh_session", {
+          sessionId: ptySessionId,
+          host: config.host,
+          port: config.port,
+          username: config.username,
+          password: config.password,
+          keyPath,
+          keyPassphrase: config.keyPassphrase,
+        });
+
+        const newPaneTree = replacePendingWithTerminal(activeTab.paneTree, pendingPaneId, ptySessionId);
+
+        setTabs(
+          tabs.map((t) =>
+            t.id === activeTabId
+              ? { ...t, paneTree: newPaneTree }
+              : t
+          )
+        );
+
+        pluginManager.notifySessionConnect({
+          id: ptySessionId,
+          type: 'ssh',
+          host: config.host,
+          port: config.port,
+          username: config.username,
+          status: 'connected',
+        });
+      } catch (error) {
+        console.error("Failed to duplicate SSH session:", error);
+        // On error, close the pending pane
+        handleClosePane(pendingPaneId);
+      }
+    },
+    [tabs, activeTabId, handleClosePane]
+  );
+
+  // Handler for selecting a saved session in a pending pane
+  const handlePendingSelectSaved = useCallback(
+    async (pendingPaneId: string, saved: SavedSession) => {
+      const activeTab = tabs.find((t) => t.id === activeTabId);
+      if (!activeTab) return;
+
+      try {
+        const credentials = await invoke<{ password: string | null; key_passphrase: string | null }>(
+          "get_session_credentials",
+          { id: saved.id }
+        );
+
+        const needsPassword = saved.auth_type === "password" && !credentials.password;
+        if (needsPassword) {
+          // Close the pending pane and open the connection modal
+          handleClosePane(pendingPaneId);
+          setInitialConnectionConfig({
+            name: saved.name,
+            host: saved.host,
+            port: saved.port,
+            username: saved.username,
+            authType: saved.auth_type,
+            keyPath: saved.key_path,
+          });
+          setConnectionError("Veuillez entrer votre mot de passe");
+          setIsConnectionModalOpen(true);
+          return;
+        }
+
+        const ptySessionId = `ssh-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+        let keyPath = saved.key_path;
+        if (keyPath?.startsWith("~")) {
+          const home = await invoke<string>("get_home_dir").catch(() => "");
+          if (home) {
+            keyPath = keyPath.replace("~", home);
+          }
+        }
+
+        await invoke("create_ssh_session", {
+          sessionId: ptySessionId,
+          host: saved.host,
+          port: saved.port,
+          username: saved.username,
+          password: saved.auth_type === "password" ? credentials.password : null,
+          keyPath: saved.auth_type === "key" ? keyPath : null,
+          keyPassphrase: saved.auth_type === "key" ? credentials.key_passphrase : null,
+        });
+
+        const newPaneTree = replacePendingWithTerminal(activeTab.paneTree, pendingPaneId, ptySessionId);
+
+        setTabs(
+          tabs.map((t) =>
+            t.id === activeTabId
+              ? { ...t, paneTree: newPaneTree }
+              : t
+          )
+        );
+
+        pluginManager.notifySessionConnect({
+          id: ptySessionId,
+          type: 'ssh',
+          host: saved.host,
+          port: saved.port,
+          username: saved.username,
+          status: 'connected',
+        });
+
+        await invoke("add_to_recent", {
+          name: saved.name,
+          host: saved.host,
+          port: saved.port,
+          username: saved.username,
+          authType: saved.auth_type,
+          keyPath: saved.key_path,
+        });
+        await loadRecentSessions();
+      } catch (error) {
+        console.error("Failed to connect to saved session:", error);
+        handleClosePane(pendingPaneId);
+      }
+    },
+    [tabs, activeTabId, handleClosePane, loadRecentSessions]
+  );
+
+  // Handler for selecting a recent session in a pending pane
+  const handlePendingSelectRecent = useCallback(
+    (pendingPaneId: string, recent: RecentSession) => {
+      // Close the pending pane and open the connection modal with pre-filled config
+      handleClosePane(pendingPaneId);
+      setInitialConnectionConfig({
+        name: recent.name,
+        host: recent.host,
+        port: recent.port,
+        username: recent.username,
+        authType: recent.auth_type,
+        keyPath: recent.key_path,
+      });
+      setIsConnectionModalOpen(true);
+    },
+    [handleClosePane]
   );
 
   // Keyboard shortcuts for split panes
@@ -645,6 +829,17 @@ function App() {
                     sessionId={ptySessionId}
                     type={tab.type}
                     isActive={tab.id === activeTabId && isFocused}
+                  />
+                )}
+                renderPending={(paneId) => (
+                  <PanePicker
+                    onSelectLocal={() => handlePendingSelectLocal(paneId)}
+                    onSelectDuplicate={() => handlePendingSelectDuplicate(paneId)}
+                    onSelectSaved={(session) => handlePendingSelectSaved(paneId, session)}
+                    onSelectRecent={(session) => handlePendingSelectRecent(paneId, session)}
+                    currentSessionConfig={tab.sshConfig}
+                    savedSessions={savedSessions}
+                    recentSessions={recentSessions}
                   />
                 )}
               />

@@ -6,12 +6,14 @@ import { useRef, useCallback, useEffect } from "react";
 
 export type PaneNode =
   | { type: "terminal"; id: string; ptySessionId: string }
+  | { type: "pending"; id: string }
   | { type: "split"; id: string; direction: "horizontal" | "vertical"; children: PaneNode[]; sizes: number[] };
 
 export interface SplitPaneProps {
   node: PaneNode;
   onNodeChange: (node: PaneNode) => void;
   renderTerminal: (paneId: string, ptySessionId: string, isFocused: boolean) => React.ReactNode;
+  renderPending?: (paneId: string) => React.ReactNode;
   focusedPaneId: string | null;
   onFocusPane: (paneId: string) => void;
   onClosePane: (paneId: string) => void;
@@ -85,6 +87,7 @@ export function SplitPane({
   node,
   onNodeChange,
   renderTerminal,
+  renderPending,
   focusedPaneId,
   onFocusPane,
   onClosePane,
@@ -101,6 +104,21 @@ export function SplitPane({
         onClick={() => onFocusPane(node.id)}
       >
         {renderTerminal(node.id, node.ptySessionId, focusedPaneId === node.id)}
+      </div>
+    );
+  }
+
+  // Pending node - render the picker
+  if (node.type === "pending") {
+    return (
+      <div
+        className={`
+          w-full h-full relative
+          ${focusedPaneId === node.id ? "ring-1 ring-blue/50 ring-inset" : ""}
+        `}
+        onClick={() => onFocusPane(node.id)}
+      >
+        {renderPending ? renderPending(node.id) : <div className="w-full h-full bg-base" />}
       </div>
     );
   }
@@ -168,6 +186,7 @@ export function SplitPane({
               node={child}
               onNodeChange={(newChild) => handleChildChange(index, newChild)}
               renderTerminal={renderTerminal}
+              renderPending={renderPending}
               focusedPaneId={focusedPaneId}
               onFocusPane={onFocusPane}
               onClosePane={onClosePane}
@@ -203,7 +222,15 @@ export function createTerminalNode(ptySessionId: string): PaneNode {
   };
 }
 
-/** Split a pane */
+/** Create a pending node (awaiting user selection) */
+export function createPendingNode(): PaneNode {
+  return {
+    type: "pending",
+    id: generatePaneId(),
+  };
+}
+
+/** Split a pane with a new terminal */
 export function splitPane(
   root: PaneNode,
   targetPaneId: string,
@@ -232,14 +259,79 @@ export function splitPane(
   return root;
 }
 
+/** Split a pane with a pending node (user will select connection type) */
+export function splitPaneWithPending(
+  root: PaneNode,
+  targetPaneId: string,
+  direction: "horizontal" | "vertical"
+): { tree: PaneNode; pendingPaneId: string } {
+  const pendingNode = createPendingNode();
+
+  function doSplit(node: PaneNode): PaneNode {
+    // If this is the target pane (terminal or pending), split it
+    if ((node.type === "terminal" || node.type === "pending") && node.id === targetPaneId) {
+      return {
+        type: "split",
+        id: generatePaneId(),
+        direction,
+        children: [node, pendingNode],
+        sizes: [50, 50],
+      };
+    }
+
+    // If this is a split, recurse into children
+    if (node.type === "split") {
+      return {
+        ...node,
+        children: node.children.map((child) => doSplit(child)),
+      };
+    }
+
+    return node;
+  }
+
+  return { tree: doSplit(root), pendingPaneId: pendingNode.id };
+}
+
+/** Replace a pending pane with a terminal */
+export function replacePendingWithTerminal(
+  root: PaneNode,
+  pendingPaneId: string,
+  ptySessionId: string
+): PaneNode {
+  // If this is the target pending pane, convert to terminal
+  if (root.type === "pending" && root.id === pendingPaneId) {
+    return {
+      type: "terminal",
+      id: root.id, // Keep the same ID for focus management
+      ptySessionId,
+    };
+  }
+
+  // If this is a split, recurse into children
+  if (root.type === "split") {
+    return {
+      ...root,
+      children: root.children.map((child) => replacePendingWithTerminal(child, pendingPaneId, ptySessionId)),
+    };
+  }
+
+  return root;
+}
+
 /** Close a pane and clean up the tree */
 export function closePane(root: PaneNode, targetPaneId: string): PaneNode | null {
-  // Can't close the root terminal
+  // Handle terminal pane
   if (root.type === "terminal") {
     return root.id === targetPaneId ? null : root;
   }
 
-  // Filter out the closed pane from children
+  // Handle pending pane
+  if (root.type === "pending") {
+    return root.id === targetPaneId ? null : root;
+  }
+
+  // Handle split pane - filter out the closed pane from children
   const newChildren = root.children
     .map((child) => closePane(child, targetPaneId))
     .filter((child): child is PaneNode => child !== null);
@@ -255,7 +347,7 @@ export function closePane(root: PaneNode, targetPaneId: string): PaneNode | null
   }
 
   // Redistribute sizes
-  const totalSize = root.sizes.reduce((a, b) => a + b, 0);
+  const totalSize = root.sizes.reduce((a: number, b: number) => a + b, 0);
   const newSizes = newChildren.map(() => totalSize / newChildren.length);
 
   return {
@@ -285,6 +377,10 @@ export function getAllTerminalPaneIds(root: PaneNode): string[] {
     return [root.id];
   }
 
+  if (root.type === "pending") {
+    return [];
+  }
+
   return root.children.flatMap(getAllTerminalPaneIds);
 }
 
@@ -294,5 +390,22 @@ export function getAllPtySessionIds(root: PaneNode): string[] {
     return [root.ptySessionId];
   }
 
+  if (root.type === "pending") {
+    return [];
+  }
+
   return root.children.flatMap(getAllPtySessionIds);
+}
+
+/** Get all pending pane IDs */
+export function getAllPendingPaneIds(root: PaneNode): string[] {
+  if (root.type === "pending") {
+    return [root.id];
+  }
+
+  if (root.type === "terminal") {
+    return [];
+  }
+
+  return root.children.flatMap(getAllPendingPaneIds);
 }
