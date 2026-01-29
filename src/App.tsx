@@ -17,6 +17,7 @@ import {
   closePane,
   getAllTerminalPaneIds,
   getAllPtySessionIds,
+  getAllPendingPaneIds,
 } from "./components/SplitPane";
 import { PanePicker } from "./components/PanePicker";
 
@@ -507,9 +508,12 @@ function App() {
       const activeTab = tabs.find((t) => t.id === activeTabId);
       if (!activeTab) return;
 
-      // Find the pane to close to get its ptySessionId
-      const allPaneIds = getAllTerminalPaneIds(activeTab.paneTree);
-      if (allPaneIds.length <= 1) {
+      // Count all leaf panes (both terminal and pending)
+      const terminalPaneIds = getAllTerminalPaneIds(activeTab.paneTree);
+      const pendingPaneIds = getAllPendingPaneIds(activeTab.paneTree);
+      const totalLeafPanes = terminalPaneIds.length + pendingPaneIds.length;
+
+      if (totalLeafPanes <= 1) {
         // Last pane - close the whole tab instead
         handleCloseTab(activeTabId!);
         return;
@@ -531,11 +535,12 @@ function App() {
         pluginManager.notifySessionDisconnect(ptyId);
       });
 
-      // Update focus if needed
-      const remainingPaneIds = getAllTerminalPaneIds(newPaneTree);
+      // Update focus if needed - prefer terminal panes over pending ones
+      const remainingTerminalIds = getAllTerminalPaneIds(newPaneTree);
+      const remainingPendingIds = getAllPendingPaneIds(newPaneTree);
       const newFocusedPaneId =
         activeTab.focusedPaneId === paneId
-          ? remainingPaneIds[0]
+          ? (remainingTerminalIds[0] || remainingPendingIds[0])
           : activeTab.focusedPaneId;
 
       setTabs(
