@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Menu, Plus, X, Minus, Square, Maximize2 } from "lucide-react";
+import { Menu, Plus, X, Minus, Square, Copy } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Tab } from "../App";
 
@@ -107,7 +107,7 @@ function FloatingTabs({
             className="w-11 h-10 flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-0/50 transition-colors"
             title={isMaximized ? "Restaurer" : "Agrandir"}
           >
-            {isMaximized ? <Square size={12} /> : <Maximize2 size={13} />}
+            {isMaximized ? <Square size={12} /> : <Copy size={13} className="rotate-90" />}
           </button>
 
           {/* Close */}
