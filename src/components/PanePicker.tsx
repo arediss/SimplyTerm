@@ -53,7 +53,7 @@ export function PanePicker({
               className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-surface-0/50 transition-colors text-left"
             >
               <div className="w-8 h-8 rounded bg-blue/20 flex items-center justify-center">
-                <Copy size={16} className="text-blue" />
+                <Copy size={16} className="text-blue rotate-90" />
               </div>
               <div>
                 <div className="text-sm text-text">Duplicate Session</div>
