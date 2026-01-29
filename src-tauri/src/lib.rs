@@ -12,7 +12,7 @@ mod plugins;
 mod session;
 mod storage;
 
-use connectors::{connect_ssh, create_local_session, ssh_exec::ssh_exec, SshAuth, SshConfig};
+use connectors::{connect_ssh, create_local_session, ssh_exec::ssh_exec, SshAuth, SshConfig, FileEntry};
 use plugins::{PluginManager, PluginState};
 use session::SessionManager;
 use storage::{
@@ -138,6 +138,76 @@ async fn ssh_exec_command(app: AppHandle, session_id: String, command: String) -
         .ok_or_else(|| "SSH session not found or not an SSH session".to_string())?;
 
     ssh_exec(&config, &command).await
+}
+
+// ============================================================================
+// SFTP Commands
+// ============================================================================
+
+#[tauri::command]
+async fn sftp_list(app: AppHandle, session_id: String, path: String) -> Result<Vec<FileEntry>, String> {
+    let state = app.state::<AppState>();
+    let config = state
+        .session_manager
+        .get_ssh_config(&session_id)
+        .ok_or_else(|| "SSH session not found".to_string())?;
+
+    connectors::sftp_list_dir(&config, &path).await
+}
+
+#[tauri::command]
+async fn sftp_read(app: AppHandle, session_id: String, path: String) -> Result<Vec<u8>, String> {
+    let state = app.state::<AppState>();
+    let config = state
+        .session_manager
+        .get_ssh_config(&session_id)
+        .ok_or_else(|| "SSH session not found".to_string())?;
+
+    connectors::sftp_read_file(&config, &path).await
+}
+
+#[tauri::command]
+async fn sftp_write(app: AppHandle, session_id: String, path: String, data: Vec<u8>) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let config = state
+        .session_manager
+        .get_ssh_config(&session_id)
+        .ok_or_else(|| "SSH session not found".to_string())?;
+
+    connectors::sftp_write_file(&config, &path, data).await
+}
+
+#[tauri::command]
+async fn sftp_remove(app: AppHandle, session_id: String, path: String, is_dir: bool) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let config = state
+        .session_manager
+        .get_ssh_config(&session_id)
+        .ok_or_else(|| "SSH session not found".to_string())?;
+
+    connectors::sftp_delete(&config, &path, is_dir).await
+}
+
+#[tauri::command]
+async fn sftp_rename(app: AppHandle, session_id: String, old_path: String, new_path: String) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let config = state
+        .session_manager
+        .get_ssh_config(&session_id)
+        .ok_or_else(|| "SSH session not found".to_string())?;
+
+    connectors::sftp_rename(&config, &old_path, &new_path).await
+}
+
+#[tauri::command]
+async fn sftp_mkdir(app: AppHandle, session_id: String, path: String) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let config = state
+        .session_manager
+        .get_ssh_config(&session_id)
+        .ok_or_else(|| "SSH session not found".to_string())?;
+
+    connectors::sftp_mkdir(&config, &path).await
 }
 
 #[tauri::command]
@@ -594,6 +664,13 @@ pub fn run() {
             close_pty_session,
             ssh_exec_command,
             get_home_dir,
+            // SFTP
+            sftp_list,
+            sftp_read,
+            sftp_write,
+            sftp_remove,
+            sftp_rename,
+            sftp_mkdir,
             // Saved sessions
             load_saved_sessions,
             save_session,

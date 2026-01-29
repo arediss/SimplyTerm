@@ -8,7 +8,9 @@
 pub mod local;
 pub mod ssh;
 pub mod ssh_exec;
+pub mod sftp;
 
 pub use local::create_local_session;
 pub use ssh::{connect_ssh, SshAuth, SshConfig};
 pub use ssh_exec::ssh_exec;
+pub use sftp::{sftp_list_dir, sftp_read_file, sftp_write_file, sftp_delete, sftp_rename, sftp_mkdir, FileEntry};

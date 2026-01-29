@@ -14,11 +14,13 @@ import {
   createTerminalNode,
   splitPaneWithPending,
   replacePendingWithTerminal,
+  replacePendingWithSftp,
   closePane,
   getAllTerminalPaneIds,
   getAllPtySessionIds,
   getAllPendingPaneIds,
 } from "./components/SplitPane";
+import { SftpBrowser } from "./components/SftpBrowser";
 import { PanePicker } from "./components/PanePicker";
 
 export interface Session {
@@ -754,6 +756,25 @@ function App() {
     [handleClosePane]
   );
 
+  // Handler for opening SFTP browser in a pending pane
+  const handlePendingSelectSftp = useCallback(
+    (pendingPaneId: string, sessionId: string) => {
+      const activeTab = tabs.find((t) => t.id === activeTabId);
+      if (!activeTab) return;
+
+      const newPaneTree = replacePendingWithSftp(activeTab.paneTree, pendingPaneId, sessionId, "/");
+
+      setTabs(
+        tabs.map((t) =>
+          t.id === activeTabId
+            ? { ...t, paneTree: newPaneTree }
+            : t
+        )
+      );
+    },
+    [tabs, activeTabId]
+  );
+
   // Keyboard shortcuts for split panes
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -860,16 +881,25 @@ function App() {
                     isActive={tab.id === activeTabId && isFocused}
                   />
                 )}
-                renderPending={(paneId) => (
-                  <PanePicker
-                    onSelectLocal={() => handlePendingSelectLocal(paneId)}
-                    onSelectDuplicate={() => handlePendingSelectDuplicate(paneId)}
-                    onSelectSaved={(session) => handlePendingSelectSaved(paneId, session)}
-                    onSelectRecent={(session) => handlePendingSelectRecent(paneId, session)}
-                    currentSessionConfig={tab.sshConfig}
-                    savedSessions={savedSessions}
-                    recentSessions={recentSessions}
-                  />
+                renderPending={(paneId) => {
+                  const ptyIds = getAllPtySessionIds(tab.paneTree);
+                  const currentPtySessionId = ptyIds[0];
+                  return (
+                    <PanePicker
+                      onSelectLocal={() => handlePendingSelectLocal(paneId)}
+                      onSelectDuplicate={() => handlePendingSelectDuplicate(paneId)}
+                      onSelectSftp={() => currentPtySessionId && handlePendingSelectSftp(paneId, currentPtySessionId)}
+                      onSelectSaved={(session) => handlePendingSelectSaved(paneId, session)}
+                      onSelectRecent={(session) => handlePendingSelectRecent(paneId, session)}
+                      currentSessionConfig={tab.sshConfig}
+                      currentSessionId={tab.type === "ssh" ? currentPtySessionId : undefined}
+                      savedSessions={savedSessions}
+                      recentSessions={recentSessions}
+                    />
+                  );
+                }}
+                renderSftp={(_paneId, sessionId, initialPath, _isFocused) => (
+                  <SftpBrowser sessionId={sessionId} initialPath={initialPath} />
                 )}
               />
             </div>
