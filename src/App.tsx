@@ -83,6 +83,9 @@ function App() {
   // Edit session state
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
 
+  // Pending SFTP session (when credentials are needed)
+  const [pendingSftpSession, setPendingSftpSession] = useState<SavedSession | null>(null);
+
   // Settings state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [appSettings, setAppSettings] = useState<AppSettings>(defaultSettings);
@@ -165,8 +168,18 @@ function App() {
 
       const needsPassword = saved.auth_type === "password" && !credentials.password;
       if (needsPassword) {
-        // For now, just show an error - in the future we could prompt for password
-        console.error("SFTP requires credentials that are not saved");
+        // Open connection form to get credentials, then open SFTP
+        setPendingSftpSession(saved);
+        setInitialConnectionConfig({
+          name: saved.name,
+          host: saved.host,
+          port: saved.port,
+          username: saved.username,
+          authType: saved.auth_type,
+          keyPath: saved.key_path,
+        });
+        setConnectionError("Entrez votre mot de passe pour ouvrir SFTP");
+        setIsConnectionModalOpen(true);
         return;
       }
 
@@ -219,6 +232,57 @@ function App() {
   const handleSshConnect = async (config: SshConnectionConfig) => {
     setIsConnecting(true);
     setConnectionError(undefined);
+
+    // Check if this is for SFTP (credentials were requested for SFTP)
+    if (pendingSftpSession) {
+      const saved = pendingSftpSession;
+      setPendingSftpSession(null);
+
+      try {
+        const sessionId = `sftp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+        let keyPath = config.keyPath;
+        if (keyPath?.startsWith("~")) {
+          const home = await invoke<string>("get_home_dir").catch(() => "");
+          if (home) {
+            keyPath = keyPath.replace("~", home);
+          }
+        }
+
+        await invoke("register_sftp_session", {
+          sessionId,
+          host: config.host,
+          port: config.port,
+          username: config.username,
+          password: config.authType === "password" ? config.password : null,
+          keyPath: config.authType === "key" ? keyPath : null,
+          keyPassphrase: config.authType === "key" ? config.keyPassphrase : null,
+        });
+
+        const newTab: Tab = {
+          id: `tab-${Date.now()}`,
+          sessionId,
+          paneTree: createTerminalNode(sessionId),
+          title: `SFTP - ${saved.name}`,
+          type: "sftp",
+          sshConfig: config,
+          focusedPaneId: null,
+        };
+
+        setTabs([...tabs, newTab]);
+        setActiveTabId(newTab.id);
+        setIsConnectionModalOpen(false);
+        setIsSidebarOpen(false);
+        setIsConnecting(false);
+        setInitialConnectionConfig(null);
+        return;
+      } catch (error) {
+        console.error("Failed to open SFTP:", error);
+        setConnectionError(`Erreur SFTP: ${error}`);
+        setIsConnecting(false);
+        return;
+      }
+    }
 
     const ptySessionId = `ssh-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -987,8 +1051,9 @@ function App() {
           setInitialConnectionConfig(null);
           setConnectionError(undefined);
           setEditingSessionId(null);
+          setPendingSftpSession(null);
         }}
-        title={editingSessionId ? "Modifier la connexion" : (initialConnectionConfig ? "Reconnexion SSH" : "Nouvelle connexion SSH")}
+        title={editingSessionId ? "Modifier la connexion" : (pendingSftpSession ? "Connexion SFTP" : (initialConnectionConfig ? "Reconnexion SSH" : "Nouvelle connexion SSH"))}
         width="md"
       >
         <ConnectionForm
@@ -998,6 +1063,7 @@ function App() {
             setInitialConnectionConfig(null);
             setConnectionError(undefined);
             setEditingSessionId(null);
+            setPendingSftpSession(null);
           }}
           isConnecting={isConnecting}
           error={connectionError}
