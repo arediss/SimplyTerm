@@ -14,7 +14,6 @@ import {
   createTerminalNode,
   splitPaneWithPending,
   replacePendingWithTerminal,
-  replacePendingWithSftp,
   closePane,
   getAllTerminalPaneIds,
   getAllPtySessionIds,
@@ -58,7 +57,7 @@ export interface Tab {
   sessionId: string;
   paneTree: PaneNode;
   title: string;
-  type: "local" | "ssh";
+  type: "local" | "ssh" | "sftp";
   sshConfig?: SshConnectionConfig;
   focusedPaneId: string | null;
 }
@@ -151,6 +150,70 @@ function App() {
     setTabs([...tabs, newTab]);
     setActiveTabId(newTab.id);
     setIsSidebarOpen(false);
+  };
+
+  // Open SFTP tab for a saved session
+  const handleOpenSftpTab = async (saved: SavedSession) => {
+    setIsSidebarOpen(false);
+
+    try {
+      // Get credentials for this saved session
+      const credentials = await invoke<{ password: string | null; key_passphrase: string | null }>(
+        "get_session_credentials",
+        { id: saved.id }
+      );
+
+      const needsPassword = saved.auth_type === "password" && !credentials.password;
+      if (needsPassword) {
+        // For now, just show an error - in the future we could prompt for password
+        console.error("SFTP requires credentials that are not saved");
+        return;
+      }
+
+      const sessionId = `sftp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      let keyPath = saved.key_path;
+      if (keyPath?.startsWith("~")) {
+        const home = await invoke<string>("get_home_dir").catch(() => "");
+        if (home) {
+          keyPath = keyPath.replace("~", home);
+        }
+      }
+
+      // Register the SSH config for SFTP use
+      await invoke("register_sftp_session", {
+        sessionId,
+        host: saved.host,
+        port: saved.port,
+        username: saved.username,
+        password: saved.auth_type === "password" ? credentials.password : null,
+        keyPath: saved.auth_type === "key" ? keyPath : null,
+        keyPassphrase: saved.auth_type === "key" ? credentials.key_passphrase : null,
+      });
+
+      // Create SFTP tab - no paneTree needed, we render SftpBrowser directly
+      const newTab: Tab = {
+        id: `tab-${Date.now()}`,
+        sessionId,
+        paneTree: createTerminalNode(sessionId), // Placeholder, not used for SFTP
+        title: `SFTP - ${saved.name}`,
+        type: "sftp",
+        sshConfig: {
+          name: saved.name,
+          host: saved.host,
+          port: saved.port,
+          username: saved.username,
+          authType: saved.auth_type,
+          keyPath: saved.key_path,
+        },
+        focusedPaneId: null,
+      };
+
+      setTabs([...tabs, newTab]);
+      setActiveTabId(newTab.id);
+    } catch (error) {
+      console.error("Failed to open SFTP tab:", error);
+    }
   };
 
   const handleSshConnect = async (config: SshConnectionConfig) => {
@@ -756,24 +819,6 @@ function App() {
     [handleClosePane]
   );
 
-  // Handler for opening SFTP browser in a pending pane
-  const handlePendingSelectSftp = useCallback(
-    (pendingPaneId: string, sessionId: string) => {
-      const activeTab = tabs.find((t) => t.id === activeTabId);
-      if (!activeTab) return;
-
-      const newPaneTree = replacePendingWithSftp(activeTab.paneTree, pendingPaneId, sessionId, "/");
-
-      setTabs(
-        tabs.map((t) =>
-          t.id === activeTabId
-            ? { ...t, paneTree: newPaneTree }
-            : t
-        )
-      );
-    },
-    [tabs, activeTabId]
-  );
 
   // Keyboard shortcuts for split panes
   useEffect(() => {
@@ -858,7 +903,7 @@ function App() {
         {tabs.length === 0 ? (
           <EmptyState onNewConnection={handleOpenConnectionModal} />
         ) : (
-          /* Render ALL terminals, hide inactive ones to preserve state */
+          /* Render ALL tabs, hide inactive ones to preserve state */
           tabs.map((tab) => (
             <div
               key={tab.id}
@@ -866,42 +911,38 @@ function App() {
                 tab.id === activeTabId ? "visible" : "invisible"
               }`}
             >
-              <SplitPane
-                node={tab.paneTree}
-                onNodeChange={handlePaneTreeChange}
-                focusedPaneId={tab.focusedPaneId}
-                onFocusPane={handleFocusPane}
-                onClosePane={handleClosePane}
-                onSplitPane={handleSplitPaneById}
-                renderTerminal={(_paneId, ptySessionId, isFocused) => (
-                  <TerminalPane
-                    key={ptySessionId}
-                    sessionId={ptySessionId}
-                    type={tab.type}
-                    isActive={tab.id === activeTabId && isFocused}
-                  />
-                )}
-                renderPending={(paneId) => {
-                  const ptyIds = getAllPtySessionIds(tab.paneTree);
-                  const currentPtySessionId = ptyIds[0];
-                  return (
+              {/* SFTP tabs render SftpBrowser directly */}
+              {tab.type === "sftp" ? (
+                <SftpBrowser sessionId={tab.sessionId} initialPath="/" />
+              ) : (
+                <SplitPane
+                  node={tab.paneTree}
+                  onNodeChange={handlePaneTreeChange}
+                  focusedPaneId={tab.focusedPaneId}
+                  onFocusPane={handleFocusPane}
+                  onClosePane={handleClosePane}
+                  onSplitPane={handleSplitPaneById}
+                  renderTerminal={(_paneId, ptySessionId, isFocused) => (
+                    <TerminalPane
+                      key={ptySessionId}
+                      sessionId={ptySessionId}
+                      type={tab.type as "local" | "ssh"}
+                      isActive={tab.id === activeTabId && isFocused}
+                    />
+                  )}
+                  renderPending={(paneId) => (
                     <PanePicker
                       onSelectLocal={() => handlePendingSelectLocal(paneId)}
                       onSelectDuplicate={() => handlePendingSelectDuplicate(paneId)}
-                      onSelectSftp={() => currentPtySessionId && handlePendingSelectSftp(paneId, currentPtySessionId)}
                       onSelectSaved={(session) => handlePendingSelectSaved(paneId, session)}
                       onSelectRecent={(session) => handlePendingSelectRecent(paneId, session)}
                       currentSessionConfig={tab.sshConfig}
-                      currentSessionId={tab.type === "ssh" ? currentPtySessionId : undefined}
                       savedSessions={savedSessions}
                       recentSessions={recentSessions}
                     />
-                  );
-                }}
-                renderSftp={(_paneId, sessionId, initialPath, _isFocused) => (
-                  <SftpBrowser sessionId={sessionId} initialPath={initialPath} />
-                )}
-              />
+                  )}
+                />
+              )}
             </div>
           ))
         )}
@@ -930,6 +971,7 @@ function App() {
         onSavedSessionConnect={handleConnectToSavedSession}
         onSavedSessionEdit={handleEditSavedSession}
         onSavedSessionDelete={handleDeleteSavedSession}
+        onSavedSessionSftp={handleOpenSftpTab}
         onRecentSessionConnect={handleConnectToRecentSession}
         onRecentSessionDelete={handleDeleteRecentSession}
         onClearRecentSessions={handleClearRecentSessions}

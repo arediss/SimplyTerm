@@ -11,6 +11,7 @@ import {
   Search,
   XCircle,
   Pencil,
+  FolderOpen,
 } from "lucide-react";
 import { Session, SavedSession, RecentSession } from "../App";
 
@@ -25,6 +26,7 @@ interface SidebarProps {
   onSavedSessionConnect: (session: SavedSession) => void;
   onSavedSessionEdit: (session: SavedSession) => void;
   onSavedSessionDelete: (sessionId: string) => void;
+  onSavedSessionSftp: (session: SavedSession) => void;
   onRecentSessionConnect: (session: RecentSession) => void;
   onRecentSessionDelete: (sessionId: string) => void;
   onClearRecentSessions: () => void;
@@ -43,6 +45,7 @@ function Sidebar({
   onSavedSessionConnect,
   onSavedSessionEdit,
   onSavedSessionDelete,
+  onSavedSessionSftp,
   onRecentSessionConnect,
   onRecentSessionDelete,
   onClearRecentSessions,
@@ -190,6 +193,7 @@ function Sidebar({
                   onClick={() => onSavedSessionConnect(session)}
                   onEdit={() => onSavedSessionEdit(session)}
                   onDelete={() => onSavedSessionDelete(session.id)}
+                  onSftp={() => onSavedSessionSftp(session)}
                 />
               ))
             )}
@@ -296,6 +300,7 @@ interface SavedSessionItemProps {
   onClick: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onSftp: () => void;
 }
 
 function SavedSessionItem({
@@ -303,6 +308,7 @@ function SavedSessionItem({
   onClick,
   onEdit,
   onDelete,
+  onSftp,
 }: SavedSessionItemProps) {
   const handleEdit = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -314,6 +320,12 @@ function SavedSessionItem({
     e.stopPropagation();
     e.preventDefault();
     onDelete();
+  };
+
+  const handleSftp = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onSftp();
   };
 
   return (
@@ -333,6 +345,13 @@ function SavedSessionItem({
         </div>
       </div>
       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+        <button
+          onClick={handleSftp}
+          className="p-1.5 rounded-md hover:bg-blue/20 text-text-muted hover:text-blue transition-all"
+          title="Ouvrir SFTP"
+        >
+          <FolderOpen size={14} />
+        </button>
         <button
           onClick={handleEdit}
           className="p-1.5 rounded-md hover:bg-accent/20 text-text-muted hover:text-accent transition-all"

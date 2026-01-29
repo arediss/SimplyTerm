@@ -210,6 +210,43 @@ async fn sftp_mkdir(app: AppHandle, session_id: String, path: String) -> Result<
     connectors::sftp_mkdir(&config, &path).await
 }
 
+/// Register SSH config for SFTP-only use (no terminal session)
+#[tauri::command]
+async fn register_sftp_session(
+    app: AppHandle,
+    session_id: String,
+    host: String,
+    port: u16,
+    username: String,
+    password: Option<String>,
+    key_path: Option<String>,
+    key_passphrase: Option<String>,
+) -> Result<(), String> {
+    let state = app.state::<AppState>();
+
+    let auth = if let Some(key) = key_path {
+        SshAuth::KeyFile {
+            path: key,
+            passphrase: key_passphrase,
+        }
+    } else if let Some(pass) = password {
+        SshAuth::Password(pass)
+    } else {
+        return Err("No authentication method provided".to_string());
+    };
+
+    let config = SshConfig {
+        host,
+        port,
+        username,
+        auth,
+    };
+
+    // Just store the config, don't create a session
+    state.session_manager.store_ssh_config(session_id, config);
+    Ok(())
+}
+
 #[tauri::command]
 fn get_home_dir() -> Result<String, String> {
     std::env::var("HOME")
@@ -665,6 +702,7 @@ pub fn run() {
             ssh_exec_command,
             get_home_dir,
             // SFTP
+            register_sftp_session,
             sftp_list,
             sftp_read,
             sftp_write,

@@ -1,15 +1,13 @@
-import { Terminal, Server, Clock, Copy, FolderOpen } from "lucide-react";
+import { Terminal, Server, Clock, Copy } from "lucide-react";
 import type { SshConnectionConfig } from "./ConnectionForm";
 import type { SavedSession, RecentSession } from "../App";
 
 interface PanePickerProps {
   onSelectLocal: () => void;
   onSelectDuplicate: () => void;
-  onSelectSftp: () => void;
   onSelectSaved: (session: SavedSession) => void;
   onSelectRecent: (session: RecentSession) => void;
   currentSessionConfig?: SshConnectionConfig;
-  currentSessionId?: string;
   savedSessions: SavedSession[];
   recentSessions: RecentSession[];
 }
@@ -17,11 +15,9 @@ interface PanePickerProps {
 export function PanePicker({
   onSelectLocal,
   onSelectDuplicate,
-  onSelectSftp,
   onSelectSaved,
   onSelectRecent,
   currentSessionConfig,
-  currentSessionId,
   savedSessions,
   recentSessions,
 }: PanePickerProps) {
@@ -63,24 +59,6 @@ export function PanePicker({
                 <div className="text-sm text-text">Duplicate Session</div>
                 <div className="text-xs text-subtext-0 truncate max-w-[200px]">
                   {currentSessionConfig.username}@{currentSessionConfig.host}
-                </div>
-              </div>
-            </button>
-          )}
-
-          {/* SFTP Browser - only for SSH sessions */}
-          {currentSessionId && currentSessionConfig && (
-            <button
-              onClick={onSelectSftp}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-surface-0/50 transition-colors text-left"
-            >
-              <div className="w-8 h-8 rounded bg-teal/20 flex items-center justify-center">
-                <FolderOpen size={16} className="text-teal" />
-              </div>
-              <div>
-                <div className="text-sm text-text">SFTP Browser</div>
-                <div className="text-xs text-subtext-0 truncate max-w-[200px]">
-                  Browse files on {currentSessionConfig.host}
                 </div>
               </div>
             </button>

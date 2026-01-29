@@ -8,7 +8,6 @@ import { Columns2, Rows2, X } from "lucide-react";
 export type PaneNode =
   | { type: "terminal"; id: string; ptySessionId: string }
   | { type: "pending"; id: string }
-  | { type: "sftp"; id: string; sessionId: string; initialPath: string }
   | { type: "split"; id: string; direction: "horizontal" | "vertical"; children: PaneNode[]; sizes: number[] };
 
 export interface SplitPaneProps {
@@ -16,7 +15,6 @@ export interface SplitPaneProps {
   onNodeChange: (node: PaneNode) => void;
   renderTerminal: (paneId: string, ptySessionId: string, isFocused: boolean) => React.ReactNode;
   renderPending?: (paneId: string) => React.ReactNode;
-  renderSftp?: (paneId: string, sessionId: string, initialPath: string, isFocused: boolean) => React.ReactNode;
   focusedPaneId: string | null;
   onFocusPane: (paneId: string) => void;
   onClosePane: (paneId: string) => void;
@@ -140,7 +138,6 @@ export function SplitPane({
   onNodeChange,
   renderTerminal,
   renderPending,
-  renderSftp,
   focusedPaneId,
   onFocusPane,
   onClosePane,
@@ -183,29 +180,6 @@ export function SplitPane({
         onClick={() => onFocusPane(node.id)}
       >
         {renderPending ? renderPending(node.id) : <div className="w-full h-full bg-base" />}
-        {onSplitPane && (
-          <PaneToolbar
-            paneId={node.id}
-            onSplitHorizontal={() => onSplitPane(node.id, "horizontal")}
-            onSplitVertical={() => onSplitPane(node.id, "vertical")}
-            onClose={() => onClosePane(node.id)}
-          />
-        )}
-      </div>
-    );
-  }
-
-  // SFTP node - render the file browser
-  if (node.type === "sftp") {
-    return (
-      <div
-        className={`
-          w-full h-full relative group
-          ${isFocused ? "ring-1 ring-blue/50 ring-inset" : ""}
-        `}
-        onClick={() => onFocusPane(node.id)}
-      >
-        {renderSftp ? renderSftp(node.id, node.sessionId, node.initialPath, isFocused) : <div className="w-full h-full bg-base" />}
         {onSplitPane && (
           <PaneToolbar
             paneId={node.id}
@@ -282,7 +256,6 @@ export function SplitPane({
               onNodeChange={(newChild) => handleChildChange(index, newChild)}
               renderTerminal={renderTerminal}
               renderPending={renderPending}
-              renderSftp={renderSftp}
               focusedPaneId={focusedPaneId}
               onFocusPane={onFocusPane}
               onClosePane={onClosePane}
@@ -365,8 +338,8 @@ export function splitPaneWithPending(
   const pendingNode = createPendingNode();
 
   function doSplit(node: PaneNode): PaneNode {
-    // If this is the target pane (terminal, pending, or sftp), split it
-    if ((node.type === "terminal" || node.type === "pending" || node.type === "sftp") && node.id === targetPaneId) {
+    // If this is the target pane (terminal or pending), split it
+    if ((node.type === "terminal" || node.type === "pending") && node.id === targetPaneId) {
       return {
         type: "split",
         id: generatePaneId(),
@@ -416,44 +389,6 @@ export function replacePendingWithTerminal(
   return root;
 }
 
-/** Create an SFTP browser node */
-export function createSftpNode(sessionId: string, initialPath: string = "/"): PaneNode {
-  return {
-    type: "sftp",
-    id: generatePaneId(),
-    sessionId,
-    initialPath,
-  };
-}
-
-/** Replace a pending pane with an SFTP browser */
-export function replacePendingWithSftp(
-  root: PaneNode,
-  pendingPaneId: string,
-  sessionId: string,
-  initialPath: string = "/"
-): PaneNode {
-  // If this is the target pending pane, convert to SFTP
-  if (root.type === "pending" && root.id === pendingPaneId) {
-    return {
-      type: "sftp",
-      id: root.id,
-      sessionId,
-      initialPath,
-    };
-  }
-
-  // If this is a split, recurse into children
-  if (root.type === "split") {
-    return {
-      ...root,
-      children: root.children.map((child) => replacePendingWithSftp(child, pendingPaneId, sessionId, initialPath)),
-    };
-  }
-
-  return root;
-}
-
 /** Close a pane and clean up the tree */
 export function closePane(root: PaneNode, targetPaneId: string): PaneNode | null {
   // Handle terminal pane
@@ -463,11 +398,6 @@ export function closePane(root: PaneNode, targetPaneId: string): PaneNode | null
 
   // Handle pending pane
   if (root.type === "pending") {
-    return root.id === targetPaneId ? null : root;
-  }
-
-  // Handle SFTP pane
-  if (root.type === "sftp") {
     return root.id === targetPaneId ? null : root;
   }
 
@@ -517,7 +447,7 @@ export function getAllTerminalPaneIds(root: PaneNode): string[] {
     return [root.id];
   }
 
-  if (root.type === "pending" || root.type === "sftp") {
+  if (root.type === "pending") {
     return [];
   }
 
@@ -530,24 +460,11 @@ export function getAllPtySessionIds(root: PaneNode): string[] {
     return [root.ptySessionId];
   }
 
-  if (root.type === "pending" || root.type === "sftp") {
+  if (root.type === "pending") {
     return [];
   }
 
   return root.children.flatMap(getAllPtySessionIds);
-}
-
-/** Get all SFTP pane IDs */
-export function getAllSftpPaneIds(root: PaneNode): string[] {
-  if (root.type === "sftp") {
-    return [root.id];
-  }
-
-  if (root.type === "terminal" || root.type === "pending") {
-    return [];
-  }
-
-  return root.children.flatMap(getAllSftpPaneIds);
 }
 
 /** Get all pending pane IDs */
@@ -556,7 +473,7 @@ export function getAllPendingPaneIds(root: PaneNode): string[] {
     return [root.id];
   }
 
-  if (root.type === "terminal" || root.type === "sftp") {
+  if (root.type === "terminal") {
     return [];
   }
 
