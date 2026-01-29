@@ -8,6 +8,15 @@ import ConnectionForm, { SshConnectionConfig } from "./components/ConnectionForm
 import SettingsModal, { AppSettings, defaultSettings } from "./components/SettingsModal";
 import DebugStats from "./components/DebugStats";
 import { PluginHost, pluginManager, type SessionInfo, type ModalConfig, type NotificationType } from "./plugins";
+import {
+  SplitPane,
+  type PaneNode,
+  createTerminalNode,
+  splitPane,
+  closePane,
+  getAllTerminalPaneIds,
+  getAllPtySessionIds,
+} from "./components/SplitPane";
 
 export interface Session {
   id: string;
@@ -42,10 +51,11 @@ export interface RecentSession {
 export interface Tab {
   id: string;
   sessionId: string;
-  ptySessionId: string;
+  paneTree: PaneNode;
   title: string;
   type: "local" | "ssh";
   sshConfig?: SshConnectionConfig;
+  focusedPaneId: string | null;
 }
 
 function App() {
@@ -124,12 +134,14 @@ function App() {
 
   const handleNewLocalTab = () => {
     const ptySessionId = `pty-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const paneTree = createTerminalNode(ptySessionId);
     const newTab: Tab = {
       id: `tab-${Date.now()}`,
       sessionId: "local",
-      ptySessionId,
+      paneTree,
       title: "Terminal",
       type: "local",
+      focusedPaneId: paneTree.id,
     };
     setTabs([...tabs, newTab]);
     setActiveTabId(newTab.id);
@@ -161,13 +173,15 @@ function App() {
         keyPassphrase: config.keyPassphrase,
       });
 
+      const paneTree = createTerminalNode(ptySessionId);
       const newTab: Tab = {
         id: `tab-${Date.now()}`,
         sessionId: `ssh-${config.host}`,
-        ptySessionId,
+        paneTree,
         title: config.name,
         type: "ssh",
         sshConfig: config,
+        focusedPaneId: paneTree.id,
       };
 
       setTabs([...tabs, newTab]);
@@ -330,10 +344,11 @@ function App() {
         keyPassphrase: saved.auth_type === "key" ? credentials.key_passphrase : null,
       });
 
+      const paneTree = createTerminalNode(ptySessionId);
       const newTab: Tab = {
         id: `tab-${Date.now()}`,
         sessionId: `ssh-${saved.host}`,
-        ptySessionId,
+        paneTree,
         title: saved.name,
         type: "ssh",
         sshConfig: {
@@ -344,6 +359,7 @@ function App() {
           authType: saved.auth_type,
           keyPath: saved.key_path,
         },
+        focusedPaneId: paneTree.id,
       };
 
       setTabs(prevTabs => [...prevTabs, newTab]);
@@ -423,11 +439,12 @@ function App() {
   const handleCloseTab = (tabId: string) => {
     const tabToClose = tabs.find((t) => t.id === tabId);
     if (tabToClose) {
-      invoke("close_pty_session", { sessionId: tabToClose.ptySessionId }).catch(
-        console.error
-      );
-      // Notify plugins of session disconnect (use ptySessionId to match connect)
-      pluginManager.notifySessionDisconnect(tabToClose.ptySessionId);
+      // Close all PTY sessions in the pane tree
+      const ptySessionIds = getAllPtySessionIds(tabToClose.paneTree);
+      ptySessionIds.forEach((ptySessionId) => {
+        invoke("close_pty_session", { sessionId: ptySessionId }).catch(console.error);
+        pluginManager.notifySessionDisconnect(ptySessionId);
+      });
     }
     const newTabs = tabs.filter((t) => t.id !== tabId);
     setTabs(newTabs);
@@ -435,6 +452,122 @@ function App() {
       setActiveTabId(newTabs.length > 0 ? newTabs[newTabs.length - 1].id : null);
     }
   };
+
+  // Split pane handlers
+  const handleSplitPane = useCallback(
+    (direction: "horizontal" | "vertical") => {
+      const activeTab = tabs.find((t) => t.id === activeTabId);
+      if (!activeTab || !activeTab.focusedPaneId) return;
+
+      const newPtySessionId = `pty-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const newPaneTree = splitPane(activeTab.paneTree, activeTab.focusedPaneId, direction, newPtySessionId);
+
+      setTabs(
+        tabs.map((t) =>
+          t.id === activeTabId
+            ? { ...t, paneTree: newPaneTree }
+            : t
+        )
+      );
+    },
+    [tabs, activeTabId]
+  );
+
+  const handleClosePane = useCallback(
+    (paneId: string) => {
+      const activeTab = tabs.find((t) => t.id === activeTabId);
+      if (!activeTab) return;
+
+      // Find the pane to close to get its ptySessionId
+      const allPaneIds = getAllTerminalPaneIds(activeTab.paneTree);
+      if (allPaneIds.length <= 1) {
+        // Last pane - close the whole tab instead
+        handleCloseTab(activeTabId!);
+        return;
+      }
+
+      const newPaneTree = closePane(activeTab.paneTree, paneId);
+      if (!newPaneTree) {
+        handleCloseTab(activeTabId!);
+        return;
+      }
+
+      // Close the PTY session for this pane
+      // We need to find which pty was removed
+      const oldPtyIds = getAllPtySessionIds(activeTab.paneTree);
+      const newPtyIds = getAllPtySessionIds(newPaneTree);
+      const removedPtyIds = oldPtyIds.filter((id) => !newPtyIds.includes(id));
+      removedPtyIds.forEach((ptyId) => {
+        invoke("close_pty_session", { sessionId: ptyId }).catch(console.error);
+        pluginManager.notifySessionDisconnect(ptyId);
+      });
+
+      // Update focus if needed
+      const remainingPaneIds = getAllTerminalPaneIds(newPaneTree);
+      const newFocusedPaneId =
+        activeTab.focusedPaneId === paneId
+          ? remainingPaneIds[0]
+          : activeTab.focusedPaneId;
+
+      setTabs(
+        tabs.map((t) =>
+          t.id === activeTabId
+            ? { ...t, paneTree: newPaneTree, focusedPaneId: newFocusedPaneId }
+            : t
+        )
+      );
+    },
+    [tabs, activeTabId, handleCloseTab]
+  );
+
+  const handleFocusPane = useCallback(
+    (paneId: string) => {
+      setTabs(
+        tabs.map((t) =>
+          t.id === activeTabId ? { ...t, focusedPaneId: paneId } : t
+        )
+      );
+    },
+    [tabs, activeTabId]
+  );
+
+  const handlePaneTreeChange = useCallback(
+    (newTree: PaneNode) => {
+      setTabs(
+        tabs.map((t) =>
+          t.id === activeTabId ? { ...t, paneTree: newTree } : t
+        )
+      );
+    },
+    [tabs, activeTabId]
+  );
+
+  // Keyboard shortcuts for split panes
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+Shift+D: Split vertical
+      if (e.ctrlKey && e.shiftKey && e.key === "D") {
+        e.preventDefault();
+        handleSplitPane("vertical");
+      }
+      // Ctrl+Shift+E: Split horizontal
+      if (e.ctrlKey && e.shiftKey && e.key === "E") {
+        e.preventDefault();
+        handleSplitPane("horizontal");
+      }
+      // Ctrl+Shift+W: Close current pane
+      if (e.ctrlKey && e.shiftKey && e.key === "W") {
+        e.preventDefault();
+        const activeTab = tabs.find((t) => t.id === activeTabId);
+        if (activeTab?.focusedPaneId) {
+          handleClosePane(activeTab.focusedPaneId);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleSplitPane, handleClosePane, tabs, activeTabId]);
 
   const handleOpenConnectionModal = () => {
     setConnectionError(undefined);
@@ -459,20 +592,24 @@ function App() {
   }, []);
 
   const getSessions = useCallback((): SessionInfo[] => {
-    return tabs.map(tab => ({
-      id: tab.ptySessionId,
-      type: tab.type === "local" ? "local" : "ssh",
-      host: tab.sshConfig?.host,
-      port: tab.sshConfig?.port,
-      username: tab.sshConfig?.username,
-      status: "connected" as const,
-    }));
+    return tabs.map(tab => {
+      const ptyIds = getAllPtySessionIds(tab.paneTree);
+      return {
+        id: ptyIds[0] || tab.sessionId,
+        type: tab.type === "local" ? "local" : "ssh",
+        host: tab.sshConfig?.host,
+        port: tab.sshConfig?.port,
+        username: tab.sshConfig?.username,
+        status: "connected" as const,
+      };
+    });
   }, [tabs]);
 
   const getActiveSessionInfo = useCallback((): SessionInfo | null => {
     if (!activeTab) return null;
+    const ptyIds = getAllPtySessionIds(activeTab.paneTree);
     return {
-      id: activeTab.ptySessionId,
+      id: ptyIds[0] || activeTab.sessionId,
       type: activeTab.type === "local" ? "local" : "ssh",
       host: activeTab.sshConfig?.host,
       port: activeTab.sshConfig?.port,
@@ -491,15 +628,25 @@ function App() {
           /* Render ALL terminals, hide inactive ones to preserve state */
           tabs.map((tab) => (
             <div
-              key={tab.ptySessionId}
+              key={tab.id}
               className={`absolute inset-0 ${
                 tab.id === activeTabId ? "visible" : "invisible"
               }`}
             >
-              <TerminalPane
-                sessionId={tab.ptySessionId}
-                type={tab.type}
-                isActive={tab.id === activeTabId}
+              <SplitPane
+                node={tab.paneTree}
+                onNodeChange={handlePaneTreeChange}
+                focusedPaneId={tab.focusedPaneId}
+                onFocusPane={handleFocusPane}
+                onClosePane={handleClosePane}
+                renderTerminal={(_paneId, ptySessionId, isFocused) => (
+                  <TerminalPane
+                    key={ptySessionId}
+                    sessionId={ptySessionId}
+                    type={tab.type}
+                    isActive={tab.id === activeTabId && isFocused}
+                  />
+                )}
               />
             </div>
           ))
