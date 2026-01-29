@@ -96,10 +96,31 @@ function App() {
     }
   }, []);
 
+  // Load app settings on startup
+  const loadAppSettings = useCallback(async () => {
+    try {
+      const settings = await invoke<AppSettings>("load_settings");
+      setAppSettings(settings);
+    } catch (error) {
+      console.error("Failed to load settings:", error);
+    }
+  }, []);
+
+  // Save settings when changed
+  const handleSettingsChange = useCallback(async (newSettings: AppSettings) => {
+    setAppSettings(newSettings);
+    try {
+      await invoke("save_settings", { settings: newSettings });
+    } catch (error) {
+      console.error("Failed to save settings:", error);
+    }
+  }, []);
+
   useEffect(() => {
     loadSavedSessions();
     loadRecentSessions();
-  }, [loadSavedSessions, loadRecentSessions]);
+    loadAppSettings();
+  }, [loadSavedSessions, loadRecentSessions, loadAppSettings]);
 
   const handleNewLocalTab = () => {
     const ptySessionId = `pty-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -593,7 +614,7 @@ function App() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         settings={appSettings}
-        onSettingsChange={setAppSettings}
+        onSettingsChange={handleSettingsChange}
         savedSessionsCount={savedSessions.length}
         onClearAllSessions={handleClearAllSavedSessions}
       />

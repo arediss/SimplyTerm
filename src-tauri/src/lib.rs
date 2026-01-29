@@ -19,6 +19,7 @@ use storage::{
     load_sessions, save_sessions, SavedSession, AuthType,
     store_credential, get_credential, delete_credential, CredentialType,
     load_recent_sessions, add_recent_session, remove_recent_session, clear_recent_sessions, RecentSession,
+    load_settings as load_app_settings, save_settings as save_app_settings, AppSettings,
 };
 
 /// État global de l'application
@@ -353,6 +354,20 @@ fn clear_recent() -> Result<(), String> {
 }
 
 // ============================================================================
+// Settings Commands
+// ============================================================================
+
+#[tauri::command]
+fn load_settings() -> Result<AppSettings, String> {
+    load_app_settings()
+}
+
+#[tauri::command]
+fn save_settings(settings: AppSettings) -> Result<(), String> {
+    save_app_settings(&settings)
+}
+
+// ============================================================================
 // Commandes Plugins
 // ============================================================================
 
@@ -589,6 +604,9 @@ pub fn run() {
             add_to_recent,
             remove_from_recent,
             clear_recent,
+            // Settings
+            load_settings,
+            save_settings,
             // Plugins
             list_plugins,
             get_plugin_manifest,
