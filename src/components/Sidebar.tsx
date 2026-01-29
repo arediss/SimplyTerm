@@ -334,19 +334,21 @@ function Sidebar({
                   />
                 ))}
 
-                {/* Render root level sessions (no folder) */}
-                {(sessionsByFolder.get(null) || []).map((session) => (
-                  <SavedSessionItem
-                    key={session.id}
-                    session={session}
-                    onClick={() => onSavedSessionConnect(session)}
-                    onEdit={() => onSavedSessionEdit(session)}
-                    onDelete={() => onSavedSessionDelete(session.id)}
-                    onSftp={() => onSavedSessionSftp(session)}
-                    folders={folders}
-                    onMoveToFolder={(folderId) => _onMoveSessionToFolder(session.id, folderId)}
-                  />
-                ))}
+                {/* Render root level sessions (no folder) - also drop zone */}
+                <RootDropZone onDrop={(sessionId) => _onMoveSessionToFolder(sessionId, null)}>
+                  {(sessionsByFolder.get(null) || []).map((session) => (
+                    <SavedSessionItem
+                      key={session.id}
+                      session={session}
+                      onClick={() => onSavedSessionConnect(session)}
+                      onEdit={() => onSavedSessionEdit(session)}
+                      onDelete={() => onSavedSessionDelete(session.id)}
+                      onSftp={() => onSavedSessionSftp(session)}
+                      folders={folders}
+                      onMoveToFolder={(folderId) => _onMoveSessionToFolder(session.id, folderId)}
+                    />
+                  ))}
+                </RootDropZone>
               </>
             )}
           </div>
@@ -466,130 +468,147 @@ function SavedSessionItem({
   folders = [],
   onMoveToFolder,
 }: SavedSessionItemProps) {
-  const [showFolderMenu, setShowFolderMenu] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [showFolderSubmenu, setShowFolderSubmenu] = useState(false);
 
-  const handleEdit = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    onEdit();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+    setShowFolderSubmenu(false);
   };
 
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    onDelete();
+  const closeContextMenu = () => {
+    setContextMenu(null);
+    setShowFolderSubmenu(false);
   };
 
-  const handleSftp = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    onSftp();
-  };
-
-  const handleFolderClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    setShowFolderMenu(!showFolderMenu);
+  const handleAction = (action: () => void) => {
+    action();
+    closeContextMenu();
   };
 
   const handleMoveToFolder = (folderId: string | null) => {
     if (onMoveToFolder) {
       onMoveToFolder(folderId);
     }
-    setShowFolderMenu(false);
+    closeContextMenu();
   };
 
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData("sessionId", session.id);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  // Close context menu on outside click
+  useEffect(() => {
+    if (contextMenu) {
+      const handleClick = () => closeContextMenu();
+      document.addEventListener("click", handleClick);
+      return () => document.removeEventListener("click", handleClick);
+    }
+  }, [contextMenu]);
+
   return (
-    <div
-      onClick={onClick}
-      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors text-left group cursor-pointer"
-    >
-      <span style={{ color: session.color || undefined }} className={session.color ? "" : "text-accent"}>
-        <Monitor size={16} />
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-text truncate">
+    <>
+      <div
+        onClick={onClick}
+        onContextMenu={handleContextMenu}
+        draggable
+        onDragStart={handleDragStart}
+        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors text-left cursor-pointer"
+      >
+        <span style={{ color: session.color || undefined }} className={session.color ? "" : "text-accent"}>
+          <Monitor size={16} />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium text-text truncate">
             {session.name}
-          </span>
-          {session.tags && session.tags.length > 0 && (
-            <div className="flex gap-1">
-              {session.tags.slice(0, 2).map((tag, i) => (
-                <span
-                  key={i}
-                  className="px-1.5 py-0.5 text-[9px] rounded bg-surface-0/50 text-text-muted"
-                >
-                  {tag}
-                </span>
-              ))}
-              {session.tags.length > 2 && (
-                <span className="text-[9px] text-text-muted">+{session.tags.length - 2}</span>
+          </div>
+          <div className="text-[11px] text-text-muted truncate">
+            {session.username}@{session.host}:{session.port}
+          </div>
+        </div>
+      </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          className="fixed z-[100] min-w-[160px] bg-crust border border-surface-0/50 rounded-lg shadow-xl py-1"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => handleAction(onClick)}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-text hover:bg-surface-0/50 transition-colors"
+          >
+            <Terminal size={12} />
+            <span>Connecter</span>
+          </button>
+          <button
+            onClick={() => handleAction(onSftp)}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-text hover:bg-surface-0/50 transition-colors"
+          >
+            <FolderOpen size={12} />
+            <span>Ouvrir SFTP</span>
+          </button>
+          <div className="h-px bg-surface-0/30 my-1" />
+          {folders.length > 0 && onMoveToFolder && (
+            <div
+              className="relative"
+              onMouseEnter={() => setShowFolderSubmenu(true)}
+              onMouseLeave={() => setShowFolderSubmenu(false)}
+            >
+              <button className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-xs text-text hover:bg-surface-0/50 transition-colors">
+                <div className="flex items-center gap-2">
+                  <FolderInput size={12} />
+                  <span>Déplacer vers</span>
+                </div>
+                <ChevronRight size={12} />
+              </button>
+              {showFolderSubmenu && (
+                <div className="absolute left-full top-0 ml-1 min-w-[140px] bg-crust border border-surface-0/50 rounded-lg shadow-xl py-1">
+                  {session.folder_id && (
+                    <button
+                      onClick={() => handleMoveToFolder(null)}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-text hover:bg-surface-0/50 transition-colors"
+                    >
+                      <Home size={12} />
+                      <span>Racine</span>
+                    </button>
+                  )}
+                  {folders.filter(f => f.id !== session.folder_id).map((folder) => (
+                    <button
+                      key={folder.id}
+                      onClick={() => handleMoveToFolder(folder.id)}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-text hover:bg-surface-0/50 transition-colors"
+                    >
+                      <Folder size={12} style={{ color: folder.color || undefined }} />
+                      <span className="truncate">{folder.name}</span>
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
           )}
+          <button
+            onClick={() => handleAction(onEdit)}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-text hover:bg-surface-0/50 transition-colors"
+          >
+            <Pencil size={12} />
+            <span>Modifier</span>
+          </button>
+          <div className="h-px bg-surface-0/30 my-1" />
+          <button
+            onClick={() => handleAction(onDelete)}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-error hover:bg-error/10 transition-colors"
+          >
+            <Trash2 size={12} />
+            <span>Supprimer</span>
+          </button>
         </div>
-        <div className="text-[11px] text-text-muted truncate">
-          {session.username}@{session.host}:{session.port}
-        </div>
-      </div>
-      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all relative">
-        <button
-          onClick={handleSftp}
-          className="p-1.5 rounded-md hover:bg-blue/20 text-text-muted hover:text-blue transition-all"
-          title="Ouvrir SFTP"
-        >
-          <FolderOpen size={14} />
-        </button>
-        {folders.length > 0 && onMoveToFolder && (
-          <div className="relative">
-            <button
-              onClick={handleFolderClick}
-              className={`p-1.5 rounded-md hover:bg-mauve/20 text-text-muted hover:text-mauve transition-all ${showFolderMenu ? 'bg-mauve/20 text-mauve' : ''}`}
-              title="Déplacer vers dossier"
-            >
-              <FolderInput size={14} />
-            </button>
-            {showFolderMenu && (
-              <div className="absolute right-0 top-full mt-1 z-50 min-w-[150px] bg-crust border border-surface-0/50 rounded-lg shadow-xl py-1">
-                {session.folder_id && (
-                  <button
-                    onClick={() => handleMoveToFolder(null)}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-text hover:bg-surface-0/50 transition-colors"
-                  >
-                    <Home size={12} />
-                    <span>Racine</span>
-                  </button>
-                )}
-                {folders.filter(f => f.id !== session.folder_id).map((folder) => (
-                  <button
-                    key={folder.id}
-                    onClick={() => handleMoveToFolder(folder.id)}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-text hover:bg-surface-0/50 transition-colors"
-                  >
-                    <Folder size={12} style={{ color: folder.color || undefined }} />
-                    <span className="truncate">{folder.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-        <button
-          onClick={handleEdit}
-          className="p-1.5 rounded-md hover:bg-accent/20 text-text-muted hover:text-accent transition-all"
-          title="Modifier"
-        >
-          <Pencil size={14} />
-        </button>
-        <button
-          onClick={handleDelete}
-          className="p-1.5 rounded-md hover:bg-error/20 text-text-muted hover:text-error transition-all"
-          title="Supprimer"
-        >
-          <Trash2 size={14} />
-        </button>
-      </div>
-    </div>
+      )}
+    </>
   );
 }
 
@@ -620,18 +639,55 @@ function FolderItem({
   allFolders,
   onMoveSessionToFolder,
 }: FolderItemProps) {
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+
+  const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    onDelete();
+    e.stopPropagation();
+    setIsDragOver(true);
   };
+
+  const handleDragLeave = () => {
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    const sessionId = e.dataTransfer.getData("sessionId");
+    if (sessionId) {
+      onMoveSessionToFolder(sessionId, folder.id);
+    }
+  };
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  };
+
+  useEffect(() => {
+    if (contextMenu) {
+      const handleClick = () => setContextMenu(null);
+      document.addEventListener("click", handleClick);
+      return () => document.removeEventListener("click", handleClick);
+    }
+  }, [contextMenu]);
 
   return (
     <div>
       {/* Folder header */}
       <div
         onClick={onToggle}
-        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors cursor-pointer group"
+        onContextMenu={handleContextMenu}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors cursor-pointer ${
+          isDragOver ? "bg-accent/20 ring-1 ring-accent/50" : ""
+        }`}
       >
         <span className="text-text-muted">
           {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -645,14 +701,24 @@ function FolderItem({
         <span className="text-[10px] text-text-muted">
           {sessions.length}
         </span>
-        <button
-          onClick={handleDelete}
-          className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-error/20 text-text-muted hover:text-error transition-all"
-          title="Supprimer le dossier"
-        >
-          <Trash2 size={12} />
-        </button>
       </div>
+
+      {/* Folder context menu */}
+      {contextMenu && (
+        <div
+          className="fixed z-[100] min-w-[140px] bg-crust border border-surface-0/50 rounded-lg shadow-xl py-1"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => { onDelete(); setContextMenu(null); }}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-error hover:bg-error/10 transition-colors"
+          >
+            <Trash2 size={12} />
+            <span>Supprimer le dossier</span>
+          </button>
+        </div>
+      )}
 
       {/* Folder contents */}
       {isExpanded && sessions.length > 0 && (
@@ -671,6 +737,44 @@ function FolderItem({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+interface RootDropZoneProps {
+  children: React.ReactNode;
+  onDrop: (sessionId: string) => void;
+}
+
+function RootDropZone({ children, onDrop }: RootDropZoneProps) {
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const sessionId = e.dataTransfer.getData("sessionId");
+    if (sessionId) {
+      onDrop(sessionId);
+    }
+  };
+
+  return (
+    <div
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={`min-h-[20px] rounded transition-colors ${isDragOver ? "bg-accent/10" : ""}`}
+    >
+      {children}
     </div>
   );
 }
