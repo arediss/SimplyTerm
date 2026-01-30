@@ -1465,9 +1465,6 @@ function App() {
         </div>
       )}
 
-      {/* Debug Stats - only in dev */}
-      {import.meta.env.DEV && <DebugStats />}
-
       {/* Vault Setup Modal */}
       <VaultSetupModal
         isOpen={showVaultSetup}

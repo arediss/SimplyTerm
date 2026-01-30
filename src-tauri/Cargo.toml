@@ -52,9 +52,6 @@ sha2 = "0.10"
 # FIDO2 security keys
 ctap-hid-fido2 = "3.5"
 
-# System info (debug)
-sysinfo = "0.32"
-
 # External file editing
 notify = "6"
 open = "5"

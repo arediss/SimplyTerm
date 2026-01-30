@@ -866,57 +866,6 @@ fn plugin_invoke(
 }
 
 // ============================================================================
-// Debug: System Stats
-// ============================================================================
-
-use sysinfo::{System, Pid, ProcessRefreshKind};
-
-#[derive(serde::Serialize)]
-struct ProcessStats {
-    memory_mb: f64,
-    cpu_percent: f32,
-}
-
-#[tauri::command]
-fn get_process_stats() -> ProcessStats {
-    let mut sys = System::new();
-    let pid = Pid::from_u32(std::process::id());
-
-    let refresh_kind = ProcessRefreshKind::new()
-        .with_cpu()
-        .with_memory();
-
-    // Refresh CPU info first
-    sys.refresh_processes_specifics(
-        sysinfo::ProcessesToUpdate::Some(&[pid]),
-        true,
-        refresh_kind,
-    );
-
-    // Small delay for CPU measurement accuracy
-    std::thread::sleep(std::time::Duration::from_millis(100));
-
-    // Refresh again to get CPU usage
-    sys.refresh_processes_specifics(
-        sysinfo::ProcessesToUpdate::Some(&[pid]),
-        true,
-        refresh_kind,
-    );
-
-    if let Some(process) = sys.process(pid) {
-        ProcessStats {
-            memory_mb: process.memory() as f64 / 1024.0 / 1024.0,
-            cpu_percent: process.cpu_usage(),
-        }
-    } else {
-        ProcessStats {
-            memory_mb: 0.0,
-            cpu_percent: 0.0,
-        }
-    }
-}
-
-// ============================================================================
 // Point d'entrée
 // ============================================================================
 
@@ -994,8 +943,6 @@ pub fn run() {
             plugin_storage_set,
             plugin_storage_delete,
             plugin_invoke,
-            // Debug
-            get_process_stats,
             // Vault
             storage::vault::get_vault_status,
             storage::vault::create_vault,
