@@ -6,7 +6,6 @@ import TerminalPane from "./components/TerminalPane";
 import Modal from "./components/Modal";
 import ConnectionForm, { SshConnectionConfig } from "./components/ConnectionForm";
 import SettingsModal, { AppSettings, defaultSettings } from "./components/SettingsModal";
-import DebugStats from "./components/DebugStats";
 import { PluginHost, pluginManager, type SessionInfo, type ModalConfig, type NotificationType } from "./plugins";
 import {
   SplitPane,
@@ -14,13 +13,15 @@ import {
   createTerminalNode,
   splitPaneWithPending,
   replacePendingWithTerminal,
+  replacePendingWithSftp,
   closePane,
   getAllTerminalPaneIds,
   getAllPtySessionIds,
   getAllPendingPaneIds,
+  getAllSftpPaneIds,
 } from "./components/SplitPane";
 import { SftpBrowser } from "./components/SftpBrowser";
-import { PanePicker } from "./components/PanePicker";
+import { PanePicker, type ActiveConnection } from "./components/PanePicker";
 import { useVault } from "./hooks/useVault";
 import { VaultSetupModal, VaultUnlockModal } from "./components/vault";
 
@@ -816,10 +817,11 @@ function App() {
       const activeTab = tabs.find((t) => t.id === activeTabId);
       if (!activeTab) return;
 
-      // Count all leaf panes (both terminal and pending)
+      // Count all leaf panes (terminal, sftp, and pending)
       const terminalPaneIds = getAllTerminalPaneIds(activeTab.paneTree);
+      const sftpPaneIds = getAllSftpPaneIds(activeTab.paneTree);
       const pendingPaneIds = getAllPendingPaneIds(activeTab.paneTree);
-      const totalLeafPanes = terminalPaneIds.length + pendingPaneIds.length;
+      const totalLeafPanes = terminalPaneIds.length + sftpPaneIds.length + pendingPaneIds.length;
 
       if (totalLeafPanes <= 1) {
         // Last pane - close the whole tab instead
@@ -843,12 +845,13 @@ function App() {
         pluginManager.notifySessionDisconnect(ptyId);
       });
 
-      // Update focus if needed - prefer terminal panes over pending ones
+      // Update focus if needed - prefer terminal panes, then sftp, then pending
       const remainingTerminalIds = getAllTerminalPaneIds(newPaneTree);
+      const remainingSftpIds = getAllSftpPaneIds(newPaneTree);
       const remainingPendingIds = getAllPendingPaneIds(newPaneTree);
       const newFocusedPaneId =
         activeTab.focusedPaneId === paneId
-          ? (remainingTerminalIds[0] || remainingPendingIds[0])
+          ? (remainingTerminalIds[0] || remainingSftpIds[0] || remainingPendingIds[0])
           : activeTab.focusedPaneId;
 
       setTabs(
@@ -1076,6 +1079,108 @@ function App() {
     [handleClosePane]
   );
 
+  // Handler for selecting SFTP for an active SSH connection in a pending pane
+  const handlePendingSelectSftp = useCallback(
+    async (pendingPaneId: string, _sessionId: string, ptySessionId: string) => {
+      const activeTab = tabs.find((t) => t.id === activeTabId);
+      if (!activeTab) return;
+
+      // Create a new SFTP session ID
+      const sftpSessionId = `sftp-pane-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      // Find the tab that has this ptySessionId to get SSH config
+      const sourceTab = tabs.find(t => {
+        const ptyIds = getAllPtySessionIds(t.paneTree);
+        return ptyIds.includes(ptySessionId);
+      });
+
+      if (!sourceTab?.sshConfig) {
+        console.error("Could not find SSH config for session");
+        return;
+      }
+
+      const config = sourceTab.sshConfig;
+
+      try {
+        // Get credentials if available
+        let password: string | null = null;
+        let keyPassphrase: string | null = null;
+
+        // Try to get stored credentials
+        try {
+          // Find saved session with matching host/username
+          const matchingSaved = savedSessions.find(
+            s => s.host === config.host && s.username === config.username
+          );
+          if (matchingSaved) {
+            const credentials = await invoke<{ password: string | null; key_passphrase: string | null }>(
+              "get_session_credentials",
+              { id: matchingSaved.id }
+            );
+            password = credentials.password;
+            keyPassphrase = credentials.key_passphrase;
+          }
+        } catch (err) {
+          console.log("[SFTP Pane] Could not get stored credentials:", err);
+        }
+
+        // Expand ~ in key path
+        let keyPath = config.keyPath;
+        if (keyPath?.startsWith("~")) {
+          const home = await invoke<string>("get_home_dir").catch(() => "");
+          if (home) {
+            keyPath = keyPath.replace("~", home);
+          }
+        }
+
+        // Register SFTP session
+        await invoke("register_sftp_session", {
+          sessionId: sftpSessionId,
+          host: config.host,
+          port: config.port,
+          username: config.username,
+          password: config.authType === "password" ? (password || config.password) : null,
+          keyPath: config.authType === "key" ? keyPath : null,
+          keyPassphrase: config.authType === "key" ? (keyPassphrase || config.keyPassphrase) : null,
+        });
+
+        // Replace pending with SFTP pane
+        const newPaneTree = replacePendingWithSftp(activeTab.paneTree, pendingPaneId, sftpSessionId, "/");
+
+        setTabs(
+          tabs.map((t) =>
+            t.id === activeTabId
+              ? { ...t, paneTree: newPaneTree }
+              : t
+          )
+        );
+      } catch (error) {
+        console.error("Failed to open SFTP pane:", error);
+        handleClosePane(pendingPaneId);
+      }
+    },
+    [tabs, activeTabId, savedSessions, handleClosePane]
+  );
+
+  // Build active connections list for PanePicker
+  const activeConnections: ActiveConnection[] = tabs
+    .filter(t => t.type === "ssh")
+    .flatMap(t => {
+      const ptyIds = getAllPtySessionIds(t.paneTree);
+      // Return one connection per SSH tab (use first ptyId)
+      if (ptyIds.length > 0) {
+        return [{
+          tabId: t.id,
+          sessionId: t.sessionId,
+          ptySessionId: ptyIds[0],
+          type: "ssh" as const,
+          title: t.title,
+          host: t.sshConfig?.host,
+          username: t.sshConfig?.username,
+        }];
+      }
+      return [];
+    });
 
   // Keyboard shortcuts for split panes
   useEffect(() => {
@@ -1187,15 +1292,24 @@ function App() {
                       isActive={tab.id === activeTabId && isFocused}
                     />
                   )}
+                  renderSftp={(_paneId, sessionId, initialPath) => (
+                    <SftpBrowser
+                      key={sessionId}
+                      sessionId={sessionId}
+                      initialPath={initialPath}
+                    />
+                  )}
                   renderPending={(paneId) => (
                     <PanePicker
                       onSelectLocal={() => handlePendingSelectLocal(paneId)}
                       onSelectDuplicate={() => handlePendingSelectDuplicate(paneId)}
                       onSelectSaved={(session) => handlePendingSelectSaved(paneId, session)}
                       onSelectRecent={(session) => handlePendingSelectRecent(paneId, session)}
+                      onSelectSftpForConnection={(sessionId, ptySessionId) => handlePendingSelectSftp(paneId, sessionId, ptySessionId)}
                       currentSessionConfig={tab.sshConfig}
                       savedSessions={savedSessions}
                       recentSessions={recentSessions}
+                      activeConnections={activeConnections}
                     />
                   )}
                 />

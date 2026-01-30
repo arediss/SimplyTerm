@@ -55,5 +55,6 @@ ctap-hid-fido2 = "3.5"
 # System info (debug)
 sysinfo = "0.32"
 
-# Plugins (file watching for hot reload - optional)
-# notify = "6"
+# External file editing
+notify = "6"
+open = "5"

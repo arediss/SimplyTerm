@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import {
   Folder,
   File,
@@ -12,6 +13,7 @@ import {
   X,
   Check,
   Loader2,
+  ExternalLink,
 } from "lucide-react";
 
 interface FileEntry {
@@ -28,6 +30,21 @@ interface SftpBrowserProps {
   initialPath?: string;
 }
 
+interface EditingFile {
+  remotePath: string;
+  localPath: string;
+  status: "synced" | "uploading" | "error";
+  error?: string;
+}
+
+interface FileUploadedEvent {
+  session_id: string;
+  remote_path: string;
+  local_path: string;
+  success: boolean;
+  error?: string;
+}
+
 export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) {
   const [currentPath, setCurrentPath] = useState(initialPath);
   const [entries, setEntries] = useState<FileEntry[]>([]);
@@ -42,6 +59,16 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
   // Rename dialog
   const [renamingEntry, setRenamingEntry] = useState<FileEntry | null>(null);
   const [renameValue, setRenameValue] = useState("");
+
+  // External editing state
+  const [editingFiles, setEditingFiles] = useState<Map<string, EditingFile>>(new Map());
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    entry: FileEntry;
+  } | null>(null);
 
   const loadDirectory = useCallback(async (path: string) => {
     setLoading(true);
@@ -63,6 +90,71 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
   useEffect(() => {
     loadDirectory(currentPath);
   }, []);
+
+  // Listen for file upload events
+  useEffect(() => {
+    const unlisten = listen<FileUploadedEvent>("sftp-file-uploaded", (event) => {
+      const { session_id, remote_path, success, error } = event.payload;
+
+      // Only handle events for this session
+      if (session_id !== sessionId) return;
+
+      setEditingFiles((prev) => {
+        const newMap = new Map(prev);
+        const existing = newMap.get(remote_path);
+        if (existing) {
+          newMap.set(remote_path, {
+            ...existing,
+            status: success ? "synced" : "error",
+            error: error || undefined,
+          });
+        }
+        return newMap;
+      });
+
+      // Auto-clear synced status after 3 seconds
+      if (success) {
+        setTimeout(() => {
+          setEditingFiles((prev) => {
+            const newMap = new Map(prev);
+            const existing = newMap.get(remote_path);
+            if (existing && existing.status === "synced") {
+              newMap.set(remote_path, { ...existing, status: "synced" });
+            }
+            return newMap;
+          });
+        }, 3000);
+      }
+    });
+
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [sessionId]);
+
+  // Load editing files on mount
+  useEffect(() => {
+    const loadEditingFiles = async () => {
+      try {
+        const files = await invoke<Array<{ session_id: string; remote_path: string; local_path: string }>>(
+          "sftp_get_editing_files",
+          { sessionId }
+        );
+        const newMap = new Map<string, EditingFile>();
+        for (const f of files) {
+          newMap.set(f.remote_path, {
+            remotePath: f.remote_path,
+            localPath: f.local_path,
+            status: "synced",
+          });
+        }
+        setEditingFiles(newMap);
+      } catch (err) {
+        console.error("Failed to load editing files:", err);
+      }
+    };
+    loadEditingFiles();
+  }, [sessionId]);
 
   const handleNavigate = (entry: FileEntry) => {
     if (entry.is_dir) {
@@ -135,6 +227,77 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
       setError(String(err));
     }
   };
+
+  const handleEditExternal = async (entry: FileEntry) => {
+    if (entry.is_dir) return;
+
+    // Set initial uploading state
+    setEditingFiles((prev) => {
+      const newMap = new Map(prev);
+      newMap.set(entry.path, {
+        remotePath: entry.path,
+        localPath: "",
+        status: "uploading",
+      });
+      return newMap;
+    });
+
+    try {
+      const result = await invoke<{ local_path: string; remote_path: string }>(
+        "sftp_edit_external",
+        {
+          sessionId,
+          remotePath: entry.path,
+        }
+      );
+
+      setEditingFiles((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(entry.path, {
+          remotePath: result.remote_path,
+          localPath: result.local_path,
+          status: "synced",
+        });
+        return newMap;
+      });
+    } catch (err) {
+      setError(String(err));
+      setEditingFiles((prev) => {
+        const newMap = new Map(prev);
+        newMap.delete(entry.path);
+        return newMap;
+      });
+    }
+  };
+
+  const isEditing = (path: string) => editingFiles.has(path);
+  const getEditStatus = (path: string) => editingFiles.get(path)?.status;
+
+  // Handle right-click context menu
+  const handleContextMenu = (e: React.MouseEvent, entry: FileEntry) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, entry });
+    setSelectedEntry(entry);
+  };
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setContextMenu(null);
+    };
+
+    if (contextMenu) {
+      document.addEventListener("click", handleClick);
+      document.addEventListener("keydown", handleKeyDown);
+    }
+
+    return () => {
+      document.removeEventListener("click", handleClick);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [contextMenu]);
 
   const formatSize = (bytes: number): string => {
     if (bytes === 0) return "-";
@@ -247,7 +410,6 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
                 <th className="text-left px-3 py-1.5 font-medium">Name</th>
                 <th className="text-right px-3 py-1.5 font-medium w-20">Size</th>
                 <th className="text-right px-3 py-1.5 font-medium w-24">Modified</th>
-                <th className="text-center px-3 py-1.5 font-medium w-20">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -256,10 +418,15 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
                   key={entry.path}
                   className={`
                     border-b border-surface-0/10 cursor-pointer
-                    ${selectedEntry?.path === entry.path ? "bg-blue/10" : "hover:bg-surface-0/30"}
+                    ${contextMenu?.entry.path === entry.path
+                      ? "bg-blue/20 ring-1 ring-blue/40 ring-inset"
+                      : selectedEntry?.path === entry.path
+                      ? "bg-blue/10"
+                      : "hover:bg-surface-0/30"}
                   `}
                   onClick={() => setSelectedEntry(entry)}
                   onDoubleClick={() => handleNavigate(entry)}
+                  onContextMenu={(e) => handleContextMenu(e, entry)}
                 >
                   <td className="px-3 py-1.5">
                     <div className="flex items-center gap-2">
@@ -269,22 +436,62 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
                         <File size={14} className="text-subtext-0 shrink-0" />
                       )}
                       {renamingEntry?.path === entry.path ? (
-                        <input
-                          type="text"
-                          value={renameValue}
-                          onChange={(e) => setRenameValue(e.target.value)}
-                          className="flex-1 bg-crust px-1.5 py-0.5 rounded text-sm outline-none focus:ring-1 focus:ring-blue/50"
-                          autoFocus
-                          onClick={(e) => e.stopPropagation()}
-                          onDoubleClick={(e) => e.stopPropagation()}
-                          onKeyDown={(e) => {
-                            e.stopPropagation();
-                            if (e.key === "Enter") handleRename();
-                            if (e.key === "Escape") setRenamingEntry(null);
-                          }}
-                        />
+                        <>
+                          <input
+                            type="text"
+                            value={renameValue}
+                            onChange={(e) => setRenameValue(e.target.value)}
+                            className="flex-1 bg-crust px-1.5 py-0.5 rounded text-sm outline-none focus:ring-1 focus:ring-blue/50"
+                            autoFocus
+                            onClick={(e) => e.stopPropagation()}
+                            onDoubleClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => {
+                              e.stopPropagation();
+                              if (e.key === "Enter") handleRename();
+                              if (e.key === "Escape") setRenamingEntry(null);
+                            }}
+                          />
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRename();
+                            }}
+                            className="p-1 rounded bg-green/20 text-green hover:bg-green/30 shrink-0"
+                          >
+                            <Check size={12} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRenamingEntry(null);
+                            }}
+                            className="p-1 rounded bg-surface-0/50 text-subtext-0 hover:bg-surface-0 shrink-0"
+                          >
+                            <X size={12} />
+                          </button>
+                        </>
                       ) : (
-                        <span className="truncate">{entry.name}</span>
+                        <>
+                          <span className="truncate">{entry.name}</span>
+                          {isEditing(entry.path) && (
+                            <span
+                              className={`ml-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${
+                                getEditStatus(entry.path) === "uploading"
+                                  ? "bg-yellow animate-pulse"
+                                  : getEditStatus(entry.path) === "error"
+                                  ? "bg-red"
+                                  : "bg-teal"
+                              }`}
+                              title={
+                                getEditStatus(entry.path) === "uploading"
+                                  ? "Uploading..."
+                                  : getEditStatus(entry.path) === "error"
+                                  ? "Upload failed"
+                                  : "Watching for changes"
+                              }
+                            />
+                          )}
+                        </>
                       )}
                     </div>
                   </td>
@@ -294,56 +501,6 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
                   <td className="px-3 py-1.5 text-right text-subtext-0 text-xs">
                     {formatDate(entry.modified)}
                   </td>
-                  <td className="px-3 py-1.5">
-                    <div className="flex items-center justify-center gap-1">
-                      {renamingEntry?.path === entry.path ? (
-                        <>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRename();
-                            }}
-                            className="p-1 rounded bg-green/20 text-green hover:bg-green/30"
-                          >
-                            <Check size={12} />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setRenamingEntry(null);
-                            }}
-                            className="p-1 rounded bg-surface-0/50 text-subtext-0 hover:bg-surface-0"
-                          >
-                            <X size={12} />
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setRenamingEntry(entry);
-                              setRenameValue(entry.name);
-                            }}
-                            className="p-1 rounded hover:bg-surface-0/50 text-subtext-0 hover:text-text"
-                            title="Rename"
-                          >
-                            <Edit3 size={12} />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(entry);
-                            }}
-                            className="p-1 rounded hover:bg-red/20 text-subtext-0 hover:text-red"
-                            title="Delete"
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -351,9 +508,88 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
         )}
       </div>
 
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          className="fixed z-50 min-w-[160px] py-1 bg-crust rounded-lg border border-surface-0/50 shadow-xl"
+          style={{
+            left: Math.min(contextMenu.x, window.innerWidth - 180),
+            top: Math.min(contextMenu.y, window.innerHeight - 200),
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Edit externally (only for files) */}
+          {!contextMenu.entry.is_dir && (
+            <button
+              onClick={() => {
+                handleEditExternal(contextMenu.entry);
+                setContextMenu(null);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-text hover:bg-surface-0/50 transition-colors text-left"
+              disabled={getEditStatus(contextMenu.entry.path) === "uploading"}
+            >
+              <ExternalLink size={14} className={isEditing(contextMenu.entry.path) ? "text-teal" : "text-subtext-0"} />
+              <span>{isEditing(contextMenu.entry.path) ? "Open in editor" : "Edit externally"}</span>
+              {isEditing(contextMenu.entry.path) && (
+                <span className="ml-auto text-xs text-teal">watching</span>
+              )}
+            </button>
+          )}
+
+          {/* Open folder */}
+          {contextMenu.entry.is_dir && (
+            <button
+              onClick={() => {
+                handleNavigate(contextMenu.entry);
+                setContextMenu(null);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-text hover:bg-surface-0/50 transition-colors text-left"
+            >
+              <Folder size={14} className="text-yellow" />
+              <span>Open</span>
+            </button>
+          )}
+
+          <div className="my-1 border-t border-surface-0/30" />
+
+          {/* Rename */}
+          <button
+            onClick={() => {
+              setRenamingEntry(contextMenu.entry);
+              setRenameValue(contextMenu.entry.name);
+              setContextMenu(null);
+            }}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-text hover:bg-surface-0/50 transition-colors text-left"
+          >
+            <Edit3 size={14} className="text-subtext-0" />
+            <span>Rename</span>
+          </button>
+
+          {/* Delete */}
+          <button
+            onClick={() => {
+              handleDelete(contextMenu.entry);
+              setContextMenu(null);
+            }}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-red hover:bg-red/10 transition-colors text-left"
+          >
+            <Trash2 size={14} />
+            <span>Delete</span>
+          </button>
+        </div>
+      )}
+
       {/* Status bar */}
       <div className="px-3 py-1 bg-mantle border-t border-surface-0/30 text-xs text-subtext-0 flex items-center justify-between">
-        <span>{entries.length} items</span>
+        <div className="flex items-center gap-3">
+          <span>{entries.length} items</span>
+          {editingFiles.size > 0 && (
+            <span className="flex items-center gap-1 text-teal">
+              <ExternalLink size={10} />
+              {editingFiles.size} editing
+            </span>
+          )}
+        </div>
         {selectedEntry && (
           <span>
             {selectedEntry.name} - {selectedEntry.is_dir ? "Folder" : formatSize(selectedEntry.size)}

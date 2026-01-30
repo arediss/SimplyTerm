@@ -8,11 +8,12 @@ use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
 
 mod connectors;
+mod edit_watcher;
 mod plugins;
 mod session;
 mod storage;
 
-use connectors::{connect_ssh, create_local_session, ssh_exec::ssh_exec, SshAuth, SshConfig, FileEntry};
+use connectors::{connect_ssh, create_local_session, ssh_exec::ssh_exec, SshAuth, SshConfig, FileEntry, sftp_read_file};
 use plugins::{PluginManager, PluginState};
 use session::SessionManager;
 use storage::{
@@ -25,11 +26,15 @@ use storage::{
     VaultState, VaultCredentialType,
 };
 
+use edit_watcher::EditWatcher;
+use parking_lot::Mutex;
+
 /// État global de l'application
 struct AppState {
     session_manager: Arc<SessionManager>,
     plugin_manager: Arc<PluginManager>,
     vault: Arc<VaultState>,
+    edit_watcher: Arc<Mutex<EditWatcher>>,
 }
 
 // ============================================================================
@@ -212,6 +217,94 @@ async fn sftp_mkdir(app: AppHandle, session_id: String, path: String) -> Result<
         .ok_or_else(|| "SSH session not found".to_string())?;
 
     connectors::sftp_mkdir(&config, &path).await
+}
+
+/// Response for sftp_edit_external command
+#[derive(serde::Serialize)]
+struct EditExternalResponse {
+    local_path: String,
+    remote_path: String,
+}
+
+/// Download a remote file, open it in the default editor, and watch for changes
+#[tauri::command]
+async fn sftp_edit_external(
+    app: AppHandle,
+    session_id: String,
+    remote_path: String,
+) -> Result<EditExternalResponse, String> {
+    let state = app.state::<AppState>();
+    let config = state
+        .session_manager
+        .get_ssh_config(&session_id)
+        .ok_or_else(|| "SSH session not found".to_string())?;
+
+    // Get local path for this file
+    let local_path = edit_watcher::get_local_edit_path(&session_id, &remote_path)?;
+
+    // Download the file
+    let content = sftp_read_file(&config, &remote_path).await?;
+
+    // Write to local file
+    std::fs::write(&local_path, &content)
+        .map_err(|e| format!("Failed to write local file: {}", e))?;
+
+    // Start tracking the file for changes
+    {
+        let mut watcher = state.edit_watcher.lock();
+        watcher.track_file(session_id.clone(), remote_path.clone(), local_path.clone())?;
+    }
+
+    // Open with default editor
+    open::that(&local_path)
+        .map_err(|e| format!("Failed to open file in editor: {}", e))?;
+
+    Ok(EditExternalResponse {
+        local_path: local_path.to_string_lossy().to_string(),
+        remote_path,
+    })
+}
+
+/// Stop tracking a file for external editing
+#[tauri::command]
+async fn sftp_stop_editing(
+    app: AppHandle,
+    local_path: String,
+) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let path = std::path::PathBuf::from(&local_path);
+
+    let mut watcher = state.edit_watcher.lock();
+    watcher.untrack_file(&path)?;
+
+    // Optionally delete the local file
+    let _ = std::fs::remove_file(&path);
+
+    Ok(())
+}
+
+/// Get list of files being edited for a session
+#[tauri::command]
+async fn sftp_get_editing_files(
+    app: AppHandle,
+    session_id: String,
+) -> Result<Vec<EditingFileInfo>, String> {
+    let state = app.state::<AppState>();
+    let watcher = state.edit_watcher.lock();
+
+    let files = watcher.get_tracked_files(&session_id);
+    Ok(files.into_iter().map(|f| EditingFileInfo {
+        session_id: f.session_id,
+        remote_path: f.remote_path,
+        local_path: f.local_path.to_string_lossy().to_string(),
+    }).collect())
+}
+
+#[derive(serde::Serialize)]
+struct EditingFileInfo {
+    session_id: String,
+    remote_path: String,
+    local_path: String,
 }
 
 /// Register SSH config for SFTP-only use (no terminal session)
@@ -835,7 +928,16 @@ pub fn run() {
             let session_manager = SessionManager::new(app.handle().clone());
             let plugin_manager = Arc::new(PluginManager::default());
             let vault = Arc::new(VaultState::new().expect("Failed to initialize vault"));
-            app.manage(AppState { session_manager, plugin_manager, vault: vault.clone() });
+            let edit_watcher = Arc::new(Mutex::new(EditWatcher::new(
+                session_manager.clone(),
+                app.handle().clone(),
+            )));
+            app.manage(AppState {
+                session_manager,
+                plugin_manager,
+                vault: vault.clone(),
+                edit_watcher,
+            });
             // Also manage vault directly for vault commands
             app.manage(vault);
             Ok(())
@@ -856,6 +958,9 @@ pub fn run() {
             sftp_remove,
             sftp_rename,
             sftp_mkdir,
+            sftp_edit_external,
+            sftp_stop_editing,
+            sftp_get_editing_files,
             // Saved sessions
             load_saved_sessions,
             save_session,
