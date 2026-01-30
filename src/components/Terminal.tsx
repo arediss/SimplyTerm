@@ -304,7 +304,7 @@ function Terminal({ sessionId, type, onExit, isActive = true }: TerminalProps) {
   }, [isActive]);
 
   return (
-    <div className="relative h-full w-full bg-terminal p-3">
+    <div className="relative h-full w-full bg-terminal pl-3 pt-3 pb-1">
       <div
         ref={terminalRef}
         className="h-full w-full"
