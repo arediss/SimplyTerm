@@ -1,9 +1,11 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
+import { SearchAddon } from "@xterm/addon-search";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
+import { X, ChevronUp, ChevronDown, CaseSensitive, Regex } from "lucide-react";
 import "@xterm/xterm/css/xterm.css";
 
 interface TerminalProps {
@@ -19,8 +21,16 @@ function Terminal({ sessionId, type, onExit, isActive = true }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const searchAddonRef = useRef<SearchAddon | null>(null);
   const resizeTimeoutRef = useRef<number | null>(null);
   const lastDimsRef = useRef<{ cols: number; rows: number } | null>(null);
+
+  // Search state
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [caseSensitive, setCaseSensitive] = useState(false);
+  const [useRegex, setUseRegex] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const sendResize = useCallback(
     (cols: number, rows: number) => {
@@ -79,14 +89,31 @@ function Terminal({ sessionId, type, onExit, isActive = true }: TerminalProps) {
 
     const fitAddon = new FitAddon();
     const webLinksAddon = new WebLinksAddon();
+    const searchAddon = new SearchAddon();
 
     xterm.loadAddon(fitAddon);
     xterm.loadAddon(webLinksAddon);
+    xterm.loadAddon(searchAddon);
+
+    // Intercept Ctrl+F to open search
+    xterm.attachCustomKeyEventHandler((event) => {
+      if (event.ctrlKey && event.key === "f" && event.type === "keydown") {
+        setIsSearchOpen(true);
+        return false; // Prevent default
+      }
+      if (event.key === "Escape" && event.type === "keydown") {
+        setIsSearchOpen(false);
+        searchAddon.clearDecorations();
+        return true; // Let terminal handle it too
+      }
+      return true;
+    });
 
     xterm.open(terminalRef.current);
 
     xtermRef.current = xterm;
     fitAddonRef.current = fitAddon;
+    searchAddonRef.current = searchAddon;
 
     // Fit after DOM is ready
     requestAnimationFrame(() => {
@@ -184,13 +211,165 @@ function Terminal({ sessionId, type, onExit, isActive = true }: TerminalProps) {
     xtermRef.current?.focus();
   };
 
+  // Search functions
+  const handleSearch = useCallback((direction: "next" | "prev") => {
+    if (!searchAddonRef.current || !searchQuery) return;
+
+    const options = {
+      caseSensitive,
+      regex: useRegex,
+      incremental: direction === "next",
+    };
+
+    if (direction === "next") {
+      searchAddonRef.current.findNext(searchQuery, options);
+    } else {
+      searchAddonRef.current.findPrevious(searchQuery, options);
+    }
+  }, [searchQuery, caseSensitive, useRegex]);
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    if (searchAddonRef.current && value) {
+      searchAddonRef.current.findNext(value, {
+        caseSensitive,
+        regex: useRegex,
+        incremental: true,
+      });
+    } else if (searchAddonRef.current) {
+      searchAddonRef.current.clearDecorations();
+    }
+  };
+
+  const closeSearch = () => {
+    setIsSearchOpen(false);
+    setSearchQuery("");
+    searchAddonRef.current?.clearDecorations();
+    xtermRef.current?.focus();
+  };
+
+  // Focus search input when opened
+  useEffect(() => {
+    if (isSearchOpen && searchInputRef.current) {
+      searchInputRef.current.focus();
+      searchInputRef.current.select();
+    }
+  }, [isSearchOpen]);
+
+  // Intercept Ctrl+F globally to prevent Tauri's native search
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === "f") {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsSearchOpen(true);
+      }
+    };
+
+    // Only add listener when terminal is active
+    if (isActive) {
+      document.addEventListener("keydown", handleGlobalKeyDown, true);
+      return () => document.removeEventListener("keydown", handleGlobalKeyDown, true);
+    }
+  }, [isActive]);
+
   return (
-    <div className="h-full w-full bg-terminal p-3">
+    <div className="relative h-full w-full bg-terminal p-3">
       <div
         ref={terminalRef}
         className="h-full w-full"
         onClick={handleClick}
       />
+
+      {/* Search Panel */}
+      {isSearchOpen && (
+        <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5 px-2 py-1.5 bg-mantle/95 backdrop-blur-xl border border-surface-0/50 rounded-xl shadow-lg">
+          {/* Search Input */}
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchQuery}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleSearch(e.shiftKey ? "prev" : "next");
+              } else if (e.key === "Escape") {
+                closeSearch();
+              }
+            }}
+            placeholder="Rechercher..."
+            className="w-48 px-2 py-1 bg-surface-0/50 border border-surface-0 rounded-lg text-sm text-text placeholder-text-muted focus:outline-none focus:border-accent/50"
+          />
+
+          {/* Case Sensitive Toggle */}
+          <button
+            onClick={() => {
+              setCaseSensitive(!caseSensitive);
+              if (searchQuery) handleSearch("next");
+            }}
+            className={`p-1.5 rounded-lg transition-colors ${
+              caseSensitive
+                ? "bg-accent/20 text-accent"
+                : "text-text-muted hover:text-text hover:bg-surface-0/50"
+            }`}
+            title="Sensible à la casse (Aa)"
+          >
+            <CaseSensitive size={14} />
+          </button>
+
+          {/* Regex Toggle */}
+          <button
+            onClick={() => {
+              setUseRegex(!useRegex);
+              if (searchQuery) handleSearch("next");
+            }}
+            className={`p-1.5 rounded-lg transition-colors ${
+              useRegex
+                ? "bg-accent/20 text-accent"
+                : "text-text-muted hover:text-text hover:bg-surface-0/50"
+            }`}
+            title="Expression régulière (.*)"
+          >
+            <Regex size={14} />
+          </button>
+
+          {/* Separator */}
+          <div className="w-px h-5 bg-surface-0/50" />
+
+          {/* Previous */}
+          <button
+            onClick={() => handleSearch("prev")}
+            disabled={!searchQuery}
+            className="p-1.5 text-text-muted hover:text-text hover:bg-surface-0/50 rounded-lg transition-colors disabled:opacity-30"
+            title="Précédent (Shift+Enter)"
+          >
+            <ChevronUp size={14} />
+          </button>
+
+          {/* Next */}
+          <button
+            onClick={() => handleSearch("next")}
+            disabled={!searchQuery}
+            className="p-1.5 text-text-muted hover:text-text hover:bg-surface-0/50 rounded-lg transition-colors disabled:opacity-30"
+            title="Suivant (Enter)"
+          >
+            <ChevronDown size={14} />
+          </button>
+
+          {/* Separator */}
+          <div className="w-px h-5 bg-surface-0/50" />
+
+          {/* Close */}
+          <button
+            onClick={closeSearch}
+            className="p-1.5 text-text-muted hover:text-text hover:bg-surface-0/50 rounded-lg transition-colors"
+            title="Fermer (Escape)"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
