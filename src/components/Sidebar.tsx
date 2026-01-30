@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import {
   Monitor,
   Plus,
@@ -27,7 +28,6 @@ interface SidebarProps {
   savedSessions: SavedSession[];
   folders: SessionFolder[];
   recentSessions: RecentSession[];
-  onLocalTerminal: () => void;
   onSessionSelect: (session: Session) => void;
   onSavedSessionConnect: (session: SavedSession) => void;
   onSavedSessionEdit: (session: SavedSession) => void;
@@ -36,7 +36,6 @@ interface SidebarProps {
   onRecentSessionConnect: (session: RecentSession) => void;
   onRecentSessionDelete: (sessionId: string) => void;
   onClearRecentSessions: () => void;
-  onNewConnection: () => void;
   onOpenSettings: () => void;
   onCreateFolder: (name: string, color?: string, parentId?: string) => void;
   onUpdateFolder: (id: string, name?: string, color?: string, expanded?: boolean) => void;
@@ -51,7 +50,6 @@ function Sidebar({
   savedSessions,
   folders,
   recentSessions,
-  onLocalTerminal,
   onSessionSelect: _onSessionSelect,
   onSavedSessionConnect,
   onSavedSessionEdit,
@@ -60,7 +58,6 @@ function Sidebar({
   onRecentSessionConnect,
   onRecentSessionDelete,
   onClearRecentSessions,
-  onNewConnection,
   onOpenSettings,
   onCreateFolder,
   onUpdateFolder,
@@ -186,28 +183,15 @@ function Sidebar({
         onClick={onClose}
       />
 
-      {/* Sidebar panel - sous la titlebar */}
+      {/* Sidebar panel - flottant */}
       <div
         className={`
-          fixed top-10 left-0 bottom-0 z-40 w-72
-          bg-mantle/95 backdrop-blur-xl border-r border-surface-0/50
-          flex flex-col
+          fixed top-14 left-3 bottom-3 z-40 w-72
+          bg-mantle/95 backdrop-blur-xl border border-surface-0/50 rounded-2xl
+          flex flex-col shadow-2xl
           ${isAnimating ? "animate-slide-in" : "animate-slide-out"}
         `}
       >
-        {/* Header */}
-        <div className="h-14 px-4 flex items-center justify-between border-b border-surface-0/30">
-          <span className="text-sm font-semibold text-text tracking-tight">
-            SimplyTerm
-          </span>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-text hover:bg-white/5 transition-colors"
-          >
-            <X size={16} />
-          </button>
-        </div>
-
         {/* Search bar */}
         <div className="p-3 border-b border-surface-0/30">
           <div className="relative">
@@ -233,23 +217,7 @@ function Sidebar({
           </div>
         </div>
 
-        {/* Quick actions */}
-        <div className="p-3 border-b border-surface-0/30">
-          <div className="grid grid-cols-2 gap-2">
-            <QuickAction
-              icon={<Terminal size={18} />}
-              label="Local"
-              onClick={onLocalTerminal}
-              color="success"
-            />
-            <QuickAction
-              icon={<Plus size={18} />}
-              label="SSH"
-              onClick={onNewConnection}
-              color="accent"
-            />
-          </div>
-        </div>
+
 
         {/* Sessions list */}
         <div className="flex-1 overflow-y-auto p-3">
@@ -401,33 +369,7 @@ function Sidebar({
   );
 }
 
-interface QuickActionProps {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-  color: "success" | "accent";
-}
 
-function QuickAction({ icon, label, onClick, color }: QuickActionProps) {
-  const colorClasses = {
-    success: "text-success hover:bg-success/10",
-    accent: "text-accent hover:bg-accent/10",
-  };
-
-  return (
-    <button
-      onClick={onClick}
-      className={`
-        flex items-center justify-center gap-2 py-3 rounded-xl
-        bg-surface-0/30 transition-all duration-200
-        ${colorClasses[color]}
-      `}
-    >
-      {icon}
-      <span className="text-xs font-medium text-text">{label}</span>
-    </button>
-  );
-}
 
 interface SectionHeaderProps {
   icon: React.ReactNode;
@@ -474,6 +416,8 @@ function SavedSessionItem({
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    // Fermer tous les autres context menus
+    window.dispatchEvent(new CustomEvent("closeContextMenus"));
     setContextMenu({ x: e.clientX, y: e.clientY });
     setShowFolderSubmenu(false);
   };
@@ -500,14 +444,19 @@ function SavedSessionItem({
     e.dataTransfer.effectAllowed = "move";
   };
 
-  // Close context menu on outside click
+  // Close context menu on outside click or when another menu opens
   useEffect(() => {
-    if (contextMenu) {
-      const handleClick = () => closeContextMenu();
-      document.addEventListener("click", handleClick);
-      return () => document.removeEventListener("click", handleClick);
-    }
-  }, [contextMenu]);
+    const handleClick = () => closeContextMenu();
+    const handleCloseAll = () => closeContextMenu();
+    
+    document.addEventListener("click", handleClick);
+    window.addEventListener("closeContextMenus", handleCloseAll);
+    
+    return () => {
+      document.removeEventListener("click", handleClick);
+      window.removeEventListener("closeContextMenus", handleCloseAll);
+    };
+  }, []);
 
   return (
     <>
@@ -531,8 +480,8 @@ function SavedSessionItem({
         </div>
       </div>
 
-      {/* Context Menu */}
-      {contextMenu && (
+      {/* Context Menu - rendered via Portal to escape transform context */}
+      {contextMenu && createPortal(
         <div
           className="fixed z-[100] min-w-[160px] bg-crust border border-surface-0/50 rounded-lg shadow-xl py-1"
           style={{ left: contextMenu.x, top: contextMenu.y }}
@@ -606,7 +555,8 @@ function SavedSessionItem({
             <Trash2 size={12} />
             <span>Supprimer</span>
           </button>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
@@ -665,16 +615,24 @@ function FolderItem({
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    // Fermer tous les autres context menus
+    window.dispatchEvent(new CustomEvent("closeContextMenus"));
     setContextMenu({ x: e.clientX, y: e.clientY });
   };
 
+  // Close context menu on outside click or when another menu opens
   useEffect(() => {
-    if (contextMenu) {
-      const handleClick = () => setContextMenu(null);
-      document.addEventListener("click", handleClick);
-      return () => document.removeEventListener("click", handleClick);
-    }
-  }, [contextMenu]);
+    const handleClick = () => setContextMenu(null);
+    const handleCloseAll = () => setContextMenu(null);
+    
+    document.addEventListener("click", handleClick);
+    window.addEventListener("closeContextMenus", handleCloseAll);
+    
+    return () => {
+      document.removeEventListener("click", handleClick);
+      window.removeEventListener("closeContextMenus", handleCloseAll);
+    };
+  }, []);
 
   return (
     <div>
@@ -703,8 +661,8 @@ function FolderItem({
         </span>
       </div>
 
-      {/* Folder context menu */}
-      {contextMenu && (
+      {/* Folder context menu - rendered via Portal to escape transform context */}
+      {contextMenu && createPortal(
         <div
           className="fixed z-[100] min-w-[140px] bg-crust border border-surface-0/50 rounded-lg shadow-xl py-1"
           style={{ left: contextMenu.x, top: contextMenu.y }}
@@ -717,7 +675,8 @@ function FolderItem({
             <Trash2 size={12} />
             <span>Supprimer le dossier</span>
           </button>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Folder contents */}

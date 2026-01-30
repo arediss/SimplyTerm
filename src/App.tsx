@@ -1084,6 +1084,9 @@ function App() {
         onTabSelect={setActiveTabId}
         onTabClose={handleCloseTab}
         onNewTab={handleOpenConnectionModal}
+        onLocalTerminal={handleNewLocalTab}
+        onRecentSessionConnect={handleConnectToRecentSession}
+        recentSessions={recentSessions}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         isSidebarOpen={isSidebarOpen}
       />
@@ -1096,7 +1099,6 @@ function App() {
         savedSessions={savedSessions}
         folders={folders}
         recentSessions={recentSessions}
-        onLocalTerminal={handleNewLocalTab}
         onSessionSelect={() => {}}
         onSavedSessionConnect={handleConnectToSavedSession}
         onSavedSessionEdit={handleEditSavedSession}
@@ -1105,7 +1107,6 @@ function App() {
         onRecentSessionConnect={handleConnectToRecentSession}
         onRecentSessionDelete={handleDeleteRecentSession}
         onClearRecentSessions={handleClearRecentSessions}
-        onNewConnection={handleOpenConnectionModal}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onCreateFolder={handleCreateFolder}
         onUpdateFolder={handleUpdateFolder}
