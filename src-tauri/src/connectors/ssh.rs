@@ -51,6 +51,7 @@ impl Handler for SshHandler {
 enum SshCommand {
     Data(Vec<u8>),
     Resize { cols: u32, rows: u32 },
+    Close,
 }
 
 /// Session SSH
@@ -83,6 +84,12 @@ impl Session for SshSession {
 
     fn session_type(&self) -> &'static str {
         "ssh"
+    }
+
+    fn close(&self) -> Result<(), String> {
+        // Send close command to gracefully shut down the SSH session
+        let _ = self.cmd_tx.lock().send(SshCommand::Close);
+        Ok(())
     }
 }
 
@@ -176,6 +183,12 @@ pub async fn connect_ssh(
                         }
                         SshCommand::Resize { cols, rows } => {
                             let _ = channel.window_change(cols, rows, 0, 0).await;
+                        }
+                        SshCommand::Close => {
+                            // Close the channel gracefully
+                            let _ = channel.eof().await;
+                            let _ = channel.close().await;
+                            break;
                         }
                     }
                 }
