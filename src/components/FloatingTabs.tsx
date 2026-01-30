@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, forwardRef } from "react";
 import { createPortal } from "react-dom";
-import { Menu, Plus, X, Minus, Square, Copy, ChevronDown, Terminal, Clock } from "lucide-react";
+import { Menu, Plus, X, Minus, Square, Copy, ChevronDown, Terminal, Clock, ArrowLeftRight } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Tab, RecentSession } from "../App";
 
@@ -15,6 +15,9 @@ interface FloatingTabsProps {
   recentSessions: RecentSession[];
   onToggleSidebar: () => void;
   isSidebarOpen: boolean;
+  onToggleTunnelSidebar: () => void;
+  isTunnelSidebarOpen: boolean;
+  activeTunnelCount: number;
 }
 
 function FloatingTabs({
@@ -28,6 +31,9 @@ function FloatingTabs({
   recentSessions,
   onToggleSidebar,
   isSidebarOpen,
+  onToggleTunnelSidebar,
+  isTunnelSidebarOpen,
+  activeTunnelCount,
 }: FloatingTabsProps) {
   const [isMaximized, setIsMaximized] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -93,6 +99,24 @@ function FloatingTabs({
             title="Menu"
           >
             <Menu size={14} />
+          </button>
+
+          {/* Bouton tunnels avec badge */}
+          <button
+            onClick={onToggleTunnelSidebar}
+            className={`
+              relative shrink-0 w-7 h-7 flex items-center justify-center rounded-lg
+              transition-all duration-200 hover:bg-surface-0/50
+              ${isTunnelSidebarOpen ? "text-accent" : "text-text-muted hover:text-text"}
+            `}
+            title="Port Forwarding (Tunnels)"
+          >
+            <ArrowLeftRight size={14} />
+            {activeTunnelCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] flex items-center justify-center px-1 text-[9px] font-bold bg-accent text-crust rounded-full">
+                {activeTunnelCount}
+              </span>
+            )}
           </button>
 
           {/* Tabs */}

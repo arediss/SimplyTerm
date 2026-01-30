@@ -139,7 +139,7 @@ function TunnelManager({ isOpen, onClose, sessionId, sessionName, embedded = fal
       case "Error":
         return <AlertCircle size={14} className="text-red" />;
       case "Stopped":
-        return <Square size={14} className="text-text-muted" />;
+        return <StopCircle size={14} className="text-text-muted" />;
     }
   };
 

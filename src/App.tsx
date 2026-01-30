@@ -25,6 +25,7 @@ import { PanePicker, type ActiveConnection } from "./components/PanePicker";
 import { useVault } from "./hooks/useVault";
 import { VaultSetupModal, VaultUnlockModal } from "./components/vault";
 import TunnelManager from "./components/TunnelManager";
+import TunnelSidebar from "./components/TunnelSidebar";
 
 export interface Session {
   id: string;
@@ -85,7 +86,11 @@ function App() {
   const [recentSessions, setRecentSessions] = useState<RecentSession[]>([]);
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Sidebar state - un seul sidebar ouvert à la fois
+  const [openSidebar, setOpenSidebar] = useState<"none" | "menu" | "tunnel">("none");
+  const isSidebarOpen = openSidebar === "menu";
+  const isTunnelSidebarOpen = openSidebar === "tunnel";
 
   // Vault state
   const vault = useVault();
@@ -116,6 +121,9 @@ function App() {
 
   // Tunnel manager state
   const [tunnelManagerTabId, setTunnelManagerTabId] = useState<string | null>(null);
+
+  // Tunnel count for badge
+  const [activeTunnelCount, setActiveTunnelCount] = useState(0);
 
   // Notification state (for plugins)
   const [notification, setNotification] = useState<{ message: string; type: NotificationType } | null>(null);
@@ -234,12 +242,12 @@ function App() {
     };
     setTabs([...tabs, newTab]);
     setActiveTabId(newTab.id);
-    setIsSidebarOpen(false);
+    setOpenSidebar("none");
   };
 
   // Open SFTP tab for a saved session
   const handleOpenSftpTab = async (saved: SavedSession) => {
-    setIsSidebarOpen(false);
+    setOpenSidebar("none");
 
     // Helper pour ouvrir le formulaire de connexion SFTP
     const openSftpConnectionForm = () => {
@@ -325,7 +333,7 @@ function App() {
 
   // Open Tunnel-only tab for a saved session
   const handleOpenTunnelTab = async (saved: SavedSession) => {
-    setIsSidebarOpen(false);
+    setOpenSidebar("none");
 
     try {
       // Get credentials for this saved session
@@ -436,7 +444,7 @@ function App() {
         setTabs([...tabs, newTab]);
         setActiveTabId(newTab.id);
         setIsConnectionModalOpen(false);
-        setIsSidebarOpen(false);
+        setOpenSidebar("none");
         setIsConnecting(false);
         setInitialConnectionConfig(null);
 
@@ -502,7 +510,7 @@ function App() {
       setTabs([...tabs, newTab]);
       setActiveTabId(newTab.id);
       setIsConnectionModalOpen(false);
-      setIsSidebarOpen(false);
+      setOpenSidebar("none");
       setIsConnecting(false);
 
       // Notify plugins of session connect (use ptySessionId for backend commands)
@@ -657,12 +665,12 @@ function App() {
     });
     setConnectionError(undefined);
     setIsConnectionModalOpen(true);
-    setIsSidebarOpen(false);
+    setOpenSidebar("none");
   };
 
   // Se connecter à une session sauvegardée
   const handleConnectToSavedSession = async (saved: SavedSession) => {
-    setIsSidebarOpen(false);
+    setOpenSidebar("none");
 
     // Helper pour ouvrir le formulaire de connexion
     const openConnectionForm = (message: string) => {
@@ -783,7 +791,7 @@ function App() {
   const handleConnectToRecentSession = async (_recent: RecentSession) => {
     // TODO: Pré-remplir le formulaire avec les infos de la session récente
     setIsConnectionModalOpen(true);
-    setIsSidebarOpen(false);
+    setOpenSidebar("none");
   };
 
   // Supprimer une session récente
@@ -1288,7 +1296,7 @@ function App() {
     setInitialConnectionConfig(null);
     setEditingSessionId(null);
     setIsConnectionModalOpen(true);
-    setIsSidebarOpen(false);
+    setOpenSidebar("none");
   };
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
@@ -1418,14 +1426,17 @@ function App() {
         onLocalTerminal={handleNewLocalTab}
         onRecentSessionConnect={handleConnectToRecentSession}
         recentSessions={recentSessions}
-        onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+        onToggleSidebar={() => setOpenSidebar(openSidebar === "menu" ? "none" : "menu")}
         isSidebarOpen={isSidebarOpen}
+        onToggleTunnelSidebar={() => setOpenSidebar(openSidebar === "tunnel" ? "none" : "tunnel")}
+        isTunnelSidebarOpen={isTunnelSidebarOpen}
+        activeTunnelCount={activeTunnelCount}
       />
 
       {/* Sidebar drawer */}
       <Sidebar
         isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
+        onClose={() => setOpenSidebar("none")}
         sessions={sessions}
         savedSessions={savedSessions}
         folders={folders}
@@ -1531,7 +1542,7 @@ function App() {
         onClearAllSessions={handleClearAllSavedSessions}
       />
 
-      {/* Tunnel Manager Modal */}
+      {/* Tunnel Manager Modal (for SSH session tunnels) */}
       {tunnelManagerTabId && (() => {
         const tab = tabs.find(t => t.id === tunnelManagerTabId);
         if (!tab || tab.type !== "ssh") return null;
@@ -1544,6 +1555,14 @@ function App() {
           />
         );
       })()}
+
+      {/* Tunnel Sidebar (standalone tunnels) */}
+      <TunnelSidebar
+        isOpen={isTunnelSidebarOpen}
+        onClose={() => setOpenSidebar("none")}
+        savedSessions={savedSessions}
+        onTunnelCountChange={setActiveTunnelCount}
+      />
 
       {/* Plugin Host */}
       <PluginHost
