@@ -115,6 +115,32 @@ function Terminal({ sessionId, type, onExit, isActive = true }: TerminalProps) {
     fitAddonRef.current = fitAddon;
     searchAddonRef.current = searchAddon;
 
+    // Get xterm container for scrollbar visibility control
+    const xtermElement = terminalRef.current.querySelector('.xterm');
+    let scrollHideTimeout: number | null = null;
+
+    // Show scrollbar when not at bottom, hide when at bottom or after delay
+    const scrollDisposable = xterm.onScroll(() => {
+      if (!xtermElement) return;
+
+      const buffer = xterm.buffer.active;
+      const isAtBottom = buffer.viewportY >= buffer.baseY;
+
+      if (!isAtBottom) {
+        xtermElement.classList.add('is-scrolling');
+        // Clear existing timeout
+        if (scrollHideTimeout) clearTimeout(scrollHideTimeout);
+        // Hide after 1.5s of no scroll
+        scrollHideTimeout = window.setTimeout(() => {
+          xtermElement.classList.remove('is-scrolling');
+        }, 1500);
+      } else {
+        // At bottom - hide immediately
+        if (scrollHideTimeout) clearTimeout(scrollHideTimeout);
+        xtermElement.classList.remove('is-scrolling');
+      }
+    });
+
     // Fit after DOM is ready
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -188,8 +214,12 @@ function Terminal({ sessionId, type, onExit, isActive = true }: TerminalProps) {
       if (resizeTimeoutRef.current) {
         clearTimeout(resizeTimeoutRef.current);
       }
+      if (scrollHideTimeout) {
+        clearTimeout(scrollHideTimeout);
+      }
       resizeObserver.disconnect();
       dataDisposable.dispose();
+      scrollDisposable.dispose();
       unlistenOutput?.();
       unlistenExit?.();
       xterm.dispose();
