@@ -90,6 +90,7 @@ function App() {
   const [showVaultSetup, setShowVaultSetup] = useState(false);
   const [showVaultUnlock, setShowVaultUnlock] = useState(false);
   const [vaultSetupSkipped, setVaultSetupSkipped] = useState(false);
+  const [initialVaultCheckDone, setInitialVaultCheckDone] = useState(false);
 
   // Modal state
   const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false);
@@ -114,7 +115,7 @@ function App() {
   // Notification state (for plugins)
   const [notification, setNotification] = useState<{ message: string; type: NotificationType } | null>(null);
 
-  // Handle vault startup flow
+  // Handle vault startup flow - only show unlock modal on initial app load
   useEffect(() => {
     if (vault.isLoading) return;
 
@@ -125,15 +126,23 @@ function App() {
       }
       setShowVaultUnlock(false);
     } else if (!vault.status?.isUnlocked) {
-      // Vault exists but is locked - show unlock modal
-      setShowVaultSetup(false);
-      setShowVaultUnlock(true);
+      // Vault exists but is locked
+      // Only show unlock modal on initial load, not after auto-lock
+      if (!initialVaultCheckDone) {
+        setShowVaultSetup(false);
+        setShowVaultUnlock(true);
+      }
     } else {
       // Vault is unlocked - hide all modals
       setShowVaultSetup(false);
       setShowVaultUnlock(false);
     }
-  }, [vault.isLoading, vault.status?.exists, vault.status?.isUnlocked, vaultSetupSkipped]);
+
+    // Mark initial check as done after first evaluation
+    if (!initialVaultCheckDone) {
+      setInitialVaultCheckDone(true);
+    }
+  }, [vault.isLoading, vault.status?.exists, vault.status?.isUnlocked, vaultSetupSkipped, initialVaultCheckDone]);
 
   // Handle vault setup skip
   const handleVaultSetupSkip = useCallback(() => {

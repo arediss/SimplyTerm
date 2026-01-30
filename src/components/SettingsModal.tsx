@@ -744,7 +744,7 @@ function SecuritySettings() {
       {/* Auto-lock */}
       <SettingGroup title="Verrouillage automatique" description="Délai avant le verrouillage automatique">
         <select
-          value={vault.status?.autoLockTimeout || 300}
+          value={vault.status?.autoLockTimeout ?? 300}
           onChange={(e) => handleAutoLockChange(Number(e.target.value))}
           disabled={!vault.status?.isUnlocked}
           className="w-full px-4 py-3 bg-surface-0/30 border border-surface-0/50 rounded-xl text-text focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent disabled:opacity-50"
