@@ -12,7 +12,7 @@ import {
   CheckCircle,
   Loader2,
 } from "lucide-react";
-import { SavedSession } from "../App";
+import { SavedSession } from "../types";
 
 interface Tunnel {
   id: string;

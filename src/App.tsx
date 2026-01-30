@@ -5,7 +5,7 @@ import FloatingTabs from "./components/FloatingTabs";
 import TerminalPane from "./components/TerminalPane";
 import Modal from "./components/Modal";
 import ConnectionForm, { SshConnectionConfig } from "./components/ConnectionForm";
-import SettingsModal, { AppSettings, defaultSettings } from "./components/SettingsModal";
+import SettingsModal from "./components/SettingsModal";
 import { PluginHost, pluginManager, type SessionInfo, type ModalConfig, type NotificationType } from "./plugins";
 import {
   SplitPane,
@@ -22,82 +22,54 @@ import {
 } from "./components/SplitPane";
 import { SftpBrowser } from "./components/SftpBrowser";
 import { PanePicker, type ActiveConnection } from "./components/PanePicker";
-import { useVault } from "./hooks/useVault";
 import { VaultSetupModal, VaultUnlockModal } from "./components/vault";
 import TunnelManager from "./components/TunnelManager";
 import TunnelSidebar from "./components/TunnelSidebar";
-
-export interface Session {
-  id: string;
-  name: string;
-  type: "ssh" | "local" | "sftp";
-  host?: string;
-  user?: string;
-  status: "connected" | "disconnected" | "connecting";
-}
-
-export interface SavedSession {
-  id: string;
-  name: string;
-  host: string;
-  port: number;
-  username: string;
-  auth_type: "password" | "key";
-  key_path?: string;
-  folder_id?: string;
-  tags: string[];
-  color?: string;
-}
-
-export interface SessionFolder {
-  id: string;
-  name: string;
-  color?: string;
-  parent_id?: string;
-  order: number;
-  expanded: boolean;
-}
-
-export interface RecentSession {
-  id: string;
-  name: string;
-  host: string;
-  port: number;
-  username: string;
-  auth_type: "password" | "key";
-  key_path?: string;
-  last_used: number;
-}
-
-export interface Tab {
-  id: string;
-  sessionId: string;
-  paneTree: PaneNode;
-  title: string;
-  type: "local" | "ssh" | "sftp" | "tunnel";
-  sshConfig?: SshConnectionConfig;
-  focusedPaneId: string | null;
-}
+import { useSessions, useAppSettings, useVaultFlow } from "./hooks";
+import { Session, SavedSession, RecentSession, Tab } from "./types";
+import { generateSessionId, generateTabId, expandHomeDir } from "./utils";
 
 function App() {
   const [sessions] = useState<Session[]>([]);
-  const [savedSessions, setSavedSessions] = useState<SavedSession[]>([]);
-  const [folders, setFolders] = useState<SessionFolder[]>([]);
-  const [recentSessions, setRecentSessions] = useState<RecentSession[]>([]);
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
+
+  // Use extracted hooks
+  const {
+    savedSessions,
+    folders,
+    recentSessions,
+    loadSavedSessions,
+    createFolder,
+    updateFolder,
+    deleteFolder,
+    moveSessionToFolder,
+    deleteSavedSession: handleDeleteSavedSession,
+    deleteRecentSession: handleDeleteRecentSession,
+    clearRecentSessions: handleClearRecentSessions,
+    clearAllSavedSessions,
+    addToRecentSessions,
+  } = useSessions();
+
+  const {
+    settings: appSettings,
+    updateSettings: handleSettingsChange,
+  } = useAppSettings();
+
+  const {
+    vault,
+    showVaultSetup,
+    showVaultUnlock,
+    handleVaultSetupSkip,
+    handleVaultSetup,
+    closeVaultSetup,
+    closeVaultUnlock,
+  } = useVaultFlow();
 
   // Sidebar state - un seul sidebar ouvert à la fois
   const [openSidebar, setOpenSidebar] = useState<"none" | "menu" | "tunnel">("none");
   const isSidebarOpen = openSidebar === "menu";
   const isTunnelSidebarOpen = openSidebar === "tunnel";
-
-  // Vault state
-  const vault = useVault();
-  const [showVaultSetup, setShowVaultSetup] = useState(false);
-  const [showVaultUnlock, setShowVaultUnlock] = useState(false);
-  const [vaultSetupSkipped, setVaultSetupSkipped] = useState(false);
-  const [initialVaultCheckDone, setInitialVaultCheckDone] = useState(false);
 
   // Modal state
   const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false);
@@ -117,7 +89,6 @@ function App() {
 
   // Settings state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [appSettings, setAppSettings] = useState<AppSettings>(defaultSettings);
 
   // Tunnel manager state
   const [tunnelManagerTabId, setTunnelManagerTabId] = useState<string | null>(null);
@@ -128,112 +99,11 @@ function App() {
   // Notification state (for plugins)
   const [notification, setNotification] = useState<{ message: string; type: NotificationType } | null>(null);
 
-  // Handle vault startup flow - only show unlock modal on initial app load
-  useEffect(() => {
-    if (vault.isLoading) return;
-
-    if (!vault.status?.exists) {
-      // No vault exists - show setup modal (unless skipped)
-      if (!vaultSetupSkipped) {
-        setShowVaultSetup(true);
-      }
-      setShowVaultUnlock(false);
-    } else if (!vault.status?.isUnlocked) {
-      // Vault exists but is locked
-      // Only show unlock modal on initial load, not after auto-lock
-      if (!initialVaultCheckDone) {
-        setShowVaultSetup(false);
-        setShowVaultUnlock(true);
-      }
-    } else {
-      // Vault is unlocked - hide all modals
-      setShowVaultSetup(false);
-      setShowVaultUnlock(false);
-    }
-
-    // Mark initial check as done after first evaluation
-    if (!initialVaultCheckDone) {
-      setInitialVaultCheckDone(true);
-    }
-  }, [vault.isLoading, vault.status?.exists, vault.status?.isUnlocked, vaultSetupSkipped, initialVaultCheckDone]);
-
-  // Handle vault setup skip
-  const handleVaultSetupSkip = useCallback(() => {
-    setVaultSetupSkipped(true);
-    setShowVaultSetup(false);
-  }, []);
-
-  // Vault setup handler
-  const handleVaultSetup = useCallback(async (
-    masterPassword: string,
-    autoLockTimeout: number,
-    pin?: string
-  ) => {
-    return vault.createVault({ masterPassword, autoLockTimeout, pin });
-  }, [vault]);
-
-  // Charger les sessions sauvegardées au démarrage
-  const loadSavedSessions = useCallback(async () => {
-    try {
-      const sessions = await invoke<SavedSession[]>("load_saved_sessions");
-      setSavedSessions(sessions);
-    } catch (error) {
-      console.error("Failed to load saved sessions:", error);
-    }
-  }, []);
-
-  // Charger les dossiers au démarrage
-  const loadFolders = useCallback(async () => {
-    try {
-      const loadedFolders = await invoke<SessionFolder[]>("get_folders");
-      setFolders(loadedFolders);
-    } catch (error) {
-      console.error("Failed to load folders:", error);
-    }
-  }, []);
-
-  // Charger les sessions récentes au démarrage
-  const loadRecentSessions = useCallback(async () => {
-    try {
-      const sessions = await invoke<RecentSession[]>("get_recent_sessions");
-      setRecentSessions(sessions);
-    } catch (error) {
-      console.error("Failed to load recent sessions:", error);
-    }
-  }, []);
-
-  // Load app settings on startup
-  const loadAppSettings = useCallback(async () => {
-    try {
-      const settings = await invoke<AppSettings>("load_settings");
-      setAppSettings(settings);
-    } catch (error) {
-      console.error("Failed to load settings:", error);
-    }
-  }, []);
-
-  // Save settings when changed
-  const handleSettingsChange = useCallback(async (newSettings: AppSettings) => {
-    setAppSettings(newSettings);
-    try {
-      await invoke("save_settings", { settings: newSettings });
-    } catch (error) {
-      console.error("Failed to save settings:", error);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadSavedSessions();
-    loadFolders();
-    loadRecentSessions();
-    loadAppSettings();
-  }, [loadSavedSessions, loadFolders, loadRecentSessions, loadAppSettings]);
-
   const handleNewLocalTab = () => {
-    const ptySessionId = `pty-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const ptySessionId = generateSessionId("pty");
     const paneTree = createTerminalNode(ptySessionId);
     const newTab: Tab = {
-      id: `tab-${Date.now()}`,
+      id: generateTabId(),
       sessionId: "local",
       paneTree,
       title: "Terminal",
@@ -285,15 +155,8 @@ function App() {
         return;
       }
 
-      const sessionId = `sftp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-      let keyPath = saved.key_path;
-      if (keyPath?.startsWith("~")) {
-        const home = await invoke<string>("get_home_dir").catch(() => "");
-        if (home) {
-          keyPath = keyPath.replace("~", home);
-        }
-      }
+      const sessionId = generateSessionId("sftp");
+      const keyPath = await expandHomeDir(saved.key_path);
 
       // Register the SSH config for SFTP use
       await invoke("register_sftp_session", {
@@ -308,7 +171,7 @@ function App() {
 
       // Create SFTP tab - no paneTree needed, we render SftpBrowser directly
       const newTab: Tab = {
-        id: `tab-${Date.now()}`,
+        id: generateTabId(),
         sessionId,
         paneTree: createTerminalNode(sessionId), // Placeholder, not used for SFTP
         title: `SFTP - ${saved.name}`,
@@ -324,7 +187,7 @@ function App() {
         focusedPaneId: null,
       };
 
-      setTabs([...tabs, newTab]);
+      setTabs((prev) => [...prev, newTab]);
       setActiveTabId(newTab.id);
     } catch (error) {
       console.error("Failed to open SFTP tab:", error);
@@ -355,15 +218,8 @@ function App() {
         return;
       }
 
-      const sessionId = `tunnel-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-      let keyPath = saved.key_path;
-      if (keyPath?.startsWith("~")) {
-        const home = await invoke<string>("get_home_dir").catch(() => "");
-        if (home) {
-          keyPath = keyPath.replace("~", home);
-        }
-      }
+      const sessionId = generateSessionId("tunnel");
+      const keyPath = await expandHomeDir(saved.key_path);
 
       // Register the SSH config for tunnel use (reuses SFTP registration)
       await invoke("register_sftp_session", {
@@ -378,7 +234,7 @@ function App() {
 
       // Create Tunnel tab
       const newTab: Tab = {
-        id: `tab-${Date.now()}`,
+        id: generateTabId(),
         sessionId,
         paneTree: createTerminalNode(sessionId), // Placeholder, not used for tunnel
         title: `Tunnels - ${saved.name}`,
@@ -394,7 +250,7 @@ function App() {
         focusedPaneId: null,
       };
 
-      setTabs([...tabs, newTab]);
+      setTabs((prev) => [...prev, newTab]);
       setActiveTabId(newTab.id);
     } catch (error) {
       console.error("Failed to open Tunnel tab:", error);
@@ -411,15 +267,8 @@ function App() {
       setPendingSftpSession(null);
 
       try {
-        const sessionId = `sftp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-        let keyPath = config.keyPath;
-        if (keyPath?.startsWith("~")) {
-          const home = await invoke<string>("get_home_dir").catch(() => "");
-          if (home) {
-            keyPath = keyPath.replace("~", home);
-          }
-        }
+        const sessionId = generateSessionId("sftp");
+        const keyPath = await expandHomeDir(config.keyPath);
 
         await invoke("register_sftp_session", {
           sessionId,
@@ -432,7 +281,7 @@ function App() {
         });
 
         const newTab: Tab = {
-          id: `tab-${Date.now()}`,
+          id: generateTabId(),
           sessionId,
           paneTree: createTerminalNode(sessionId),
           title: `SFTP - ${saved.name}`,
@@ -441,7 +290,7 @@ function App() {
           focusedPaneId: null,
         };
 
-        setTabs([...tabs, newTab]);
+        setTabs((prev) => [...prev, newTab]);
         setActiveTabId(newTab.id);
         setIsConnectionModalOpen(false);
         setOpenSidebar("none");
@@ -475,16 +324,10 @@ function App() {
       }
     }
 
-    const ptySessionId = `ssh-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const ptySessionId = generateSessionId("ssh");
 
     try {
-      let keyPath = config.keyPath;
-      if (keyPath?.startsWith("~")) {
-        const home = await invoke<string>("get_home_dir").catch(() => "");
-        if (home) {
-          keyPath = keyPath.replace("~", home);
-        }
-      }
+      const keyPath = await expandHomeDir(config.keyPath);
 
       await invoke("create_ssh_session", {
         sessionId: ptySessionId,
@@ -498,7 +341,7 @@ function App() {
 
       const paneTree = createTerminalNode(ptySessionId);
       const newTab: Tab = {
-        id: `tab-${Date.now()}`,
+        id: generateTabId(),
         sessionId: `ssh-${config.host}`,
         paneTree,
         title: config.name,
@@ -507,7 +350,7 @@ function App() {
         focusedPaneId: paneTree.id,
       };
 
-      setTabs([...tabs, newTab]);
+      setTabs((prev) => [...prev, newTab]);
       setActiveTabId(newTab.id);
       setIsConnectionModalOpen(false);
       setOpenSidebar("none");
@@ -524,7 +367,7 @@ function App() {
       });
 
       // Ajouter aux sessions récentes
-      await invoke("add_to_recent", {
+      await addToRecentSessions({
         name: config.name,
         host: config.host,
         port: config.port,
@@ -532,7 +375,6 @@ function App() {
         authType: config.authType,
         keyPath: config.keyPath,
       });
-      await loadRecentSessions();
 
       // Si on était en mode édition (reconnexion à une session existante), sauvegarder directement les credentials
       if (editingSessionId) {
@@ -577,7 +419,7 @@ function App() {
 
     const config = pendingSaveConfig;
     // Utiliser l'ID existant si on édite, sinon en générer un nouveau
-    const sessionId = editingSessionId || `saved-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const sessionId = editingSessionId || generateSessionId("saved");
 
     try {
       await invoke("save_session", {
@@ -598,57 +440,6 @@ function App() {
       setEditingSessionId(null);
     } catch (error) {
       console.error("Failed to save session:", error);
-    }
-  };
-
-  // Supprimer une session sauvegardée
-  const handleDeleteSavedSession = async (sessionId: string) => {
-    try {
-      await invoke("delete_saved_session", { id: sessionId });
-      await loadSavedSessions();
-    } catch (error) {
-      console.error("Failed to delete session:", error);
-    }
-  };
-
-  // Créer un dossier
-  const handleCreateFolder = async (name: string, color?: string, parentId?: string) => {
-    try {
-      await invoke("create_folder", { name, color, parentId });
-      await loadFolders();
-    } catch (error) {
-      console.error("Failed to create folder:", error);
-    }
-  };
-
-  // Mettre à jour un dossier
-  const handleUpdateFolder = async (id: string, name?: string, color?: string, expanded?: boolean) => {
-    try {
-      await invoke("update_folder", { id, name, color, expanded });
-      await loadFolders();
-    } catch (error) {
-      console.error("Failed to update folder:", error);
-    }
-  };
-
-  // Supprimer un dossier
-  const handleDeleteFolder = async (id: string) => {
-    try {
-      await invoke("delete_folder", { id });
-      await loadFolders();
-      await loadSavedSessions(); // Sessions may have been moved to root
-    } catch (error) {
-      console.error("Failed to delete folder:", error);
-    }
-  };
-
-  // Déplacer une session dans un dossier
-  const handleMoveSessionToFolder = async (sessionId: string, folderId: string | null) => {
-    try {
-      await invoke("update_session_folder", { sessionId, folderId });
-      await loadSavedSessions();
-    } catch (error) {
-      console.error("Failed to move session to folder:", error);
     }
   };
 
@@ -718,15 +509,8 @@ function App() {
       setIsConnecting(true);
       setConnectionError(undefined);
 
-      const ptySessionId = `ssh-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-      let keyPath = saved.key_path;
-      if (keyPath?.startsWith("~")) {
-        const home = await invoke<string>("get_home_dir").catch(() => "");
-        if (home) {
-          keyPath = keyPath.replace("~", home);
-        }
-      }
+      const ptySessionId = generateSessionId("ssh");
+      const keyPath = await expandHomeDir(saved.key_path);
 
       await invoke("create_ssh_session", {
         sessionId: ptySessionId,
@@ -740,7 +524,7 @@ function App() {
 
       const paneTree = createTerminalNode(ptySessionId);
       const newTab: Tab = {
-        id: `tab-${Date.now()}`,
+        id: generateTabId(),
         sessionId: `ssh-${saved.host}`,
         paneTree,
         title: saved.name,
@@ -756,7 +540,7 @@ function App() {
         focusedPaneId: paneTree.id,
       };
 
-      setTabs(prevTabs => [...prevTabs, newTab]);
+      setTabs((prev) => [...prev, newTab]);
       setActiveTabId(newTab.id);
       setIsConnecting(false);
 
@@ -771,7 +555,7 @@ function App() {
       });
 
       // Mettre à jour les sessions récentes
-      await invoke("add_to_recent", {
+      await addToRecentSessions({
         name: saved.name,
         host: saved.host,
         port: saved.port,
@@ -779,7 +563,6 @@ function App() {
         authType: saved.auth_type,
         keyPath: saved.key_path,
       });
-      await loadRecentSessions();
     } catch (error) {
       console.error("[SavedSession] SSH connection failed:", error);
       setConnectionError(String(error));
@@ -792,42 +575,6 @@ function App() {
     // TODO: Pré-remplir le formulaire avec les infos de la session récente
     setIsConnectionModalOpen(true);
     setOpenSidebar("none");
-  };
-
-  // Supprimer une session récente
-  const handleDeleteRecentSession = async (sessionId: string) => {
-    try {
-      await invoke("remove_from_recent", { id: sessionId });
-      await loadRecentSessions();
-    } catch (error) {
-      console.error("Failed to delete recent session:", error);
-    }
-  };
-
-  // Vider l'historique des sessions récentes
-  const handleClearRecentSessions = async () => {
-    try {
-      await invoke("clear_recent");
-      await loadRecentSessions();
-    } catch (error) {
-      console.error("Failed to clear recent sessions:", error);
-    }
-  };
-
-  // Supprimer toutes les sessions sauvegardées
-  const handleClearAllSavedSessions = async () => {
-    try {
-      // Supprimer chaque session une par une
-      for (const session of savedSessions) {
-        await invoke("delete_saved_session", { id: session.id });
-      }
-      await loadSavedSessions();
-      // Vider aussi les récentes
-      await invoke("clear_recent");
-      await loadRecentSessions();
-    } catch (error) {
-      console.error("Failed to clear all sessions:", error);
-    }
   };
 
   const handleCloseTab = (tabId: string) => {
@@ -975,7 +722,7 @@ function App() {
       const activeTab = tabs.find((t) => t.id === activeTabId);
       if (!activeTab) return;
 
-      const newPtySessionId = `pty-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const newPtySessionId = generateSessionId("pty");
       const newPaneTree = replacePendingWithTerminal(activeTab.paneTree, pendingPaneId, newPtySessionId);
 
       setTabs(
@@ -996,16 +743,10 @@ function App() {
       if (!activeTab || !activeTab.sshConfig) return;
 
       const config = activeTab.sshConfig;
-      const ptySessionId = `ssh-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const ptySessionId = generateSessionId("ssh");
 
       try {
-        let keyPath = config.keyPath;
-        if (keyPath?.startsWith("~")) {
-          const home = await invoke<string>("get_home_dir").catch(() => "");
-          if (home) {
-            keyPath = keyPath.replace("~", home);
-          }
-        }
+        const keyPath = await expandHomeDir(config.keyPath);
 
         await invoke("create_ssh_session", {
           sessionId: ptySessionId,
@@ -1087,15 +828,8 @@ function App() {
           return;
         }
 
-        const ptySessionId = `ssh-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-        let keyPath = saved.key_path;
-        if (keyPath?.startsWith("~")) {
-          const home = await invoke<string>("get_home_dir").catch(() => "");
-          if (home) {
-            keyPath = keyPath.replace("~", home);
-          }
-        }
+        const ptySessionId = generateSessionId("ssh");
+        const keyPath = await expandHomeDir(saved.key_path);
 
         await invoke("create_ssh_session", {
           sessionId: ptySessionId,
@@ -1126,7 +860,7 @@ function App() {
           status: 'connected',
         });
 
-        await invoke("add_to_recent", {
+        await addToRecentSessions({
           name: saved.name,
           host: saved.host,
           port: saved.port,
@@ -1134,13 +868,12 @@ function App() {
           authType: saved.auth_type,
           keyPath: saved.key_path,
         });
-        await loadRecentSessions();
       } catch (error) {
         console.error("Failed to connect to saved session:", error);
         handleClosePane(pendingPaneId);
       }
     },
-    [tabs, activeTabId, handleClosePane, loadRecentSessions]
+    [tabs, activeTabId, handleClosePane, addToRecentSessions]
   );
 
   // Handler for selecting a recent session in a pending pane
@@ -1168,7 +901,7 @@ function App() {
       if (!activeTab) return;
 
       // Create a new SFTP session ID
-      const sftpSessionId = `sftp-pane-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const sftpSessionId = generateSessionId("sftp-pane");
 
       // Find the tab that has this ptySessionId to get SSH config
       const sourceTab = tabs.find(t => {
@@ -1207,13 +940,7 @@ function App() {
         }
 
         // Expand ~ in key path
-        let keyPath = config.keyPath;
-        if (keyPath?.startsWith("~")) {
-          const home = await invoke<string>("get_home_dir").catch(() => "");
-          if (home) {
-            keyPath = keyPath.replace("~", home);
-          }
-        }
+        const keyPath = await expandHomeDir(config.keyPath);
 
         // Register SFTP session
         await invoke("register_sftp_session", {
@@ -1451,10 +1178,10 @@ function App() {
         onRecentSessionDelete={handleDeleteRecentSession}
         onClearRecentSessions={handleClearRecentSessions}
         onOpenSettings={() => setIsSettingsOpen(true)}
-        onCreateFolder={handleCreateFolder}
-        onUpdateFolder={handleUpdateFolder}
-        onDeleteFolder={handleDeleteFolder}
-        onMoveSessionToFolder={handleMoveSessionToFolder}
+        onCreateFolder={createFolder}
+        onUpdateFolder={updateFolder}
+        onDeleteFolder={deleteFolder}
+        onMoveSessionToFolder={moveSessionToFolder}
       />
 
       {/* Connection Modal */}
@@ -1539,7 +1266,7 @@ function App() {
         settings={appSettings}
         onSettingsChange={handleSettingsChange}
         savedSessionsCount={savedSessions.length}
-        onClearAllSessions={handleClearAllSavedSessions}
+        onClearAllSessions={() => clearAllSavedSessions(savedSessions)}
       />
 
       {/* Tunnel Manager Modal (for SSH session tunnels) */}
@@ -1591,7 +1318,7 @@ function App() {
       {/* Vault Setup Modal */}
       <VaultSetupModal
         isOpen={showVaultSetup}
-        onClose={() => setShowVaultSetup(false)}
+        onClose={closeVaultSetup}
         onSetup={handleVaultSetup}
         onSkip={handleVaultSetupSkip}
         canSkip={true}
@@ -1600,7 +1327,7 @@ function App() {
       {/* Vault Unlock Modal */}
       <VaultUnlockModal
         isOpen={showVaultUnlock}
-        onClose={() => setShowVaultUnlock(false)}
+        onClose={closeVaultUnlock}
         unlockMethods={vault.status?.unlockMethods || []}
         pinAttemptsRemaining={vault.status?.pinAttemptsRemaining}
         pinLength={vault.status?.pinLength}

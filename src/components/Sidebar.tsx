@@ -20,7 +20,7 @@ import {
   Home,
   ArrowLeftRight,
 } from "lucide-react";
-import { Session, SavedSession, RecentSession, SessionFolder } from "../App";
+import { Session, SavedSession, RecentSession, SessionFolder } from "../types";
 
 interface SidebarProps {
   isOpen: boolean;

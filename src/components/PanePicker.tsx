@@ -1,6 +1,6 @@
 import { Terminal, Server, Clock, Copy, FolderOpen, Wifi } from "lucide-react";
 import type { SshConnectionConfig } from "./ConnectionForm";
-import type { SavedSession, RecentSession } from "../App";
+import type { SavedSession, RecentSession } from "../types";
 
 export interface ActiveConnection {
   tabId: string;

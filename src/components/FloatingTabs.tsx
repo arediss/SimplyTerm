@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, forwardRef } from "react";
 import { createPortal } from "react-dom";
 import { Menu, Plus, X, Minus, Square, Copy, ChevronDown, Terminal, Clock, ArrowLeftRight } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Tab, RecentSession } from "../App";
+import { Tab, RecentSession } from "../types";
 
 interface FloatingTabsProps {
   tabs: Tab[];
