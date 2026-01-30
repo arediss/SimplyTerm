@@ -185,11 +185,13 @@ function Terminal({ sessionId, type, onExit, isActive = true }: TerminalProps) {
   };
 
   return (
-    <div
-      ref={terminalRef}
-      className="h-full w-full bg-terminal p-3"
-      onClick={handleClick}
-    />
+    <div className="h-full w-full bg-terminal p-3">
+      <div
+        ref={terminalRef}
+        className="h-full w-full"
+        onClick={handleClick}
+      />
+    </div>
   );
 }
 
