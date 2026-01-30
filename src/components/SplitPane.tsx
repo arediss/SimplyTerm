@@ -1,5 +1,5 @@
 import { useRef, useCallback, useEffect } from "react";
-import { Columns2, Rows2, X } from "lucide-react";
+import { Columns2, Rows2, X, ArrowLeftRight } from "lucide-react";
 
 // ============================================================================
 // Types
@@ -22,6 +22,9 @@ export interface SplitPaneProps {
   onClosePane: (paneId: string) => void;
   onSplitPane?: (paneId: string, direction: "horizontal" | "vertical") => void;
   depth?: number;
+  // Tunnel support
+  sessionType?: "local" | "ssh";
+  onOpenTunnels?: () => void;
 }
 
 // ============================================================================
@@ -33,11 +36,30 @@ interface PaneToolbarProps {
   onSplitHorizontal: () => void;
   onSplitVertical: () => void;
   onClose: () => void;
+  showTunnelButton?: boolean;
+  onOpenTunnels?: () => void;
 }
 
-function PaneToolbar({ onSplitHorizontal, onSplitVertical, onClose }: PaneToolbarProps) {
+function PaneToolbar({ onSplitHorizontal, onSplitVertical, onClose, showTunnelButton, onOpenTunnels }: PaneToolbarProps) {
   return (
     <div className="absolute top-1 right-1 z-10 flex items-center gap-0.5 bg-crust/80 backdrop-blur-sm rounded-md p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+      {/* Tunnel button for SSH sessions */}
+      {showTunnelButton && onOpenTunnels && (
+        <>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenTunnels();
+            }}
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-blue/20 text-blue hover:text-blue transition-colors"
+            title="Port Forwarding (Tunnels)"
+          >
+            <ArrowLeftRight size={14} />
+          </button>
+          {/* Separator */}
+          <div className="w-px h-4 bg-surface-0/50 mx-0.5" />
+        </>
+      )}
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -146,6 +168,8 @@ export function SplitPane({
   onClosePane,
   onSplitPane,
   depth = 0,
+  sessionType,
+  onOpenTunnels,
 }: SplitPaneProps) {
   const isFocused = focusedPaneId === node.id;
 
@@ -166,6 +190,8 @@ export function SplitPane({
             onSplitHorizontal={() => onSplitPane(node.id, "horizontal")}
             onSplitVertical={() => onSplitPane(node.id, "vertical")}
             onClose={() => onClosePane(node.id)}
+            showTunnelButton={sessionType === "ssh"}
+            onOpenTunnels={onOpenTunnels}
           />
         )}
       </div>
@@ -288,6 +314,8 @@ export function SplitPane({
               onClosePane={onClosePane}
               onSplitPane={onSplitPane}
               depth={depth + 1}
+              sessionType={sessionType}
+              onOpenTunnels={onOpenTunnels}
             />
           </div>
 

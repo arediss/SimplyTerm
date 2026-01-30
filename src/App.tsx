@@ -24,6 +24,7 @@ import { SftpBrowser } from "./components/SftpBrowser";
 import { PanePicker, type ActiveConnection } from "./components/PanePicker";
 import { useVault } from "./hooks/useVault";
 import { VaultSetupModal, VaultUnlockModal } from "./components/vault";
+import TunnelManager from "./components/TunnelManager";
 
 export interface Session {
   id: string;
@@ -72,7 +73,7 @@ export interface Tab {
   sessionId: string;
   paneTree: PaneNode;
   title: string;
-  type: "local" | "ssh" | "sftp";
+  type: "local" | "ssh" | "sftp" | "tunnel";
   sshConfig?: SshConnectionConfig;
   focusedPaneId: string | null;
 }
@@ -112,6 +113,9 @@ function App() {
   // Settings state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [appSettings, setAppSettings] = useState<AppSettings>(defaultSettings);
+
+  // Tunnel manager state
+  const [tunnelManagerTabId, setTunnelManagerTabId] = useState<string | null>(null);
 
   // Notification state (for plugins)
   const [notification, setNotification] = useState<{ message: string; type: NotificationType } | null>(null);
@@ -316,6 +320,76 @@ function App() {
       setActiveTabId(newTab.id);
     } catch (error) {
       console.error("Failed to open SFTP tab:", error);
+    }
+  };
+
+  // Open Tunnel-only tab for a saved session
+  const handleOpenTunnelTab = async (saved: SavedSession) => {
+    setIsSidebarOpen(false);
+
+    try {
+      // Get credentials for this saved session
+      let credentials: { password: string | null; key_passphrase: string | null };
+      try {
+        credentials = await invoke<{ password: string | null; key_passphrase: string | null }>(
+          "get_session_credentials",
+          { id: saved.id }
+        );
+      } catch (err) {
+        console.log("[Tunnel] Cannot get credentials (vault locked?):", err);
+        // For now, show an error. In the future, we could open a credential prompt.
+        return;
+      }
+
+      const needsPassword = saved.auth_type === "password" && !credentials.password;
+      if (needsPassword) {
+        console.log("[Tunnel] Password required but not available");
+        return;
+      }
+
+      const sessionId = `tunnel-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      let keyPath = saved.key_path;
+      if (keyPath?.startsWith("~")) {
+        const home = await invoke<string>("get_home_dir").catch(() => "");
+        if (home) {
+          keyPath = keyPath.replace("~", home);
+        }
+      }
+
+      // Register the SSH config for tunnel use (reuses SFTP registration)
+      await invoke("register_sftp_session", {
+        sessionId,
+        host: saved.host,
+        port: saved.port,
+        username: saved.username,
+        password: saved.auth_type === "password" ? credentials.password : null,
+        keyPath: saved.auth_type === "key" ? keyPath : null,
+        keyPassphrase: saved.auth_type === "key" ? credentials.key_passphrase : null,
+      });
+
+      // Create Tunnel tab
+      const newTab: Tab = {
+        id: `tab-${Date.now()}`,
+        sessionId,
+        paneTree: createTerminalNode(sessionId), // Placeholder, not used for tunnel
+        title: `Tunnels - ${saved.name}`,
+        type: "tunnel",
+        sshConfig: {
+          name: saved.name,
+          host: saved.host,
+          port: saved.port,
+          username: saved.username,
+          authType: saved.auth_type,
+          keyPath: saved.key_path,
+        },
+        focusedPaneId: null,
+      };
+
+      setTabs([...tabs, newTab]);
+      setActiveTabId(newTab.id);
+    } catch (error) {
+      console.error("Failed to open Tunnel tab:", error);
     }
   };
 
@@ -1276,6 +1350,19 @@ function App() {
               {/* SFTP tabs render SftpBrowser directly */}
               {tab.type === "sftp" ? (
                 <SftpBrowser sessionId={tab.sessionId} initialPath="/" />
+              ) : tab.type === "tunnel" ? (
+                /* Tunnel tabs render TunnelManager directly (embedded, not modal) */
+                <div className="w-full h-full flex items-center justify-center bg-base p-6">
+                  <div className="w-full max-w-2xl h-full">
+                    <TunnelManager
+                      isOpen={true}
+                      onClose={() => {}} // No-op, can't close embedded view
+                      sessionId={tab.sessionId}
+                      sessionName={tab.title.replace("Tunnels - ", "")}
+                      embedded={true}
+                    />
+                  </div>
+                </div>
               ) : (
                 <SplitPane
                   node={tab.paneTree}
@@ -1284,6 +1371,8 @@ function App() {
                   onFocusPane={handleFocusPane}
                   onClosePane={handleClosePane}
                   onSplitPane={handleSplitPaneById}
+                  sessionType={tab.type as "local" | "ssh"}
+                  onOpenTunnels={tab.type === "ssh" ? () => setTunnelManagerTabId(tab.id) : undefined}
                   renderTerminal={(_paneId, ptySessionId, isFocused) => (
                     <TerminalPane
                       key={ptySessionId}
@@ -1346,6 +1435,7 @@ function App() {
         onSavedSessionEdit={handleEditSavedSession}
         onSavedSessionDelete={handleDeleteSavedSession}
         onSavedSessionSftp={handleOpenSftpTab}
+        onSavedSessionTunnel={handleOpenTunnelTab}
         onRecentSessionConnect={handleConnectToRecentSession}
         onRecentSessionDelete={handleDeleteRecentSession}
         onClearRecentSessions={handleClearRecentSessions}
@@ -1440,6 +1530,20 @@ function App() {
         savedSessionsCount={savedSessions.length}
         onClearAllSessions={handleClearAllSavedSessions}
       />
+
+      {/* Tunnel Manager Modal */}
+      {tunnelManagerTabId && (() => {
+        const tab = tabs.find(t => t.id === tunnelManagerTabId);
+        if (!tab || tab.type !== "ssh") return null;
+        return (
+          <TunnelManager
+            isOpen={true}
+            onClose={() => setTunnelManagerTabId(null)}
+            sessionId={tab.sessionId}
+            sessionName={tab.title}
+          />
+        );
+      })()}
 
       {/* Plugin Host */}
       <PluginHost

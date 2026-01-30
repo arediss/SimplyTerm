@@ -18,6 +18,7 @@ import {
   FolderPlus,
   FolderInput,
   Home,
+  ArrowLeftRight,
 } from "lucide-react";
 import { Session, SavedSession, RecentSession, SessionFolder } from "../App";
 
@@ -33,6 +34,7 @@ interface SidebarProps {
   onSavedSessionEdit: (session: SavedSession) => void;
   onSavedSessionDelete: (sessionId: string) => void;
   onSavedSessionSftp: (session: SavedSession) => void;
+  onSavedSessionTunnel: (session: SavedSession) => void;
   onRecentSessionConnect: (session: RecentSession) => void;
   onRecentSessionDelete: (sessionId: string) => void;
   onClearRecentSessions: () => void;
@@ -55,6 +57,7 @@ function Sidebar({
   onSavedSessionEdit,
   onSavedSessionDelete,
   onSavedSessionSftp,
+  onSavedSessionTunnel,
   onRecentSessionConnect,
   onRecentSessionDelete,
   onClearRecentSessions,
@@ -297,6 +300,7 @@ function Sidebar({
                     onSessionEdit={onSavedSessionEdit}
                     onSessionDelete={onSavedSessionDelete}
                     onSessionSftp={onSavedSessionSftp}
+                    onSessionTunnel={onSavedSessionTunnel}
                     allFolders={folders}
                     onMoveSessionToFolder={_onMoveSessionToFolder}
                   />
@@ -312,6 +316,7 @@ function Sidebar({
                       onEdit={() => onSavedSessionEdit(session)}
                       onDelete={() => onSavedSessionDelete(session.id)}
                       onSftp={() => onSavedSessionSftp(session)}
+                      onTunnel={() => onSavedSessionTunnel(session)}
                       folders={folders}
                       onMoveToFolder={(folderId) => _onMoveSessionToFolder(session.id, folderId)}
                     />
@@ -397,6 +402,7 @@ interface SavedSessionItemProps {
   onEdit: () => void;
   onDelete: () => void;
   onSftp: () => void;
+  onTunnel: () => void;
   folders?: SessionFolder[];
   onMoveToFolder?: (folderId: string | null) => void;
 }
@@ -407,6 +413,7 @@ function SavedSessionItem({
   onEdit,
   onDelete,
   onSftp,
+  onTunnel,
   folders = [],
   onMoveToFolder,
 }: SavedSessionItemProps) {
@@ -501,6 +508,13 @@ function SavedSessionItem({
             <FolderOpen size={12} />
             <span>Ouvrir SFTP</span>
           </button>
+          <button
+            onClick={() => handleAction(onTunnel)}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-blue hover:bg-blue/10 transition-colors"
+          >
+            <ArrowLeftRight size={12} />
+            <span>Tunnel Only</span>
+          </button>
           <div className="h-px bg-surface-0/30 my-1" />
           {folders.length > 0 && onMoveToFolder && (
             <div
@@ -572,6 +586,7 @@ interface FolderItemProps {
   onSessionEdit: (session: SavedSession) => void;
   onSessionDelete: (sessionId: string) => void;
   onSessionSftp: (session: SavedSession) => void;
+  onSessionTunnel: (session: SavedSession) => void;
   allFolders: SessionFolder[];
   onMoveSessionToFolder: (sessionId: string, folderId: string | null) => void;
 }
@@ -586,6 +601,7 @@ function FolderItem({
   onSessionEdit,
   onSessionDelete,
   onSessionSftp,
+  onSessionTunnel,
   allFolders,
   onMoveSessionToFolder,
 }: FolderItemProps) {
@@ -690,6 +706,7 @@ function FolderItem({
               onEdit={() => onSessionEdit(session)}
               onDelete={() => onSessionDelete(session.id)}
               onSftp={() => onSessionSftp(session)}
+              onTunnel={() => onSessionTunnel(session)}
               folders={allFolders}
               onMoveToFolder={(folderId) => onMoveSessionToFolder(session.id, folderId)}
             />

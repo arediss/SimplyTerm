@@ -12,6 +12,7 @@ mod edit_watcher;
 mod plugins;
 mod session;
 mod storage;
+mod tunnels;
 
 use connectors::{connect_ssh, create_local_session, ssh_exec::ssh_exec, SshAuth, SshConfig, FileEntry, sftp_read_file};
 use plugins::{PluginManager, PluginState};
@@ -28,6 +29,7 @@ use storage::{
 
 use edit_watcher::EditWatcher;
 use parking_lot::Mutex;
+use tunnels::{TunnelManager, TunnelInfo};
 
 /// État global de l'application
 struct AppState {
@@ -35,6 +37,7 @@ struct AppState {
     plugin_manager: Arc<PluginManager>,
     vault: Arc<VaultState>,
     edit_watcher: Arc<Mutex<EditWatcher>>,
+    tunnel_manager: Arc<TunnelManager>,
 }
 
 // ============================================================================
@@ -712,6 +715,99 @@ fn save_settings(settings: AppSettings) -> Result<(), String> {
 }
 
 // ============================================================================
+// Tunnel Commands (SSH Port Forwarding)
+// ============================================================================
+
+/// Create a new SSH tunnel (local, remote, or dynamic forwarding)
+#[tauri::command]
+async fn tunnel_create(
+    app: AppHandle,
+    session_id: String,
+    tunnel_type: String, // "local" | "remote" | "dynamic"
+    local_port: u16,
+    remote_host: Option<String>,
+    remote_port: Option<u16>,
+) -> Result<TunnelInfo, String> {
+    let state = app.state::<AppState>();
+    
+    // Get SSH config for this session
+    let ssh_config = state
+        .session_manager
+        .get_ssh_config(&session_id)
+        .ok_or_else(|| "SSH session not found".to_string())?;
+    
+    let tunnel_id = match tunnel_type.as_str() {
+        "local" => {
+            let remote_host = remote_host.ok_or("remote_host is required for local forwarding")?;
+            let remote_port = remote_port.ok_or("remote_port is required for local forwarding")?;
+            tunnels::local_forward::start_local_forward(
+                state.tunnel_manager.clone(),
+                &ssh_config,
+                session_id,
+                local_port,
+                remote_host,
+                remote_port,
+            ).await?
+        }
+        "remote" => {
+            let local_host = remote_host.unwrap_or_else(|| "127.0.0.1".to_string());
+            let remote_port = remote_port.ok_or("remote_port is required for remote forwarding")?;
+            tunnels::remote_forward::start_remote_forward(
+                state.tunnel_manager.clone(),
+                &ssh_config,
+                session_id,
+                remote_port,
+                local_host,
+                local_port,
+            ).await?
+        }
+        "dynamic" => {
+            tunnels::dynamic_forward::start_dynamic_forward(
+                state.tunnel_manager.clone(),
+                &ssh_config,
+                session_id,
+                local_port,
+            ).await?
+        }
+        _ => return Err(format!("Invalid tunnel type: {}", tunnel_type)),
+    };
+    
+    // Return the tunnel info
+    state.tunnel_manager.get(&tunnel_id)
+        .ok_or_else(|| "Failed to get tunnel info".to_string())
+}
+
+/// Stop a tunnel
+#[tauri::command]
+async fn tunnel_stop(app: AppHandle, tunnel_id: String) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    state.tunnel_manager.stop(&tunnel_id)
+}
+
+/// List all tunnels, optionally filtered by session_id
+#[tauri::command]
+async fn tunnel_list(app: AppHandle, session_id: Option<String>) -> Result<Vec<TunnelInfo>, String> {
+    let state = app.state::<AppState>();
+    Ok(state.tunnel_manager.list(session_id.as_deref()))
+}
+
+/// Get info for a specific tunnel
+#[tauri::command]
+async fn tunnel_get(app: AppHandle, tunnel_id: String) -> Result<TunnelInfo, String> {
+    let state = app.state::<AppState>();
+    state.tunnel_manager.get(&tunnel_id)
+        .ok_or_else(|| format!("Tunnel not found: {}", tunnel_id))
+}
+
+/// Remove a stopped tunnel from the list
+#[tauri::command]
+async fn tunnel_remove(app: AppHandle, tunnel_id: String) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    state.tunnel_manager.remove(&tunnel_id);
+    Ok(())
+}
+
+// ============================================================================
 // Commandes Plugins
 // ============================================================================
 
@@ -881,11 +977,13 @@ pub fn run() {
                 session_manager.clone(),
                 app.handle().clone(),
             )));
+            let tunnel_manager = Arc::new(TunnelManager::new());
             app.manage(AppState {
                 session_manager,
                 plugin_manager,
                 vault: vault.clone(),
                 edit_watcher,
+                tunnel_manager,
             });
             // Also manage vault directly for vault commands
             app.manage(vault);
@@ -932,6 +1030,12 @@ pub fn run() {
             // Settings
             load_settings,
             save_settings,
+            // Tunnels (SSH Port Forwarding)
+            tunnel_create,
+            tunnel_stop,
+            tunnel_list,
+            tunnel_get,
+            tunnel_remove,
             // Plugins
             list_plugins,
             get_plugin_manifest,
