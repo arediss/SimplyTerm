@@ -21,6 +21,8 @@ import {
 } from "./components/SplitPane";
 import { SftpBrowser } from "./components/SftpBrowser";
 import { PanePicker } from "./components/PanePicker";
+import { useVault } from "./hooks/useVault";
+import { VaultSetupModal, VaultUnlockModal } from "./components/vault";
 
 export interface Session {
   id: string;
@@ -83,6 +85,12 @@ function App() {
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // Vault state
+  const vault = useVault();
+  const [showVaultSetup, setShowVaultSetup] = useState(false);
+  const [showVaultUnlock, setShowVaultUnlock] = useState(false);
+  const [vaultSetupSkipped, setVaultSetupSkipped] = useState(false);
+
   // Modal state
   const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -105,6 +113,42 @@ function App() {
 
   // Notification state (for plugins)
   const [notification, setNotification] = useState<{ message: string; type: NotificationType } | null>(null);
+
+  // Handle vault startup flow
+  useEffect(() => {
+    if (vault.isLoading) return;
+
+    if (!vault.status?.exists) {
+      // No vault exists - show setup modal (unless skipped)
+      if (!vaultSetupSkipped) {
+        setShowVaultSetup(true);
+      }
+      setShowVaultUnlock(false);
+    } else if (!vault.status?.isUnlocked) {
+      // Vault exists but is locked - show unlock modal
+      setShowVaultSetup(false);
+      setShowVaultUnlock(true);
+    } else {
+      // Vault is unlocked - hide all modals
+      setShowVaultSetup(false);
+      setShowVaultUnlock(false);
+    }
+  }, [vault.isLoading, vault.status?.exists, vault.status?.isUnlocked, vaultSetupSkipped]);
+
+  // Handle vault setup skip
+  const handleVaultSetupSkip = useCallback(() => {
+    setVaultSetupSkipped(true);
+    setShowVaultSetup(false);
+  }, []);
+
+  // Vault setup handler
+  const handleVaultSetup = useCallback(async (
+    masterPassword: string,
+    autoLockTimeout: number,
+    pin?: string
+  ) => {
+    return vault.createVault({ masterPassword, autoLockTimeout, pin });
+  }, [vault]);
 
   // Charger les sessions sauvegardées au démarrage
   const loadSavedSessions = useCallback(async () => {
@@ -183,27 +227,39 @@ function App() {
   const handleOpenSftpTab = async (saved: SavedSession) => {
     setIsSidebarOpen(false);
 
+    // Helper pour ouvrir le formulaire de connexion SFTP
+    const openSftpConnectionForm = () => {
+      setPendingSftpSession(saved);
+      setInitialConnectionConfig({
+        name: saved.name,
+        host: saved.host,
+        port: saved.port,
+        username: saved.username,
+        authType: saved.auth_type,
+        keyPath: saved.key_path,
+      });
+      setConnectionError("Entrez votre mot de passe pour ouvrir SFTP");
+      setIsConnectionModalOpen(true);
+    };
+
     try {
       // Get credentials for this saved session
-      const credentials = await invoke<{ password: string | null; key_passphrase: string | null }>(
-        "get_session_credentials",
-        { id: saved.id }
-      );
+      let credentials: { password: string | null; key_passphrase: string | null };
+      try {
+        credentials = await invoke<{ password: string | null; key_passphrase: string | null }>(
+          "get_session_credentials",
+          { id: saved.id }
+        );
+      } catch (err) {
+        // Vault probablement verrouillé - ouvrir le formulaire
+        console.log("[SFTP] Cannot get credentials (vault locked?):", err);
+        openSftpConnectionForm();
+        return;
+      }
 
       const needsPassword = saved.auth_type === "password" && !credentials.password;
       if (needsPassword) {
-        // Open connection form to get credentials, then open SFTP
-        setPendingSftpSession(saved);
-        setInitialConnectionConfig({
-          name: saved.name,
-          host: saved.host,
-          port: saved.port,
-          username: saved.username,
-          authType: saved.auth_type,
-          keyPath: saved.key_path,
-        });
-        setConnectionError("Entrez votre mot de passe pour ouvrir SFTP");
-        setIsConnectionModalOpen(true);
+        openSftpConnectionForm();
         return;
       }
 
@@ -299,6 +355,25 @@ function App() {
         setIsSidebarOpen(false);
         setIsConnecting(false);
         setInitialConnectionConfig(null);
+
+        // Sauvegarder les credentials pour la session SFTP existante
+        try {
+          await invoke("save_session", {
+            id: saved.id,
+            name: config.name,
+            host: config.host,
+            port: config.port,
+            username: config.username,
+            authType: config.authType,
+            keyPath: config.keyPath,
+            password: config.password,
+            keyPassphrase: config.keyPassphrase,
+          });
+          console.log("[SFTP] Credentials saved to vault");
+          await loadSavedSessions();
+        } catch (err) {
+          console.error("[SFTP] Failed to save credentials:", err);
+        }
         return;
       } catch (error) {
         console.error("Failed to open SFTP:", error);
@@ -367,10 +442,26 @@ function App() {
       });
       await loadRecentSessions();
 
-      // Si on était en mode édition, proposer de mettre à jour
+      // Si on était en mode édition (reconnexion à une session existante), sauvegarder directement les credentials
       if (editingSessionId) {
-        setPendingSaveConfig(config);
-        setIsSaveModalOpen(true);
+        try {
+          await invoke("save_session", {
+            id: editingSessionId,
+            name: config.name,
+            host: config.host,
+            port: config.port,
+            username: config.username,
+            authType: config.authType,
+            keyPath: config.keyPath,
+            password: config.password,
+            keyPassphrase: config.keyPassphrase,
+          });
+          console.log("[SavedSession] Credentials saved to vault");
+          await loadSavedSessions();
+        } catch (err) {
+          console.error("[SavedSession] Failed to save credentials:", err);
+        }
+        setEditingSessionId(null);
       } else {
         // Proposer de sauvegarder si pas déjà sauvegardée
         const isAlreadySaved = savedSessions.some(
@@ -489,12 +580,36 @@ function App() {
   const handleConnectToSavedSession = async (saved: SavedSession) => {
     setIsSidebarOpen(false);
 
+    // Helper pour ouvrir le formulaire de connexion
+    const openConnectionForm = (message: string) => {
+      console.log("[SavedSession] Opening form:", message);
+      setEditingSessionId(saved.id); // Important: marquer qu'on édite cette session pour sauvegarder les credentials
+      setInitialConnectionConfig({
+        name: saved.name,
+        host: saved.host,
+        port: saved.port,
+        username: saved.username,
+        authType: saved.auth_type,
+        keyPath: saved.key_path,
+      });
+      setConnectionError(message);
+      setIsConnectionModalOpen(true);
+    };
+
     try {
-      // Récupérer les credentials
-      const credentials = await invoke<{ password: string | null; key_passphrase: string | null }>(
-        "get_session_credentials",
-        { id: saved.id }
-      );
+      // Récupérer les credentials (peut échouer si vault verrouillé)
+      let credentials: { password: string | null; key_passphrase: string | null };
+      try {
+        credentials = await invoke<{ password: string | null; key_passphrase: string | null }>(
+          "get_session_credentials",
+          { id: saved.id }
+        );
+      } catch (err) {
+        // Vault probablement verrouillé ou non configuré - ouvrir le formulaire
+        console.log("[SavedSession] Cannot get credentials (vault locked?):", err);
+        openConnectionForm("Entrez votre mot de passe pour vous connecter");
+        return;
+      }
 
       // Vérifier si on a les credentials nécessaires
       // Pour password auth: on a besoin du password
@@ -503,17 +618,7 @@ function App() {
 
       // Si password manquant, ouvrir le formulaire pré-rempli
       if (needsPassword) {
-        console.log("[SavedSession] Credentials missing, opening form");
-        setInitialConnectionConfig({
-          name: saved.name,
-          host: saved.host,
-          port: saved.port,
-          username: saved.username,
-          authType: saved.auth_type,
-          keyPath: saved.key_path,
-        });
-        setConnectionError("Veuillez entrer votre mot de passe");
-        setIsConnectionModalOpen(true);
+        openConnectionForm("Veuillez entrer votre mot de passe");
         return;
       }
 
@@ -851,26 +956,40 @@ function App() {
       const activeTab = tabs.find((t) => t.id === activeTabId);
       if (!activeTab) return;
 
+      // Helper pour ouvrir le formulaire
+      const openFormForCredentials = () => {
+        handleClosePane(pendingPaneId);
+        setEditingSessionId(saved.id);
+        setInitialConnectionConfig({
+          name: saved.name,
+          host: saved.host,
+          port: saved.port,
+          username: saved.username,
+          authType: saved.auth_type,
+          keyPath: saved.key_path,
+        });
+        setConnectionError("Veuillez entrer votre mot de passe");
+        setIsConnectionModalOpen(true);
+      };
+
       try {
-        const credentials = await invoke<{ password: string | null; key_passphrase: string | null }>(
-          "get_session_credentials",
-          { id: saved.id }
-        );
+        // Essayer de récupérer les credentials
+        let credentials: { password: string | null; key_passphrase: string | null };
+        try {
+          credentials = await invoke<{ password: string | null; key_passphrase: string | null }>(
+            "get_session_credentials",
+            { id: saved.id }
+          );
+        } catch (err) {
+          // Vault verrouillé - ouvrir le formulaire
+          console.log("[PanePicker] Cannot get credentials (vault locked?):", err);
+          openFormForCredentials();
+          return;
+        }
 
         const needsPassword = saved.auth_type === "password" && !credentials.password;
         if (needsPassword) {
-          // Close the pending pane and open the connection modal
-          handleClosePane(pendingPaneId);
-          setInitialConnectionConfig({
-            name: saved.name,
-            host: saved.host,
-            port: saved.port,
-            username: saved.username,
-            authType: saved.auth_type,
-            keyPath: saved.key_path,
-          });
-          setConnectionError("Veuillez entrer votre mot de passe");
-          setIsConnectionModalOpen(true);
+          openFormForCredentials();
           return;
         }
 
@@ -1225,6 +1344,27 @@ function App() {
 
       {/* Debug Stats - only in dev */}
       {import.meta.env.DEV && <DebugStats />}
+
+      {/* Vault Setup Modal */}
+      <VaultSetupModal
+        isOpen={showVaultSetup}
+        onClose={() => setShowVaultSetup(false)}
+        onSetup={handleVaultSetup}
+        onSkip={handleVaultSetupSkip}
+        canSkip={true}
+      />
+
+      {/* Vault Unlock Modal */}
+      <VaultUnlockModal
+        isOpen={showVaultUnlock}
+        onClose={() => setShowVaultUnlock(false)}
+        unlockMethods={vault.status?.unlockMethods || []}
+        pinAttemptsRemaining={vault.status?.pinAttemptsRemaining}
+        pinLength={vault.status?.pinLength}
+        onUnlockWithPassword={vault.unlockWithPassword}
+        onUnlockWithPin={vault.unlockWithPin}
+        onUnlockWithSecurityKey={vault.unlockWithSecurityKey}
+      />
     </div>
   );
 }

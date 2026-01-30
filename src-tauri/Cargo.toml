@@ -36,10 +36,21 @@ uuid = { version = "1", features = ["v4"] }
 parking_lot = "0.12"
 
 # Storage & Credentials
-keyring = "3"
 dirs = "5"
 chrono = "0.4"
 rand = "0.8"
+
+# Vault encryption
+aes-gcm = "0.10"
+argon2 = "0.5"
+zeroize = { version = "1.8", features = ["derive"] }
+base64 = "0.22"
+hex = "0.4"
+hkdf = "0.12"
+sha2 = "0.10"
+
+# FIDO2 security keys
+ctap-hid-fido2 = "3.5"
 
 # System info (debug)
 sysinfo = "0.32"

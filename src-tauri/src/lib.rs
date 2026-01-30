@@ -17,18 +17,19 @@ use plugins::{PluginManager, PluginState};
 use session::SessionManager;
 use storage::{
     load_sessions, save_sessions, SavedSession, AuthType,
-    store_credential, get_credential, delete_credential, CredentialType,
     load_recent_sessions, add_recent_session, remove_recent_session, clear_recent_sessions, RecentSession,
     load_settings as load_app_settings, save_settings as save_app_settings, AppSettings,
-    load_folders, save_folders, create_folder as storage_create_folder,
+    load_folders, create_folder as storage_create_folder,
     update_folder as storage_update_folder, delete_folder as storage_delete_folder,
     reorder_folders as storage_reorder_folders, SessionFolder,
+    VaultState, VaultCredentialType,
 };
 
 /// État global de l'application
 struct AppState {
     session_manager: Arc<SessionManager>,
     plugin_manager: Arc<PluginManager>,
+    vault: Arc<VaultState>,
 }
 
 // ============================================================================
@@ -304,6 +305,7 @@ fn load_saved_sessions() -> Result<Vec<SavedSessionResponse>, String> {
 
 #[tauri::command]
 fn save_session(
+    app: AppHandle,
     id: String,
     name: String,
     host: String,
@@ -317,6 +319,8 @@ fn save_session(
     tags: Option<Vec<String>>,
     color: Option<String>,
 ) -> Result<(), String> {
+    let state = app.state::<AppState>();
+
     // Charger les sessions existantes
     let mut sessions = load_sessions()?;
 
@@ -347,16 +351,18 @@ fn save_session(
     // Sauvegarder le fichier JSON
     save_sessions(&sessions)?;
 
-    // Stocker les credentials de manière sécurisée
-    if let Some(pwd) = password {
-        if !pwd.is_empty() {
-            store_credential(&id, CredentialType::Password, &pwd)?;
+    // Stocker les credentials dans le vault (si déverrouillé)
+    if state.vault.is_unlocked() {
+        if let Some(pwd) = password {
+            if !pwd.is_empty() {
+                state.vault.store_credential(&id, VaultCredentialType::Password, &pwd)?;
+            }
         }
-    }
 
-    if let Some(passphrase) = key_passphrase {
-        if !passphrase.is_empty() {
-            store_credential(&id, CredentialType::KeyPassphrase, &passphrase)?;
+        if let Some(passphrase) = key_passphrase {
+            if !passphrase.is_empty() {
+                state.vault.store_credential(&id, VaultCredentialType::KeyPassphrase, &passphrase)?;
+            }
         }
     }
 
@@ -364,7 +370,9 @@ fn save_session(
 }
 
 #[tauri::command]
-fn delete_saved_session(id: String) -> Result<(), String> {
+fn delete_saved_session(app: AppHandle, id: String) -> Result<(), String> {
+    let state = app.state::<AppState>();
+
     // Charger les sessions
     let mut sessions = load_sessions()?;
 
@@ -374,18 +382,25 @@ fn delete_saved_session(id: String) -> Result<(), String> {
     // Sauvegarder
     save_sessions(&sessions)?;
 
-    // Supprimer les credentials associés
-    let _ = delete_credential(&id, CredentialType::Password);
-    let _ = delete_credential(&id, CredentialType::KeyPassphrase);
+    // Supprimer les credentials du vault (si déverrouillé)
+    if state.vault.is_unlocked() {
+        let _ = state.vault.delete_all_credentials(&id);
+    }
 
     Ok(())
 }
 
 /// Récupère les credentials pour une session (pour connexion)
 #[tauri::command]
-fn get_session_credentials(id: String) -> Result<SessionCredentials, String> {
-    let password = get_credential(&id, CredentialType::Password)?;
-    let key_passphrase = get_credential(&id, CredentialType::KeyPassphrase)?;
+fn get_session_credentials(app: AppHandle, id: String) -> Result<SessionCredentials, String> {
+    let state = app.state::<AppState>();
+
+    if !state.vault.is_unlocked() {
+        return Err("Vault is locked".to_string());
+    }
+
+    let password = state.vault.get_credential(&id, VaultCredentialType::Password)?;
+    let key_passphrase = state.vault.get_credential(&id, VaultCredentialType::KeyPassphrase)?;
 
     Ok(SessionCredentials {
         password,
@@ -819,7 +834,10 @@ pub fn run() {
         .setup(|app| {
             let session_manager = SessionManager::new(app.handle().clone());
             let plugin_manager = Arc::new(PluginManager::default());
-            app.manage(AppState { session_manager, plugin_manager });
+            let vault = Arc::new(VaultState::new().expect("Failed to initialize vault"));
+            app.manage(AppState { session_manager, plugin_manager, vault: vault.clone() });
+            // Also manage vault directly for vault commands
+            app.manage(vault);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -873,6 +891,31 @@ pub fn run() {
             plugin_invoke,
             // Debug
             get_process_stats,
+            // Vault
+            storage::vault::get_vault_status,
+            storage::vault::create_vault,
+            storage::vault::unlock_vault_with_password,
+            storage::vault::unlock_vault_with_pin,
+            storage::vault::lock_vault,
+            storage::vault::is_vault_unlocked,
+            storage::vault::vault_store_credential,
+            storage::vault::vault_get_credential,
+            storage::vault::vault_delete_credential,
+            storage::vault::vault_delete_all_credentials,
+            storage::vault::update_vault_settings,
+            storage::vault::change_master_password,
+            storage::vault::setup_vault_pin,
+            storage::vault::remove_vault_pin,
+            storage::vault::delete_vault,
+            storage::vault::check_vault_auto_lock,
+            storage::vault::set_vault_require_unlock_on_connect,
+            storage::vault::get_vault_require_unlock_on_connect,
+            // FIDO2 Security Keys
+            storage::vault::is_security_key_available,
+            storage::vault::detect_security_keys,
+            storage::vault::setup_vault_security_key,
+            storage::vault::unlock_vault_with_security_key,
+            storage::vault::remove_vault_security_key,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
