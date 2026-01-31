@@ -5,6 +5,35 @@ A modern, secure SSH terminal client built with Tauri, React, and Rust.
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)
 
+---
+
+## ⚠️ Disclaimer
+
+**SimplyTerm is a learning project.** This is my first open-source project, built primarily for educational purposes and personal use.
+
+### What you should know
+
+- **AI-Assisted** — Some portions of this codebase were written with AI assistance. It's part of my learning process.
+
+- **Expect Bugs** — This is alpha software. Features may be incomplete, unstable, or behave unexpectedly. Use at your own risk, especially in production environments.
+
+- **Security** — While I've implemented security best practices (encrypted vault, host key verification, input sanitization), I'm not a security expert. If you spot vulnerabilities, please report them responsibly.
+
+- **Constructive Feedback Welcome** — I'm here to learn! If you see something that could be improved, I'd love to hear about it. Just please be kind — we're all learning.
+
+- **No Warranty** — This software is provided "as is", without warranty of any kind. See the [LICENSE](LICENSE) file for details.
+
+### Why open source?
+
+I believe in learning in public. By sharing this project, I hope to:
+- Get feedback from more experienced developers
+- Help others who are also learning
+- Contribute something useful to the community
+
+If you're an experienced developer and see room for improvement, PRs and issues are welcome!
+
+---
+
 ## Features
 
 ### Terminal
@@ -67,15 +96,35 @@ npm run tauri build
 
 ## Keyboard Shortcuts
 
+### Tabs
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+T` | New local terminal |
+| `Ctrl+N` | New SSH connection |
+| `Ctrl+W` | Close current tab |
+| `Ctrl+←` | Previous tab |
+| `Ctrl+→` | Next tab |
+
+### Panes
 | Shortcut | Action |
 |----------|--------|
 | `Ctrl+Shift+D` | Split pane vertically |
 | `Ctrl+Shift+E` | Split pane horizontally |
 | `Ctrl+Shift+W` | Close current pane |
+
+### Terminal
+| Shortcut | Action |
+|----------|--------|
 | `Ctrl+F` | Search in terminal |
-| `Escape` | Close modal/search |
 | `Enter` | Next search result |
 | `Shift+Enter` | Previous search result |
+| `Escape` | Close search |
+
+### General
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+Shift+P` | Command palette |
+| `Ctrl+,` | Open settings |
 
 ## Project Structure
 
