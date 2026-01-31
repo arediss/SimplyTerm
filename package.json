@@ -14,10 +14,21 @@
   "keywords": [
     "terminal",
     "ssh",
-    "sftp"
+    "sftp",
+    "tauri",
+    "rust",
+    "react"
   ],
-  "author": "",
+  "author": "Arediss",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arediss/SimplyTerm.git"
+  },
+  "bugs": {
+    "url": "https://github.com/arediss/SimplyTerm/issues"
+  },
+  "homepage": "https://github.com/arediss/SimplyTerm#readme",
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",
     "@tauri-apps/cli": "^2.9.6",
