@@ -1,29 +1,29 @@
-# 📖 SimplyTerm Plugin API Reference
+# SimplyTerm Plugin API Reference
 
-> **Référence technique complète de l'API Plugin**
+> Complete technical reference for the Plugin API
 
 ---
 
-## Table des matières
+## Table of Contents
 
-- [Types TypeScript](#types-typescript)
-- [Méthodes de l'API](#méthodes-de-lapi)
-- [Événements](#événements)
+- [TypeScript Types](#typescript-types)
+- [API Methods](#api-methods)
+- [Events](#events)
 - [Manifest Schema](#manifest-schema)
 
 ---
 
-## Types TypeScript
+## TypeScript Types
 
 ### SessionInfo
 
 ```typescript
 interface SessionInfo {
-  id: string;                                    // Identifiant unique de la session
-  type: 'local' | 'ssh' | 'sftp';               // Type de connexion
-  host?: string;                                 // Hôte (SSH uniquement)
-  port?: number;                                 // Port (SSH uniquement)
-  username?: string;                             // Utilisateur (SSH uniquement)
+  id: string;                                    // Unique session identifier
+  type: 'local' | 'ssh' | 'sftp';               // Connection type
+  host?: string;                                 // Host (SSH only)
+  port?: number;                                 // Port (SSH only)
+  username?: string;                             // User (SSH only)
   status: 'connected' | 'disconnected' | 'connecting';
 }
 ```
@@ -32,9 +32,9 @@ interface SessionInfo {
 
 ```typescript
 interface PanelRegistration {
-  id: string;                                    // ID unique du panel
+  id: string;                                    // Unique panel ID
   render: (container: HTMLElement) => void | (() => void);
-  // render reçoit un élément DOM et peut retourner une fonction de cleanup
+  // render receives a DOM element and can return a cleanup function
 }
 ```
 
@@ -42,8 +42,8 @@ interface PanelRegistration {
 
 ```typescript
 interface CommandRegistration {
-  id: string;                                    // ID unique de la commande
-  handler: () => void | Promise<void>;          // Fonction exécutée
+  id: string;                                    // Unique command ID
+  handler: () => void | Promise<void>;          // Function to execute
 }
 ```
 
@@ -71,23 +71,23 @@ interface ModalButton {
 
 ---
 
-## Méthodes de l'API
+## API Methods
 
 ### Lifecycle
 
 #### `onLoad(callback)`
 
-Enregistre une fonction appelée quand le plugin est activé.
+Registers a function called when the plugin is activated.
 
 ```typescript
 onLoad(callback: () => void): void
 ```
 
-| Paramètre | Type | Description |
+| Parameter | Type | Description |
 |-----------|------|-------------|
-| `callback` | `() => void` | Fonction appelée au chargement |
+| `callback` | `() => void` | Function called on load |
 
-**Exemple :**
+**Example:**
 ```javascript
 api.onLoad(() => {
   console.log('Plugin ready!');
@@ -98,17 +98,17 @@ api.onLoad(() => {
 
 #### `onUnload(callback)`
 
-Enregistre une fonction appelée quand le plugin est désactivé.
+Registers a function called when the plugin is deactivated.
 
 ```typescript
 onUnload(callback: () => void): void
 ```
 
-| Paramètre | Type | Description |
+| Parameter | Type | Description |
 |-----------|------|-------------|
-| `callback` | `() => void` | Fonction de cleanup |
+| `callback` | `() => void` | Cleanup function |
 
-**Exemple :**
+**Example:**
 ```javascript
 api.onUnload(() => {
   clearInterval(myInterval);
@@ -121,27 +121,27 @@ api.onUnload(() => {
 
 #### `registerPanel(config)`
 
-Enregistre un nouveau panel dans l'interface.
+Registers a new panel in the interface.
 
 ```typescript
 registerPanel(config: PanelRegistration): void
 ```
 
-| Paramètre | Type | Description |
+| Parameter | Type | Description |
 |-----------|------|-------------|
-| `config.id` | `string` | Identifiant unique du panel |
-| `config.render` | `(container: HTMLElement) => void \| (() => void)` | Fonction de rendu |
+| `config.id` | `string` | Unique panel identifier |
+| `config.render` | `(container: HTMLElement) => void \| (() => void)` | Render function |
 
-**Permission requise :** `panel:register`
+**Required permission:** `panel:register`
 
-**Exemple :**
+**Example:**
 ```javascript
 api.registerPanel({
   id: 'my-panel',
   render: (container) => {
     container.innerHTML = '<h1>Hello</h1>';
 
-    // Optionnel: retourner une fonction de cleanup
+    // Optional: return a cleanup function
     return () => {
       console.log('Panel closed');
     };
@@ -153,7 +153,7 @@ api.registerPanel({
 
 #### `showPanel(panelId)`
 
-Affiche un panel.
+Shows a panel.
 
 ```typescript
 showPanel(panelId: string): void
@@ -163,7 +163,7 @@ showPanel(panelId: string): void
 
 #### `hidePanel(panelId)`
 
-Masque un panel.
+Hides a panel.
 
 ```typescript
 hidePanel(panelId: string): void
@@ -175,24 +175,24 @@ hidePanel(panelId: string): void
 
 #### `registerCommand(config)`
 
-Enregistre une commande personnalisée.
+Registers a custom command.
 
 ```typescript
 registerCommand(config: CommandRegistration): void
 ```
 
-| Paramètre | Type | Description |
+| Parameter | Type | Description |
 |-----------|------|-------------|
-| `config.id` | `string` | Identifiant unique |
-| `config.handler` | `() => void \| Promise<void>` | Fonction exécutée |
+| `config.id` | `string` | Unique identifier |
+| `config.handler` | `() => void \| Promise<void>` | Function to execute |
 
-**Permission requise :** `command:register`
+**Required permission:** `command:register`
 
 ---
 
 #### `executeCommand(commandId)`
 
-Exécute une commande enregistrée.
+Executes a registered command.
 
 ```typescript
 executeCommand(commandId: string): void
@@ -204,7 +204,7 @@ executeCommand(commandId: string): void
 
 #### `onTerminalOutput(sessionId, callback)`
 
-Écoute la sortie du terminal.
+Listens to terminal output.
 
 ```typescript
 onTerminalOutput(
@@ -213,24 +213,24 @@ onTerminalOutput(
 ): Unsubscribe
 ```
 
-| Paramètre | Type | Description |
+| Parameter | Type | Description |
 |-----------|------|-------------|
-| `sessionId` | `string` | ID de la session à écouter |
-| `callback` | `(data: string) => void` | Appelée à chaque output |
+| `sessionId` | `string` | Session ID to listen to |
+| `callback` | `(data: string) => void` | Called on each output |
 
-**Retourne :** `() => void` - Fonction pour arrêter l'écoute
+**Returns:** `() => void` - Function to stop listening
 
-**Permission requise :** `terminal:read`
+**Required permission:** `terminal:read`
 
-**Exemple :**
+**Example:**
 ```javascript
 const unsubscribe = api.onTerminalOutput(session.id, (data) => {
   if (data.includes('error')) {
-    api.showNotification('Erreur détectée', 'error');
+    api.showNotification('Error detected', 'error');
   }
 });
 
-// Plus tard...
+// Later...
 unsubscribe();
 ```
 
@@ -238,7 +238,7 @@ unsubscribe();
 
 #### `onTerminalInput(sessionId, callback)`
 
-Écoute les entrées utilisateur dans le terminal.
+Listens to user input in the terminal.
 
 ```typescript
 onTerminalInput(
@@ -247,32 +247,58 @@ onTerminalInput(
 ): Unsubscribe
 ```
 
-**Permission requise :** `terminal:read`
+**Required permission:** `terminal:read`
 
 ---
 
 #### `writeToTerminal(sessionId, data)`
 
-Écrit dans le terminal.
+Writes to the terminal.
 
 ```typescript
 writeToTerminal(sessionId: string, data: string): Promise<void>
 ```
 
-| Paramètre | Type | Description |
+| Parameter | Type | Description |
 |-----------|------|-------------|
-| `sessionId` | `string` | ID de la session cible |
-| `data` | `string` | Texte à envoyer (inclure `\n` pour exécuter) |
+| `sessionId` | `string` | Target session ID |
+| `data` | `string` | Text to send (include `\n` to execute) |
 
-**Permission requise :** `terminal:write`
+**Required permission:** `terminal:write`
 
-**Exemple :**
+**Example:**
 ```javascript
-// Exécuter une commande
+// Execute a command
 await api.writeToTerminal(session.id, 'ls -la\n');
 
-// Envoyer du texte sans exécuter
+// Send text without executing
 await api.writeToTerminal(session.id, 'echo "hello"');
+```
+
+---
+
+#### `execCommand(sessionId, command)`
+
+Executes a command in the background without displaying it in the terminal. Returns the command output.
+
+```typescript
+execCommand(sessionId: string, command: string): Promise<string>
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `sessionId` | `string` | Target session ID |
+| `command` | `string` | Command to execute |
+
+**Returns:** `Promise<string>` - The command output
+
+**Required permission:** `backend:exec`
+
+**Example:**
+```javascript
+// Execute silently and get result
+const output = await api.execCommand(session.id, 'hostname');
+console.log('Server:', output.trim());
 ```
 
 ---
@@ -281,15 +307,15 @@ await api.writeToTerminal(session.id, 'echo "hello"');
 
 #### `getActiveSession()`
 
-Retourne la session actuellement active.
+Returns the currently active session.
 
 ```typescript
 getActiveSession(): SessionInfo | null
 ```
 
-**Permission requise :** `session:info`
+**Required permission:** `session:info`
 
-**Exemple :**
+**Example:**
 ```javascript
 const session = api.getActiveSession();
 if (session && session.type === 'ssh') {
@@ -301,91 +327,91 @@ if (session && session.type === 'ssh') {
 
 #### `getAllSessions()`
 
-Retourne toutes les sessions ouvertes.
+Returns all open sessions.
 
 ```typescript
 getAllSessions(): SessionInfo[]
 ```
 
-**Permission requise :** `session:info`
+**Required permission:** `session:info`
 
 ---
 
 #### `onSessionConnect(callback)`
 
-Écoute les nouvelles connexions.
+Listens for new connections.
 
 ```typescript
 onSessionConnect(callback: (session: SessionInfo) => void): Unsubscribe
 ```
 
-**Permission requise :** `session:info`
+**Required permission:** `session:info`
 
 ---
 
 #### `onSessionDisconnect(callback)`
 
-Écoute les déconnexions.
+Listens for disconnections.
 
 ```typescript
 onSessionDisconnect(callback: (sessionId: string) => void): Unsubscribe
 ```
 
-**Permission requise :** `session:info`
+**Required permission:** `session:info`
 
 ---
 
 ### Storage
 
-L'API storage permet de persister des données JSON. Les données sont isolées par plugin.
+The storage API allows you to persist JSON data. Data is isolated per plugin.
 
 #### `storage.get(key)`
 
-Récupère une valeur.
+Retrieves a value.
 
 ```typescript
 storage.get<T>(key: string): Promise<T | null>
 ```
 
-**Permission requise :** `storage:read`
+**Required permission:** `storage:read`
 
 ---
 
 #### `storage.set(key, value)`
 
-Sauvegarde une valeur.
+Saves a value.
 
 ```typescript
 storage.set<T>(key: string, value: T): Promise<void>
 ```
 
-**Permission requise :** `storage:write`
+**Required permission:** `storage:write`
 
 ---
 
 #### `storage.delete(key)`
 
-Supprime une valeur.
+Deletes a value.
 
 ```typescript
 storage.delete(key: string): Promise<void>
 ```
 
-**Permission requise :** `storage:write`
+**Required permission:** `storage:write`
 
-**Exemples :**
+**Examples:**
 ```javascript
-// Stocker des données
+// Store data
 await api.storage.set('settings', { theme: 'dark' });
 await api.storage.set('counter', 42);
 await api.storage.set('items', ['a', 'b', 'c']);
 
-// Récupérer
+// Retrieve
 const settings = await api.storage.get('settings'); // { theme: 'dark' }
 const counter = await api.storage.get('counter');   // 42
 const missing = await api.storage.get('unknown');   // null
 
-// Supprimer
+// Delete
 await api.storage.delete('counter');
 ```
 
@@ -395,32 +421,32 @@ await api.storage.delete('counter');
 
 #### `showNotification(message, type?)`
 
-Affiche une notification toast.
+Displays a toast notification.
 
 ```typescript
 showNotification(message: string, type?: NotificationType): void
 ```
 
-| Paramètre | Type | Défaut | Description |
-|-----------|------|--------|-------------|
-| `message` | `string` | - | Texte à afficher |
-| `type` | `NotificationType` | `'info'` | Style de notification |
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `message` | `string` | - | Text to display |
+| `type` | `NotificationType` | `'info'` | Notification style |
 
-**Aucune permission requise**
+**No permission required**
 
-**Exemple :**
+**Example:**
 ```javascript
-api.showNotification('Opération réussie', 'success');
-api.showNotification('Attention !', 'warning');
-api.showNotification('Erreur critique', 'error');
+api.showNotification('Operation successful', 'success');
+api.showNotification('Warning!', 'warning');
+api.showNotification('Critical error', 'error');
 api.showNotification('Information', 'info');
 ```
 
 ---
 
-#### `showModal(config)` *(à venir)*
+#### `showModal(config)`
 
-Affiche une modale personnalisée.
+Displays a custom modal dialog.
 
 ```typescript
 showModal(config: ModalConfig): Promise<unknown>
@@ -432,38 +458,38 @@ showModal(config: ModalConfig): Promise<unknown>
 
 #### `invokeBackend(command, args?)`
 
-Appelle une fonction du backend Rust.
+Calls a Rust backend function.
 
 ```typescript
 invokeBackend<T>(command: string, args?: Record<string, unknown>): Promise<T>
 ```
 
-| Paramètre | Type | Description |
+| Parameter | Type | Description |
 |-----------|------|-------------|
-| `command` | `string` | Nom de la commande backend |
-| `args` | `object` | Arguments optionnels |
+| `command` | `string` | Backend command name |
+| `args` | `object` | Optional arguments |
 
-**Permission requise :** `backend:exec`
+**Required permission:** `backend:exec`
 
-**Commandes disponibles :**
+**Available commands:**
 
-| Commande | Arguments | Description |
-|----------|-----------|-------------|
-| `get_session_info` | `{ session_id: string }` | Infos de session |
+| Command | Arguments | Description |
+|---------|-----------|-------------|
+| `get_session_info` | `{ session_id: string }` | Session info |
 
 ---
 
-## Événements
+## Events
 
-### Liste des événements
+### Event List
 
-| Événement | Payload | Description |
-|-----------|---------|-------------|
-| `session-connect` | `SessionInfo` | Nouvelle session connectée |
-| `session-disconnect` | `string` (sessionId) | Session fermée |
-| `pty-output-{sessionId}` | `string` | Output du terminal |
-| `pty-input-{sessionId}` | `string` | Input utilisateur |
-| `pty-exit-{sessionId}` | `void` | Terminal fermé |
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `session-connect` | `SessionInfo` | New session connected |
+| `session-disconnect` | `string` (sessionId) | Session closed |
+| `pty-output-{sessionId}` | `string` | Terminal output |
+| `pty-input-{sessionId}` | `string` | User input |
+| `pty-exit-{sessionId}` | `void` | Terminal closed |
 
 ---
 
@@ -548,7 +574,7 @@ invokeBackend<T>(command: string, args?: Record<string, unknown>): Promise<T>
 }
 ```
 
-### Exemple complet
+### Complete Example
 
 ```json
 {
@@ -591,20 +617,16 @@ invokeBackend<T>(command: string, args?: Record<string, unknown>): Promise<T>
 
 ---
 
-## Chemins des fichiers
+## File Paths
 
-| Chemin | Description |
-|--------|-------------|
-| `~/.simplyterm/plugins/` | Dossier des plugins |
-| `~/.simplyterm/plugins/<id>/manifest.json` | Manifest du plugin |
-| `~/.simplyterm/plugins/<id>/index.js` | Code du plugin |
-| `~/.simplyterm/plugin-data/<id>/` | Données persistantes du plugin |
-| `~/.simplyterm/plugin-settings.json` | Plugins activés/désactivés |
+| Path | Description |
+|------|-------------|
+| `~/.simplyterm/plugins/` | Plugins directory |
+| `~/.simplyterm/plugins/<id>/manifest.json` | Plugin manifest |
+| `~/.simplyterm/plugins/<id>/index.js` | Plugin code |
+| `~/.simplyterm/plugin-data/<id>/` | Plugin persistent data |
+| `~/.simplyterm/plugin-settings.json` | Enabled/disabled plugins |
 
 ---
 
-<div align="center">
-
 **SimplyTerm Plugin API v1.0**
-
-</div>

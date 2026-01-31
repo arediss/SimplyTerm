@@ -1,47 +1,39 @@
-# 📚 SimplyTerm Documentation
+# SimplyTerm Plugin Documentation
 
-<div align="center">
-
-<img src="../assets/logo.svg" alt="SimplyTerm Logo" width="120" />
-
-### Terminal SSH moderne, rapide et extensible
-
-[🚀 Quick Start](#quick-start) · [🔌 Plugins](#plugins) · [🛠️ Development](#development)
-
-</div>
+A modern, extensible SSH terminal with a powerful plugin system.
 
 ---
 
-## 📖 Documentation
+## Documentation
 
 | Document | Description |
 |----------|-------------|
-| [**Plugin Development Guide**](./PLUGIN_DEVELOPMENT.md) | Guide complet pour créer des plugins |
-| [**Plugin API Reference**](./PLUGIN_API_REFERENCE.md) | Référence technique de l'API |
-| [**Plugin Examples**](./PLUGIN_EXAMPLES.md) | Exemples de plugins prêts à l'emploi |
+| [**Plugin Development Guide**](./PLUGIN_DEVELOPMENT.md) | Complete guide to creating plugins |
+| [**Plugin API Reference**](./PLUGIN_API_REFERENCE.md) | Technical API reference |
+| [**Plugin Examples**](./PLUGIN_EXAMPLES.md) | Ready-to-use plugin examples |
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
-### Créer un plugin en 2 minutes
+### Create a plugin in 2 minutes
 
 ```bash
-# 1. Créer le dossier
-mkdir -p ~/.simplyterm/plugins/mon-plugin
+# 1. Create the plugin folder
+mkdir -p ~/.simplyterm/plugins/my-plugin
 
-# 2. Créer le manifest
-cat > ~/.simplyterm/plugins/mon-plugin/manifest.json << 'EOF'
+# 2. Create the manifest
+cat > ~/.simplyterm/plugins/my-plugin/manifest.json << 'EOF'
 {
-  "id": "mon-plugin",
-  "name": "Mon Plugin",
+  "id": "my-plugin",
+  "name": "My Plugin",
   "version": "1.0.0",
   "permissions": ["panel:register"]
 }
 EOF
 
-# 3. Créer le code
-cat > ~/.simplyterm/plugins/mon-plugin/index.js << 'EOF'
+# 3. Create the code
+cat > ~/.simplyterm/plugins/my-plugin/index.js << 'EOF'
 function init(api) {
   api.registerPanel({
     id: 'hello',
@@ -52,136 +44,112 @@ module.exports.default = init;
 EOF
 ```
 
-Ouvrez SimplyTerm → Paramètres → Plugins → Actualiser → Activer !
+Open SimplyTerm → Settings → Plugins → Refresh → Enable!
 
 ---
 
-## 🔌 Plugins
+## Plugins
 
-### Plugins inclus
-
-| Plugin | Description |
-|--------|-------------|
-| **hello-world** | Exemple basique |
-| **server-stats** | Monitoring CPU/RAM/Disk |
-
-### Structure d'un plugin
+### Plugin structure
 
 ```
-~/.simplyterm/plugins/mon-plugin/
-├── manifest.json    # Métadonnées
+~/.simplyterm/plugins/my-plugin/
+├── manifest.json    # Metadata
 └── index.js         # Code
 ```
 
-### Permissions disponibles
+### Available permissions
 
 ```
-terminal:read      Lire le terminal
-terminal:write     Écrire dans le terminal
-panel:register     Créer des panels
-command:register   Créer des commandes
-session:info       Infos de session
-storage:read       Lire le storage
-storage:write      Écrire le storage
-backend:exec       Appeler le backend
+terminal:read      Read terminal output
+terminal:write     Write to terminal
+panel:register     Create UI panels
+command:register   Create commands
+session:info       Access session info
+storage:read       Read plugin storage
+storage:write      Write to plugin storage
+backend:exec       Call backend functions
 ```
 
 ---
 
-## 🛠️ Development
+## Development
 
-### Prérequis
+### Prerequisites
 
 - Node.js 18+
 - Rust 1.70+
-- pnpm ou npm
+- npm
 
 ### Installation
 
 ```bash
-git clone https://github.com/your-repo/simplyterm
-cd simplyterm
-pnpm install
-pnpm tauri dev
+git clone https://github.com/arediss/SimplyTerm
+cd SimplyTerm
+npm install
+npm run tauri dev
 ```
 
-### Structure du projet
+### Project structure
 
 ```
-simplyterm/
-├── src/                 # Frontend React
-│   ├── components/      # Composants UI
-│   ├── plugins/         # Système de plugins
-│   └── App.tsx          # Point d'entrée
-├── src-tauri/           # Backend Rust
+SimplyTerm/
+├── src/                 # React frontend
+│   ├── components/      # UI components
+│   ├── plugins/         # Plugin system
+│   └── App.tsx          # Entry point
+├── src-tauri/           # Rust backend
 │   └── src/
-│       ├── plugins/     # Gestion des plugins
+│       ├── plugins/     # Plugin management
 │       ├── connectors/  # SSH, Local
-│       └── storage/     # Persistance
+│       └── storage/     # Persistence
 └── docs/                # Documentation
 ```
 
 ---
 
-## 🎨 Architecture des plugins
+## Plugin Architecture
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                 SimplyTerm App                       │
+│                 SimplyTerm App                      │
 ├─────────────────────────────────────────────────────┤
-│  Frontend (React)                                    │
-│  ┌─────────────┐  ┌─────────────┐                   │
-│  │ PluginHost  │  │PluginPanel  │                   │
-│  └──────┬──────┘  └─────────────┘                   │
-│         │                                            │
-│  ┌──────▼──────────────────────────────────┐        │
-│  │         SimplyTerm Plugin API            │        │
-│  │  • registerPanel()  • onTerminalOutput() │        │
-│  │  • registerCommand()• storage.get/set()  │        │
-│  └──────┬──────────────────────────────────┘        │
-├─────────┼───────────────────────────────────────────┤
-│  Backend Rust (Tauri)                                │
-│  ┌──────▼──────────────────────────────────┐        │
-│  │         PluginManager                    │        │
-│  │  • Discover plugins  • Load/unload      │        │
-│  │  • Permission check  • Plugin storage   │        │
-│  └──────────────────────────────────────────┘        │
-└─────────────────────────────────────────────────────┘
+│  Frontend (React)                                   │
+│  ┌─────────────┐  ┌─────────────┐                  │
+│  │ PluginHost  │  │PluginPanel  │                  │
+│  └──────┬──────┘  └─────────────┘                  │
+│         │                                           │
+│  ┌──────▼──────────────────────────────────┐       │
+│  │         SimplyTerm Plugin API           │       │
+│  │  • registerPanel()  • onTerminalOutput()│       │
+│  │  • registerCommand()• storage.get/set() │       │
+│  └──────┬──────────────────────────────────┘       │
+├─────────┼──────────────────────────────────────────┤
+│  Backend Rust (Tauri)                              │
+│  ┌──────▼──────────────────────────────────┐       │
+│  │         PluginManager                   │       │
+│  │  • Discover plugins  • Load/unload      │       │
+│  │  • Permission check  • Plugin storage   │       │
+│  └─────────────────────────────────────────┘       │
+└────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 📝 Changelog
+## Contributing
 
-### v1.0.0
-
-- ✨ Système de plugins extensible
-- 🔒 Permissions granulaires
-- 💾 Storage persistant par plugin
-- 📊 Panels personnalisables
-
----
-
-## 🤝 Contributing
-
-1. Fork le repo
-2. Créez une branche (`git checkout -b feature/amazing`)
+1. Fork the repo
+2. Create a branch (`git checkout -b feature/amazing`)
 3. Commit (`git commit -m 'Add amazing feature'`)
 4. Push (`git push origin feature/amazing`)
-5. Ouvrez une Pull Request
+5. Open a Pull Request
 
 ---
 
-## 📄 License
+## License
 
-MIT © SimplyTerm
+MIT - see [LICENSE](../LICENSE) for details.
 
 ---
 
-<div align="center">
-
-**[⬆ Retour en haut](#-simplyterm-documentation)**
-
-Made with ❤️ by the SimplyTerm community
-
-</div>
+**[Back to top](#simplyterm-plugin-documentation)**

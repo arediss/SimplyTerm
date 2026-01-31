@@ -1,57 +1,57 @@
-# 🔌 SimplyTerm Plugin Development Guide
+# SimplyTerm Plugin Development Guide
 
-> **Créez des plugins puissants pour SimplyTerm en quelques minutes.**
-
----
-
-## 📚 Table des matières
-
-1. [Quick Start](#-quick-start)
-2. [Structure d'un plugin](#-structure-dun-plugin)
-3. [Le fichier manifest.json](#-le-fichier-manifestjson)
-4. [L'API Plugin](#-lapi-plugin)
-5. [Permissions](#-permissions)
-6. [Exemples pratiques](#-exemples-pratiques)
-7. [Bonnes pratiques](#-bonnes-pratiques)
-8. [Debugging](#-debugging)
-9. [FAQ](#-faq)
+> Create powerful plugins for SimplyTerm in minutes.
 
 ---
 
-## 🚀 Quick Start
+## Table of Contents
 
-### 1. Créez votre dossier plugin
+1. [Quick Start](#quick-start)
+2. [Plugin Structure](#plugin-structure)
+3. [The manifest.json File](#the-manifestjson-file)
+4. [The Plugin API](#the-plugin-api)
+5. [Permissions](#permissions)
+6. [Practical Examples](#practical-examples)
+7. [Best Practices](#best-practices)
+8. [Debugging](#debugging)
+9. [FAQ](#faq)
+
+---
+
+## Quick Start
+
+### 1. Create your plugin folder
 
 ```bash
-mkdir -p ~/.simplyterm/plugins/mon-plugin
-cd ~/.simplyterm/plugins/mon-plugin
+mkdir -p ~/.simplyterm/plugins/my-plugin
+cd ~/.simplyterm/plugins/my-plugin
 ```
 
-### 2. Créez le manifest.json
+### 2. Create manifest.json
 
 ```json
 {
-  "id": "mon-plugin",
-  "name": "Mon Super Plugin",
+  "id": "my-plugin",
+  "name": "My Plugin",
   "version": "1.0.0",
-  "author": "Votre Nom",
-  "description": "Description courte de votre plugin",
+  "author": "Your Name",
+  "description": "A short description of your plugin",
   "main": "index.js",
   "permissions": ["panel:register"]
 }
 ```
 
-### 3. Créez index.js
+### 3. Create index.js
 
 ```javascript
 function init(api) {
   api.onLoad(() => {
-    console.log('Plugin chargé !');
-    api.showNotification('Mon plugin est actif !', 'success');
+    console.log('Plugin loaded!');
+    api.showNotification('My plugin is active!', 'success');
   });
 
   api.registerPanel({
-    id: 'mon-panel',
+    id: 'my-panel',
     render: (container) => {
       container.innerHTML = '<h2>Hello World!</h2>';
     }
@@ -61,44 +61,44 @@ function init(api) {
 module.exports.default = init;
 ```
 
-### 4. Activez le plugin
+### 4. Activate the plugin
 
-1. Ouvrez SimplyTerm
-2. Allez dans **Paramètres** → **Plugins**
-3. Cliquez sur **Actualiser**
-4. Activez votre plugin
+1. Open SimplyTerm
+2. Go to **Settings** → **Plugins**
+3. Click **Refresh**
+4. Enable your plugin
 
-🎉 **C'est fait !** Votre plugin est maintenant actif.
+Done! Your plugin is now active.
 
 ---
 
-## 📁 Structure d'un plugin
+## Plugin Structure
 
 ```
 ~/.simplyterm/plugins/
-└── mon-plugin/
-    ├── manifest.json      # ⚡ REQUIS - Métadonnées du plugin
-    ├── index.js           # ⚡ REQUIS - Point d'entrée
-    ├── styles.css         # Optionnel - Styles personnalisés
-    ├── icon.svg           # Optionnel - Icône du plugin
-    └── assets/            # Optionnel - Ressources additionnelles
+└── my-plugin/
+    ├── manifest.json      # REQUIRED - Plugin metadata
+    ├── index.js           # REQUIRED - Entry point
+    ├── styles.css         # Optional - Custom styles
+    ├── icon.svg           # Optional - Plugin icon
+    └── assets/            # Optional - Additional resources
 ```
 
 ---
 
-## 📋 Le fichier manifest.json
+## The manifest.json File
 
-Le manifest définit les métadonnées et les permissions de votre plugin.
+The manifest defines your plugin's metadata and permissions.
 
-### Structure complète
+### Complete structure
 
 ```json
 {
-  "id": "mon-plugin",
-  "name": "Mon Plugin",
+  "id": "my-plugin",
+  "name": "My Plugin",
   "version": "1.0.0",
-  "author": "Développeur",
-  "description": "Une description claire et concise",
+  "author": "Developer",
+  "description": "A clear and concise description",
   "main": "index.js",
   "permissions": [
     "panel:register",
@@ -113,7 +113,7 @@ Le manifest définit les métadonnées et les permissions de votre plugin.
   "panels": [
     {
       "id": "stats-panel",
-      "title": "Statistiques",
+      "title": "Statistics",
       "icon": "icon.svg",
       "position": "right"
     }
@@ -121,233 +121,243 @@ Le manifest définit les métadonnées et les permissions de votre plugin.
   "commands": [
     {
       "id": "refresh-data",
-      "title": "Rafraîchir les données",
+      "title": "Refresh Data",
       "shortcut": "Ctrl+Shift+R"
     }
   ]
 }
 ```
 
-### Champs obligatoires
+### Required fields
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
-| `id` | string | Identifiant unique (kebab-case recommandé) |
-| `name` | string | Nom affiché dans l'UI |
-| `version` | string | Version semver (ex: "1.0.0") |
+| `id` | string | Unique identifier (kebab-case recommended) |
+| `name` | string | Display name in UI |
+| `version` | string | Semver version (e.g., "1.0.0") |
 
-### Champs optionnels
+### Optional fields
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
-| `author` | string | Nom de l'auteur |
-| `description` | string | Description courte |
-| `main` | string | Fichier d'entrée (défaut: "index.js") |
-| `permissions` | string[] | Permissions requises |
-| `panels` | PanelConfig[] | Configuration des panels |
-| `commands` | CommandConfig[] | Commandes personnalisées |
+| `author` | string | Author name |
+| `description` | string | Short description |
+| `main` | string | Entry file (default: "index.js") |
+| `permissions` | string[] | Required permissions |
+| `panels` | PanelConfig[] | Panel configuration |
+| `commands` | CommandConfig[] | Custom commands |
 
 ---
 
-## 🔧 L'API Plugin
+## The Plugin API
 
-Votre fonction `init` reçoit l'objet `api` qui donne accès à toutes les fonctionnalités.
+Your `init` function receives the `api` object which provides access to all features.
 
-### Lifecycle (Cycle de vie)
+### Lifecycle
 
 ```javascript
 function init(api) {
-  // Appelé quand le plugin est chargé
+  // Called when the plugin is loaded
   api.onLoad(() => {
-    console.log('Plugin activé !');
+    console.log('Plugin activated!');
   });
 
-  // Appelé quand le plugin est désactivé
+  // Called when the plugin is deactivated
   api.onUnload(() => {
-    console.log('Plugin désactivé !');
-    // Nettoyez vos ressources ici
+    console.log('Plugin deactivated!');
+    // Clean up your resources here
   });
 }
 ```
 
 ---
 
-### 📊 Panels
+### Panels
 
-Créez des interfaces utilisateur dans des panels latéraux.
+Create user interfaces in side panels.
 
 ```javascript
 api.registerPanel({
-  id: 'mon-panel',
+  id: 'my-panel',
   render: (container) => {
-    // container est un élément DOM
+    // container is a DOM element
     container.innerHTML = `
       <div style="padding: 16px;">
-        <h2>Mon Panel</h2>
-        <button id="my-btn">Cliquez-moi</button>
+        <h2>My Panel</h2>
+        <button id="my-btn">Click me</button>
       </div>
     `;
 
-    // Ajoutez des event listeners
+    // Add event listeners
     container.querySelector('#my-btn').addEventListener('click', () => {
-      api.showNotification('Bouton cliqué !', 'success');
+      api.showNotification('Button clicked!', 'success');
     });
 
-    // Retournez une fonction de cleanup (optionnel)
+    // Return a cleanup function (optional)
     return () => {
-      console.log('Panel fermé');
+      console.log('Panel closed');
     };
   }
 });
 
-// Afficher/masquer un panel
-api.showPanel('mon-panel');
-api.hidePanel('mon-panel');
+// Show/hide a panel
+api.showPanel('my-panel');
+api.hidePanel('my-panel');
 ```
 
-**Permission requise :** `panel:register`
+**Required permission:** `panel:register`
 
 ---
 
-### ⌨️ Commands
+### Commands
 
-Enregistrez des commandes accessibles via raccourcis clavier.
+Register commands accessible via keyboard shortcuts.
 
 ```javascript
 api.registerCommand({
-  id: 'ma-commande',
+  id: 'my-command',
   handler: () => {
-    console.log('Commande exécutée !');
-    api.showNotification('Action effectuée', 'info');
+    console.log('Command executed!');
+    api.showNotification('Action performed', 'info');
   }
 });
 
-// Exécuter une commande programmatiquement
-api.executeCommand('ma-commande');
+// Execute a command programmatically
+api.executeCommand('my-command');
 ```
 
-**Permission requise :** `command:register`
+**Required permission:** `command:register`
 
 ---
 
-### 💻 Terminal
+### Terminal
 
-Interagissez avec le terminal actif.
+Interact with the active terminal.
 
-#### Lire la sortie du terminal
+#### Read terminal output
 
 ```javascript
-// Écouter tout ce qui s'affiche dans le terminal
+// Listen to everything displayed in the terminal
 const unsubscribe = api.onTerminalOutput(sessionId, (data) => {
   console.log('Output:', data);
 
-  // Exemple: détecter une erreur
+  // Example: detect an error
   if (data.includes('error')) {
-    api.showNotification('Erreur détectée !', 'error');
+    api.showNotification('Error detected!', 'error');
   }
 });
 
-// Pour arrêter d'écouter
+// Stop listening
 unsubscribe();
 ```
 
-**Permission requise :** `terminal:read`
+**Required permission:** `terminal:read`
 
-#### Écrire dans le terminal
+#### Write to terminal
 
 ```javascript
-// Envoyer une commande
+// Send a command
 await api.writeToTerminal(sessionId, 'ls -la\n');
 
-// Envoyer du texte sans exécuter
+// Send text without executing
 await api.writeToTerminal(sessionId, 'echo "Hello"');
 ```
 
-**Permission requise :** `terminal:write`
+**Required permission:** `terminal:write`
+
+#### Execute command silently
+
+```javascript
+// Run a command without showing it in terminal
+const output = await api.execCommand(sessionId, 'hostname');
+console.log('Server:', output.trim());
+```
+
+**Required permission:** `backend:exec`
 
 ---
 
-### 🔗 Sessions
+### Sessions
 
-Accédez aux informations des sessions actives.
+Access information about active sessions.
 
 ```javascript
-// Session active
+// Active session
 const session = api.getActiveSession();
-// Retourne: { id, type, host, port, username, status }
+// Returns: { id, type, host, port, username, status }
 
 if (session) {
-  console.log(`Connecté à ${session.username}@${session.host}`);
+  console.log(`Connected to ${session.username}@${session.host}`);
 }
 
-// Toutes les sessions
+// All sessions
 const sessions = api.getAllSessions();
 sessions.forEach(s => console.log(s.id, s.type));
 ```
 
-#### Événements de session
+#### Session events
 
 ```javascript
-// Quand une nouvelle session se connecte
+// When a new session connects
 api.onSessionConnect((session) => {
-  console.log('Nouvelle session:', session.type);
+  console.log('New session:', session.type);
   if (session.type === 'ssh') {
-    console.log(`SSH vers ${session.host}`);
+    console.log(`SSH to ${session.host}`);
   }
 });
 
-// Quand une session se déconnecte
+// When a session disconnects
 api.onSessionDisconnect((sessionId) => {
-  console.log('Session fermée:', sessionId);
+  console.log('Session closed:', sessionId);
 });
 ```
 
-**Permission requise :** `session:info`
+**Required permission:** `session:info`
 
 ---
 
-### 💾 Storage
+### Storage
 
-Stockez des données persistantes (scoped par plugin).
+Store persistent data (scoped per plugin).
 
 ```javascript
-// Sauvegarder
+// Save
 await api.storage.set('config', { theme: 'dark', interval: 5000 });
 await api.storage.set('counter', 42);
 
-// Récupérer
+// Retrieve
 const config = await api.storage.get('config');
 // { theme: 'dark', interval: 5000 }
 
 const counter = await api.storage.get('counter');
 // 42
 
-// Supprimer
+// Delete
 await api.storage.delete('counter');
 ```
 
-**Permissions requises :** `storage:read`, `storage:write`
+**Required permissions:** `storage:read`, `storage:write`
 
 ---
 
-### 🔔 Notifications
+### Notifications
 
-Affichez des notifications toast.
+Display toast notifications.
 
 ```javascript
-api.showNotification('Opération réussie !', 'success');
-api.showNotification('Attention...', 'warning');
-api.showNotification('Erreur !', 'error');
+api.showNotification('Operation successful!', 'success');
+api.showNotification('Warning...', 'warning');
+api.showNotification('Error!', 'error');
 api.showNotification('Information', 'info');
 ```
 
-**Aucune permission requise**
+**No permission required**
 
 ---
 
-### 🦀 Backend (Avancé)
+### Backend (Advanced)
 
-Appelez des fonctions Rust du backend.
+Call Rust backend functions.
 
 ```javascript
 try {
@@ -356,57 +366,53 @@ try {
   });
   console.log(result);
 } catch (error) {
-  console.error('Erreur backend:', error);
+  console.error('Backend error:', error);
 }
 ```
 
-**Permission requise :** `backend:exec`
-
-**Commandes disponibles :**
-- `get_session_info` - Infos de session
-- `exec_ssh_command` - Exécuter commande SSH (à venir)
+**Required permission:** `backend:exec`
 
 ---
 
-## 🔐 Permissions
+## Permissions
 
-Les permissions contrôlent ce que votre plugin peut faire.
+Permissions control what your plugin can do.
 
 | Permission | Description |
 |------------|-------------|
-| `terminal:read` | Lire la sortie du terminal |
-| `terminal:write` | Écrire dans le terminal |
-| `panel:register` | Créer des panels UI |
-| `command:register` | Créer des commandes |
-| `session:info` | Accéder aux infos de session |
-| `storage:read` | Lire le storage du plugin |
-| `storage:write` | Écrire dans le storage |
-| `backend:exec` | Appeler des fonctions Rust |
+| `terminal:read` | Read terminal output |
+| `terminal:write` | Write to terminal |
+| `panel:register` | Create UI panels |
+| `command:register` | Create commands |
+| `session:info` | Access session info |
+| `storage:read` | Read plugin storage |
+| `storage:write` | Write to plugin storage |
+| `backend:exec` | Call Rust functions |
 
-### Principe de moindre privilège
+### Principle of least privilege
 
-> ⚠️ **N'ajoutez que les permissions dont vous avez besoin.**
+Only add permissions you actually need.
 
 ```json
-// ❌ Mauvais - trop de permissions
+// Bad - too many permissions
 "permissions": ["terminal:read", "terminal:write", "backend:exec", "storage:read", "storage:write"]
 
-// ✅ Bon - juste ce qu'il faut
+// Good - just what's needed
 "permissions": ["panel:register", "session:info"]
 ```
 
 ---
 
-## 💡 Exemples pratiques
+## Practical Examples
 
-### Plugin "Compteur de connexions"
+### Connection counter plugin
 
 ```javascript
 function init(api) {
   let connectionCount = 0;
 
   api.onLoad(async () => {
-    // Charger le compteur sauvegardé
+    // Load saved counter
     const saved = await api.storage.get('count');
     if (saved !== null) connectionCount = saved;
   });
@@ -415,7 +421,7 @@ function init(api) {
     if (session.type === 'ssh') {
       connectionCount++;
       await api.storage.set('count', connectionCount);
-      api.showNotification(`Connexion #${connectionCount}`, 'info');
+      api.showNotification(`Connection #${connectionCount}`, 'info');
     }
   });
 
@@ -425,7 +431,7 @@ function init(api) {
       container.innerHTML = `
         <div style="padding: 20px; text-align: center;">
           <h2 style="font-size: 48px; color: #7da6e8;">${connectionCount}</h2>
-          <p>connexions SSH</p>
+          <p>SSH connections</p>
         </div>
       `;
     }
@@ -435,7 +441,7 @@ function init(api) {
 module.exports.default = init;
 ```
 
-### Plugin "Quick Commands"
+### Quick Commands plugin
 
 ```javascript
 function init(api) {
@@ -478,7 +484,7 @@ function init(api) {
             const cmd = quickCommands[btn.dataset.index].cmd;
             await api.writeToTerminal(session.id, cmd);
           } else {
-            api.showNotification('Aucune session active', 'warning');
+            api.showNotification('No active session', 'warning');
           }
         });
       });
@@ -491,56 +497,56 @@ module.exports.default = init;
 
 ---
 
-## ✨ Bonnes pratiques
+## Best Practices
 
-### 1. Nettoyez vos ressources
+### 1. Clean up your resources
 
 ```javascript
 api.onUnload(() => {
-  // Arrêtez les intervals
+  // Stop intervals
   if (myInterval) clearInterval(myInterval);
 
-  // Les subscriptions sont automatiquement nettoyées
-  // mais vous pouvez aussi le faire manuellement
+  // Subscriptions are automatically cleaned up
+  // but you can also do it manually
 });
 ```
 
-### 2. Gérez les erreurs
+### 2. Handle errors
 
 ```javascript
 try {
   await api.writeToTerminal(sessionId, 'command\n');
 } catch (error) {
-  api.showNotification('Erreur: ' + error.message, 'error');
-  console.error('[MonPlugin]', error);
+  api.showNotification('Error: ' + error.message, 'error');
+  console.error('[MyPlugin]', error);
 }
 ```
 
-### 3. Vérifiez la session avant d'agir
+### 3. Check session before acting
 
 ```javascript
 const session = api.getActiveSession();
 if (!session) {
-  api.showNotification('Connectez-vous d\'abord', 'warning');
+  api.showNotification('Connect first', 'warning');
   return;
 }
 
 if (session.type !== 'ssh') {
-  api.showNotification('Fonctionne uniquement en SSH', 'info');
+  api.showNotification('SSH only', 'info');
   return;
 }
 ```
 
-### 4. Préfixez vos logs
+### 4. Prefix your logs
 
 ```javascript
-console.log('[MonPlugin] Message...');
-console.error('[MonPlugin] Erreur:', error);
+console.log('[MyPlugin] Message...');
+console.error('[MyPlugin] Error:', error);
 ```
 
-### 5. Utilisez des styles inline
+### 5. Use inline styles
 
-Les panels n'ont pas accès aux styles globaux de l'app.
+Panels don't have access to the app's global styles.
 
 ```javascript
 container.innerHTML = `
@@ -549,129 +555,129 @@ container.innerHTML = `
     padding: 16px;
     color: #fff;
   ">
-    Contenu stylé
+    Styled content
   </div>
 `;
 ```
 
 ---
 
-## 🐛 Debugging
+## Debugging
 
-### Console développeur
+### Developer console
 
-1. Lancez SimplyTerm
-2. Ouvrez les DevTools : `Ctrl+Shift+I` (Windows/Linux) ou `Cmd+Option+I` (Mac)
-3. Allez dans l'onglet **Console**
+1. Launch SimplyTerm
+2. Open DevTools: `Ctrl+Shift+I` (Windows/Linux) or `Cmd+Option+I` (Mac)
+3. Go to the **Console** tab
 
-### Logs utiles
+### Useful logs
 
 ```javascript
-// Vérifier que le plugin se charge
+// Verify plugin loads
 api.onLoad(() => {
-  console.log('[MonPlugin] ✅ Chargé avec succès');
-  console.log('[MonPlugin] Session active:', api.getActiveSession());
+  console.log('[MyPlugin] Loaded successfully');
+  console.log('[MyPlugin] Active session:', api.getActiveSession());
 });
 
-// Logger les événements
+// Log events
 api.onSessionConnect((s) => {
-  console.log('[MonPlugin] Session connectée:', s);
+  console.log('[MyPlugin] Session connected:', s);
 });
 ```
 
-### Erreurs courantes
+### Common errors
 
-| Erreur | Cause | Solution |
-|--------|-------|----------|
-| "Plugin not found" | ID invalide dans manifest | Vérifiez que l'ID correspond au dossier |
-| "Permission denied" | Permission manquante | Ajoutez la permission au manifest |
-| "Missing session_id" | Session non vérifiée | Vérifiez `getActiveSession()` avant d'agir |
+| Error | Cause | Solution |
+|-------|-------|----------|
+| "Plugin not found" | Invalid ID in manifest | Check ID matches folder name |
+| "Permission denied" | Missing permission | Add permission to manifest |
+| "Missing session_id" | Session not checked | Check `getActiveSession()` before acting |
 
 ---
 
-## ❓ FAQ
+## FAQ
 
-### Comment recharger mon plugin après modification ?
+### How do I reload my plugin after changes?
 
-1. Désactivez le plugin dans Paramètres → Plugins
-2. Cliquez sur "Actualiser"
-3. Réactivez le plugin
+1. Disable the plugin in Settings → Plugins
+2. Click "Refresh"
+3. Re-enable the plugin
 
-### Puis-je utiliser des frameworks (React, Vue) ?
+### Can I use frameworks (React, Vue)?
 
-Non, les plugins s'exécutent dans un contexte simple. Utilisez du JavaScript vanilla et des templates string.
+No, plugins run in a simple context. Use vanilla JavaScript and template strings.
 
-### Où sont stockées mes données ?
+### Where is my data stored?
 
 ```
 ~/.simplyterm/plugin-data/<plugin-id>/
 ```
 
-### Comment distribuer mon plugin ?
+### How do I distribute my plugin?
 
-Créez un zip de votre dossier plugin. Les utilisateurs le décompressent dans `~/.simplyterm/plugins/`.
+Create a zip of your plugin folder. Users extract it to `~/.simplyterm/plugins/`.
 
-### Les plugins peuvent-ils communiquer entre eux ?
+### Can plugins communicate with each other?
 
-Non, chaque plugin est isolé pour des raisons de sécurité.
+No, each plugin is isolated for security reasons.
 
 ---
 
-## 📝 Template de démarrage
+## Starter Template
 
-Copiez ce template pour commencer rapidement :
+Copy this template to get started quickly:
 
 ```javascript
 /**
- * Mon Plugin pour SimplyTerm
+ * My Plugin for SimplyTerm
  * @version 1.0.0
  */
 
 function init(api) {
-  // === État du plugin ===
+  // === Plugin state ===
   let isActive = false;
 
   // === Lifecycle ===
   api.onLoad(async () => {
-    console.log('[MonPlugin] Chargé');
+    console.log('[MyPlugin] Loaded');
     isActive = true;
 
-    // Charger les données sauvegardées
+    // Load saved data
     const savedData = await api.storage.get('data');
     if (savedData) {
-      console.log('[MonPlugin] Données restaurées:', savedData);
+      console.log('[MyPlugin] Data restored:', savedData);
     }
   });
 
   api.onUnload(() => {
-    console.log('[MonPlugin] Déchargé');
+    console.log('[MyPlugin] Unloaded');
     isActive = false;
   });
 
   // === Panel ===
   api.registerPanel({
-    id: 'mon-panel',
+    id: 'my-panel',
     render: (container) => {
       updateUI(container);
       return () => {
-        // Cleanup si nécessaire
+        // Cleanup if needed
       };
     }
   });
 
-  // === Événements ===
+  // === Events ===
   api.onSessionConnect((session) => {
-    console.log('[MonPlugin] Nouvelle session:', session.type);
+    console.log('[MyPlugin] New session:', session.type);
   });
 
-  // === Fonctions ===
+  // === Functions ===
   function updateUI(container) {
     const session = api.getActiveSession();
     container.innerHTML = `
       <div style="padding: 16px; font-family: system-ui;">
-        <h2 style="color: #fff; margin: 0 0 16px 0;">Mon Plugin</h2>
+        <h2 style="color: #fff; margin: 0 0 16px 0;">My Plugin</h2>
         <p style="color: #888;">
-          ${session ? `Connecté à ${session.host}` : 'Non connecté'}
+          ${session ? `Connected to ${session.host}` : 'Not connected'}
         </p>
         <button id="action-btn" style="
           padding: 8px 16px;
@@ -688,26 +694,18 @@ function init(api) {
   }
 
   async function handleAction() {
-    api.showNotification('Action exécutée !', 'success');
+    api.showNotification('Action executed!', 'success');
   }
 }
 
-// Export CommonJS
+// CommonJS export
 module.exports.default = init;
 ```
 
 ---
 
-## 🔗 Ressources
+## Resources
 
-- [Code source SimplyTerm](https://github.com/...)
-- [Exemples de plugins](~/.simplyterm/plugins/)
-- [Signaler un bug](https://github.com/.../issues)
-
----
-
-<div align="center">
-
-**Made with ❤️ for the SimplyTerm community**
-
-</div>
+- [SimplyTerm Source Code](https://github.com/arediss/SimplyTerm)
+- [Plugin Examples](./PLUGIN_EXAMPLES.md)
+- [Report a Bug](https://github.com/arediss/SimplyTerm/issues)

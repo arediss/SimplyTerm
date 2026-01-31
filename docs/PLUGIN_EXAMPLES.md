@@ -1,26 +1,26 @@
-# 🎨 SimplyTerm Plugin Examples
+# SimplyTerm Plugin Examples
 
-> **Exemples de plugins prêts à l'emploi**
+> Ready-to-use plugin examples
 
-Copiez ces exemples dans `~/.simplyterm/plugins/<nom>/` pour les tester.
+Copy these examples to `~/.simplyterm/plugins/<name>/` to test them.
 
 ---
 
-## 📋 Table des matières
+## Table of Contents
 
-1. [Hello World](#1-hello-world) - Plugin minimal
-2. [Session Logger](#2-session-logger) - Log des connexions
-3. [Quick Commands](#3-quick-commands) - Boutons de commandes rapides
-4. [Server Monitor](#4-server-monitor) - Monitoring CPU/RAM
-5. [Command History](#5-command-history) - Historique des commandes
-6. [SSH Bookmarks](#6-ssh-bookmarks) - Favoris de commandes par serveur
-7. [Color Theme](#7-color-theme) - Personnalisation visuelle
+1. [Hello World](#1-hello-world) - Minimal plugin
+2. [Session Logger](#2-session-logger) - Connection logging
+3. [Quick Commands](#3-quick-commands) - Quick command buttons
+4. [Server Monitor](#4-server-monitor) - CPU/RAM monitoring
+5. [Command History](#5-command-history) - Command history
+6. [SSH Bookmarks](#6-ssh-bookmarks) - Commands per server
+7. [Color Theme](#7-color-theme) - Visual customization
 
 ---
 
 ## 1. Hello World
 
-Le plugin le plus simple possible.
+The simplest possible plugin.
 
 ### manifest.json
 ```json
@@ -28,7 +28,7 @@ Le plugin le plus simple possible.
   "id": "hello-world",
   "name": "Hello World",
   "version": "1.0.0",
-  "description": "Un plugin minimal pour commencer",
+  "description": "A minimal plugin to get started",
   "permissions": ["panel:register"]
 }
 ```
@@ -45,7 +45,7 @@ function init(api) {
     render: (container) => {
       container.innerHTML = `
         <div style="padding: 20px; text-align: center;">
-          <h1 style="font-size: 24px; color: #7da6e8;">👋 Hello!</h1>
+          <h1 style="font-size: 24px; color: #7da6e8;">Hello!</h1>
           <p style="color: #888; margin-top: 8px;">
             Welcome to SimplyTerm plugins
           </p>
@@ -62,7 +62,7 @@ module.exports.default = init;
 
 ## 2. Session Logger
 
-Enregistre toutes les connexions avec timestamp.
+Logs all connections with timestamps.
 
 ### manifest.json
 ```json
@@ -70,7 +70,7 @@ Enregistre toutes les connexions avec timestamp.
   "id": "session-logger",
   "name": "Session Logger",
   "version": "1.0.0",
-  "description": "Log toutes les connexions SSH",
+  "description": "Log all SSH connections",
   "permissions": ["panel:register", "session:info", "storage:read", "storage:write"]
 }
 ```
@@ -94,7 +94,7 @@ function init(api) {
         type: 'connect'
       };
       logs.unshift(entry);
-      logs = logs.slice(0, 50); // Garder les 50 derniers
+      logs = logs.slice(0, 50); // Keep last 50
       await api.storage.set('logs', logs);
       updatePanel();
     }
@@ -179,7 +179,7 @@ module.exports.default = init;
 
 ## 3. Quick Commands
 
-Boutons pour exécuter des commandes fréquentes.
+Buttons to execute frequent commands.
 
 ### manifest.json
 ```json
@@ -187,7 +187,7 @@ Boutons pour exécuter des commandes fréquentes.
   "id": "quick-commands",
   "name": "Quick Commands",
   "version": "1.0.0",
-  "description": "Exécutez des commandes en un clic",
+  "description": "Execute commands with one click",
   "permissions": ["panel:register", "terminal:write", "session:info", "storage:read", "storage:write"]
 }
 ```
@@ -196,11 +196,11 @@ Boutons pour exécuter des commandes fréquentes.
 ```javascript
 function init(api) {
   let commands = [
-    { name: 'Disk Usage', cmd: 'df -h', icon: '💾' },
-    { name: 'Memory', cmd: 'free -m', icon: '🧠' },
-    { name: 'Top Processes', cmd: 'ps aux --sort=-%mem | head -10', icon: '📊' },
-    { name: 'Network', cmd: 'netstat -tuln | head -20', icon: '🌐' },
-    { name: 'Uptime', cmd: 'uptime', icon: '⏱️' },
+    { name: 'Disk Usage', cmd: 'df -h', icon: 'disk' },
+    { name: 'Memory', cmd: 'free -m', icon: 'mem' },
+    { name: 'Top Processes', cmd: 'ps aux --sort=-%mem | head -10', icon: 'proc' },
+    { name: 'Network', cmd: 'netstat -tuln | head -20', icon: 'net' },
+    { name: 'Uptime', cmd: 'uptime', icon: 'time' },
   ];
 
   api.onLoad(async () => {
@@ -214,7 +214,7 @@ function init(api) {
       container.innerHTML = `
         <div style="padding: 12px; font-family: system-ui;">
           <h3 style="margin: 0 0 12px 0; color: #fff; font-size: 14px;">
-            ⚡ Quick Commands
+            Quick Commands
           </h3>
           <div id="cmd-list">
             ${commands.map((c, i) => `
@@ -234,7 +234,6 @@ function init(api) {
                 text-align: left;
                 transition: all 0.2s;
               ">
-                <span style="font-size: 16px;">${c.icon}</span>
                 <span>${c.name}</span>
               </button>
             `).join('')}
@@ -274,7 +273,7 @@ function init(api) {
         </div>
       `;
 
-      // Style hover effect
+      // Hover effect
       container.querySelectorAll('.cmd-btn').forEach(btn => {
         btn.addEventListener('mouseenter', () => {
           btn.style.background = 'linear-gradient(135deg, rgba(125,166,232,0.25), rgba(125,166,232,0.1))';
@@ -304,7 +303,7 @@ function init(api) {
         const name = container.querySelector('#new-cmd-name').value.trim();
         const cmd = container.querySelector('#new-cmd').value.trim();
         if (name && cmd) {
-          commands.push({ name, cmd, icon: '⚙️' });
+          commands.push({ name, cmd, icon: 'custom' });
           await api.storage.set('commands', commands);
           api.showNotification('Command added!', 'success');
           // Re-render
@@ -323,7 +322,7 @@ module.exports.default = init;
 
 ## 4. Server Monitor
 
-Affiche CPU, RAM, Disk en temps réel.
+Displays CPU, RAM, Disk in real-time.
 
 ### manifest.json
 ```json
@@ -331,7 +330,7 @@ Affiche CPU, RAM, Disk en temps réel.
   "id": "server-monitor",
   "name": "Server Monitor",
   "version": "1.0.0",
-  "description": "Monitoring système en temps réel",
+  "description": "Real-time system monitoring",
   "permissions": ["panel:register", "terminal:read", "terminal:write", "session:info"]
 }
 ```
@@ -429,7 +428,7 @@ function init(api) {
     container.innerHTML = `
       <div style="padding: 12px; font-family: system-ui;">
         <h3 style="margin: 0 0 16px 0; color: #fff; font-size: 14px;">
-          📊 Server Monitor
+          Server Monitor
         </h3>
 
         ${['CPU', 'MEM', 'DISK'].map(key => {
@@ -474,7 +473,7 @@ module.exports.default = init;
 
 ## 5. Command History
 
-Historique des commandes exécutées.
+History of executed commands.
 
 ### manifest.json
 ```json
@@ -482,7 +481,7 @@ Historique des commandes exécutées.
   "id": "cmd-history",
   "name": "Command History",
   "version": "1.0.0",
-  "description": "Historique des commandes par session",
+  "description": "Command history per session",
   "permissions": ["panel:register", "terminal:read", "session:info"]
 }
 ```
@@ -497,9 +496,9 @@ function init(api) {
     history = [];
     if (unsubscribe) unsubscribe();
 
-    // Capture les inputs (commandes tapées)
+    // Capture inputs (typed commands)
     unsubscribe = api.onTerminalInput(session.id, (data) => {
-      // Détecter une commande (terminée par Enter)
+      // Detect a command (ended by Enter)
       if (data.includes('\r') || data.includes('\n')) {
         const cmd = data.trim();
         if (cmd && cmd.length > 0) {
@@ -529,7 +528,7 @@ function init(api) {
     container.innerHTML = `
       <div style="padding: 12px; font-family: system-ui;">
         <h3 style="margin: 0 0 12px 0; color: #fff; font-size: 14px;">
-          📜 Command History
+          Command History
         </h3>
         <div style="max-height: 400px; overflow-y: auto;">
           ${history.length === 0
@@ -579,7 +578,7 @@ module.exports.default = init;
 
 ## 6. SSH Bookmarks
 
-Sauvegardez des commandes par serveur.
+Save commands per server.
 
 ### manifest.json
 ```json
@@ -587,7 +586,7 @@ Sauvegardez des commandes par serveur.
   "id": "ssh-bookmarks",
   "name": "SSH Bookmarks",
   "version": "1.0.0",
-  "description": "Commandes favorites par serveur",
+  "description": "Favorite commands per server",
   "permissions": [
     "panel:register",
     "terminal:write",
@@ -643,7 +642,7 @@ function init(api) {
     container.innerHTML = `
       <div style="padding: 12px; font-family: system-ui;">
         <h3 style="margin: 0 0 4px 0; color: #fff; font-size: 14px;">
-          🔖 Bookmarks
+          Bookmarks
         </h3>
         <p style="margin: 0 0 12px 0; color: #666; font-size: 11px;">
           ${currentHost || 'Not connected'}
@@ -686,7 +685,7 @@ function init(api) {
                     border: none;
                     color: #e88b8b;
                     cursor: pointer;
-                  ">×</button>
+                  ">x</button>
                 </div>
               `).join('')}
           </div>
@@ -772,7 +771,7 @@ module.exports.default = init;
 
 ## 7. Color Theme
 
-Personnalisez les couleurs du panel.
+Customize panel colors.
 
 ### manifest.json
 ```json
@@ -780,7 +779,7 @@ Personnalisez les couleurs du panel.
   "id": "color-theme",
   "name": "Color Theme",
   "version": "1.0.0",
-  "description": "Personnalisez vos couleurs",
+  "description": "Customize your colors",
   "permissions": ["panel:register", "storage:read", "storage:write"]
 }
 ```
@@ -809,7 +808,7 @@ function init(api) {
       container.innerHTML = `
         <div style="padding: 16px; font-family: system-ui;">
           <h3 style="margin: 0 0 16px 0; color: #fff; font-size: 14px;">
-            🎨 Color Theme
+            Color Theme
           </h3>
 
           ${Object.entries(theme).map(([key, value]) => `
@@ -917,18 +916,14 @@ module.exports.default = init;
 
 ---
 
-## 🎯 Tips pour vos propres plugins
+## Tips for Your Own Plugins
 
-1. **Commencez simple** - Faites fonctionner une feature avant d'en ajouter d'autres
-2. **Testez souvent** - Désactivez/réactivez pour voir les changements
-3. **Gérez les erreurs** - Les sessions peuvent être nulles, les API peuvent échouer
-4. **Nettoyez** - Utilisez `onUnload` pour arrêter les intervals/listeners
-5. **Loggez** - Utilisez `console.log('[MonPlugin]')` pour débugger
+1. **Start simple** - Get one feature working before adding more
+2. **Test often** - Disable/re-enable to see changes
+3. **Handle errors** - Sessions can be null, APIs can fail
+4. **Clean up** - Use `onUnload` to stop intervals/listeners
+5. **Log everything** - Use `console.log('[MyPlugin]')` to debug
 
 ---
 
-<div align="center">
-
-**Happy coding! 🚀**
-
-</div>
+**Happy coding!**
