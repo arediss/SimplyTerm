@@ -1,20 +1,21 @@
 import { useState, useEffect, useCallback } from "react";
 import { useVault } from "./useVault";
+import { useAppSettings } from "./useAppSettings";
 
 export function useVaultFlow() {
   const vault = useVault();
+  const { settings, updateSettings, isLoading: settingsLoading } = useAppSettings();
   const [showVaultSetup, setShowVaultSetup] = useState(false);
   const [showVaultUnlock, setShowVaultUnlock] = useState(false);
-  const [vaultSetupSkipped, setVaultSetupSkipped] = useState(false);
   const [initialVaultCheckDone, setInitialVaultCheckDone] = useState(false);
 
   // Handle vault startup flow - only show unlock modal on initial app load
   useEffect(() => {
-    if (vault.isLoading) return;
+    if (vault.isLoading || settingsLoading) return;
 
     if (!vault.status?.exists) {
-      // No vault exists - show setup modal (unless skipped)
-      if (!vaultSetupSkipped) {
+      // No vault exists - show setup modal (unless skipped in settings)
+      if (!settings.security?.vaultSetupSkipped) {
         setShowVaultSetup(true);
       }
       setShowVaultUnlock(false);
@@ -35,12 +36,16 @@ export function useVaultFlow() {
     if (!initialVaultCheckDone) {
       setInitialVaultCheckDone(true);
     }
-  }, [vault.isLoading, vault.status?.exists, vault.status?.isUnlocked, vaultSetupSkipped, initialVaultCheckDone]);
+  }, [vault.isLoading, vault.status?.exists, vault.status?.isUnlocked, settings.security?.vaultSetupSkipped, initialVaultCheckDone, settingsLoading]);
 
   const handleVaultSetupSkip = useCallback(() => {
-    setVaultSetupSkipped(true);
+    // Persist the skip choice in settings
+    updateSettings({
+      ...settings,
+      security: { ...settings.security, vaultSetupSkipped: true },
+    });
     setShowVaultSetup(false);
-  }, []);
+  }, [settings, updateSettings]);
 
   const handleVaultSetup = useCallback(async (
     masterPassword: string,

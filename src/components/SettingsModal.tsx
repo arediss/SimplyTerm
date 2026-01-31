@@ -55,6 +55,9 @@ export interface AppSettings {
   ui: {
     statusBarVisible: boolean;
   };
+  security: {
+    vaultSetupSkipped: boolean;
+  };
 }
 
 export const defaultSettings: AppSettings = {
@@ -70,7 +73,10 @@ export const defaultSettings: AppSettings = {
     accentColor: "#7DA6E8",
   },
   ui: {
-    statusBarVisible: true,
+    statusBarVisible: false,
+  },
+  security: {
+    vaultSetupSkipped: false,
   },
 };
 

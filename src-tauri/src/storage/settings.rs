@@ -25,11 +25,45 @@ pub struct AppearanceSettings {
     pub accent_color: String,
 }
 
+/// UI settings
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UiSettings {
+    pub status_bar_visible: bool,
+}
+
+impl Default for UiSettings {
+    fn default() -> Self {
+        Self {
+            status_bar_visible: false,
+        }
+    }
+}
+
+/// Security settings
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SecuritySettings {
+    pub vault_setup_skipped: bool,
+}
+
+impl Default for SecuritySettings {
+    fn default() -> Self {
+        Self {
+            vault_setup_skipped: false,
+        }
+    }
+}
+
 /// Full app settings
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     pub terminal: TerminalSettings,
     pub appearance: AppearanceSettings,
+    #[serde(default)]
+    pub ui: UiSettings,
+    #[serde(default)]
+    pub security: SecuritySettings,
 }
 
 impl Default for AppSettings {
@@ -46,6 +80,8 @@ impl Default for AppSettings {
                 theme: "dark".to_string(),
                 accent_color: "#7DA6E8".to_string(),
             },
+            ui: UiSettings::default(),
+            security: SecuritySettings::default(),
         }
     }
 }
