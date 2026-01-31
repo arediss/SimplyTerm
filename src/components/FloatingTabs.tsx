@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, forwardRef } from "react";
 import { createPortal } from "react-dom";
-import { Menu, Plus, X, Minus, Square, Copy, ChevronDown, Terminal, Clock, ArrowLeftRight } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Menu, Plus, X, Minus, Square, Copy, ChevronDown, Terminal, Clock, ArrowLeftRight, PanelBottomClose, PanelBottomOpen } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Tab, RecentSession } from "../types";
 
@@ -18,6 +19,8 @@ interface FloatingTabsProps {
   onToggleTunnelSidebar: () => void;
   isTunnelSidebarOpen: boolean;
   activeTunnelCount: number;
+  statusBarVisible: boolean;
+  onToggleStatusBar: () => void;
 }
 
 function FloatingTabs({
@@ -34,7 +37,10 @@ function FloatingTabs({
   onToggleTunnelSidebar,
   isTunnelSidebarOpen,
   activeTunnelCount,
+  statusBarVisible,
+  onToggleStatusBar,
 }: FloatingTabsProps) {
+  const { t } = useTranslation();
   const [isMaximized, setIsMaximized] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState<{ x: number; y: number } | null>(null);
@@ -117,6 +123,19 @@ function FloatingTabs({
                 {activeTunnelCount}
               </span>
             )}
+          </button>
+
+          {/* Bouton toggle status bar */}
+          <button
+            onClick={onToggleStatusBar}
+            className={`
+              shrink-0 w-7 h-7 flex items-center justify-center rounded-lg
+              transition-all duration-200 hover:bg-surface-0/50
+              ${statusBarVisible ? "text-accent" : "text-text-muted hover:text-text"}
+            `}
+            title={statusBarVisible ? t("statusBar.hide") : t("statusBar.show")}
+          >
+            {statusBarVisible ? <PanelBottomClose size={14} /> : <PanelBottomOpen size={14} />}
           </button>
 
           {/* Tabs */}

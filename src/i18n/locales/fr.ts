@@ -680,6 +680,24 @@ export default {
   },
 
   // ============================================
+  // STATUS BAR - StatusBar.tsx
+  // ============================================
+  statusBar: {
+    // Bouton afficher la barre de statut
+    show: "Afficher la barre de statut",
+    // Bouton masquer la barre de statut
+    hide: "Masquer la barre de statut",
+    // État vault verrouillé
+    locked: "Verrouillé",
+    // État vault déverrouillé
+    unlocked: "Déverrouillé",
+    // Tooltip vault verrouillé
+    vaultLocked: "Vault verrouillé - Cliquez pour déverrouiller",
+    // Tooltip vault déverrouillé
+    vaultUnlocked: "Vault déverrouillé - Cliquez pour verrouiller",
+  },
+
+  // ============================================
   // COMMAND PALETTE - CommandPalette.tsx
   // ============================================
   commandPalette: {

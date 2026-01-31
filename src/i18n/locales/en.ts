@@ -680,6 +680,24 @@ export default {
   },
 
   // ============================================
+  // STATUS BAR - StatusBar.tsx
+  // ============================================
+  statusBar: {
+    // Show status bar button
+    show: "Show status bar",
+    // Hide status bar button
+    hide: "Hide status bar",
+    // Vault locked state
+    locked: "Locked",
+    // Vault unlocked state
+    unlocked: "Unlocked",
+    // Vault locked tooltip
+    vaultLocked: "Vault is locked - Click to unlock",
+    // Vault unlocked tooltip
+    vaultUnlocked: "Vault is unlocked - Click to lock",
+  },
+
+  // ============================================
   // COMMAND PALETTE - CommandPalette.tsx
   // ============================================
   commandPalette: {

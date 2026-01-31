@@ -58,6 +58,20 @@ export function useVaultFlow() {
     setShowVaultUnlock(false);
   }, []);
 
+  // Manually open unlock modal (e.g., from status bar)
+  const openVaultUnlock = useCallback(() => {
+    if (vault.status?.exists && !vault.status?.isUnlocked) {
+      setShowVaultUnlock(true);
+    }
+  }, [vault.status?.exists, vault.status?.isUnlocked]);
+
+  // Lock vault and optionally show unlock modal
+  const lockVault = useCallback(async () => {
+    if (vault.status?.isUnlocked) {
+      await vault.lock();
+    }
+  }, [vault]);
+
   return {
     vault,
     showVaultSetup,
@@ -66,5 +80,7 @@ export function useVaultFlow() {
     handleVaultSetup,
     closeVaultSetup,
     closeVaultUnlock,
+    openVaultUnlock,
+    lockVault,
   };
 }

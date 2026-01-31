@@ -53,6 +53,9 @@ export interface AppSettings {
     theme: "dark" | "light";
     accentColor: string;
   };
+  ui: {
+    statusBarVisible: boolean;
+  };
 }
 
 export const defaultSettings: AppSettings = {
@@ -66,6 +69,9 @@ export const defaultSettings: AppSettings = {
   appearance: {
     theme: "dark",
     accentColor: "#7DA6E8",
+  },
+  ui: {
+    statusBarVisible: true,
   },
 };
 

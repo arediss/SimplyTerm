@@ -9,6 +9,7 @@ import HostKeyModal, { HostKeyCheckResult } from "./components/HostKeyModal";
 import ConnectionForm, { SshConnectionConfig } from "./components/ConnectionForm";
 import SettingsModal from "./components/SettingsModal";
 import { CommandPalette, useCommandPalette, CommandHandlers, CommandContext } from "./components/CommandPalette";
+import { StatusBar } from "./components/StatusBar";
 import { PluginHost, pluginManager, type SessionInfo, type ModalConfig, type NotificationType } from "./plugins";
 import {
   SplitPane,
@@ -67,6 +68,8 @@ function App() {
     handleVaultSetup,
     closeVaultSetup,
     closeVaultUnlock,
+    openVaultUnlock,
+    lockVault,
   } = useVaultFlow();
 
   // Sidebar state - un seul sidebar ouvert à la fois
@@ -1296,10 +1299,13 @@ function App() {
     };
   }, [activeTab]);
 
+  // Status bar height for content padding (bar height + padding + toggle)
+  const statusBarVisible = appSettings.ui?.statusBarVisible ?? true;
+
   return (
     <div className="relative h-screen bg-terminal overflow-hidden">
-      {/* Terminal area - sous la titlebar */}
-      <div className="absolute inset-0 top-10">
+      {/* Terminal area - sous la titlebar, au dessus de la status bar */}
+      <div className={`absolute inset-x-0 bottom-0 ${statusBarVisible ? "top-[72px]" : "top-10"}`}>
         {tabs.length === 0 ? (
           <EmptyState onNewConnection={handleOpenConnectionModal} />
         ) : (
@@ -1387,6 +1393,13 @@ function App() {
         onToggleTunnelSidebar={() => setOpenSidebar(openSidebar === "tunnel" ? "none" : "tunnel")}
         isTunnelSidebarOpen={isTunnelSidebarOpen}
         activeTunnelCount={activeTunnelCount}
+        statusBarVisible={statusBarVisible}
+        onToggleStatusBar={() =>
+          handleSettingsChange({
+            ...appSettings,
+            ui: { ...appSettings.ui, statusBarVisible: !appSettings.ui?.statusBarVisible },
+          })
+        }
       />
 
       {/* Sidebar drawer */}
@@ -1583,6 +1596,20 @@ function App() {
         onUnlockWithPassword={vault.unlockWithPassword}
         onUnlockWithPin={vault.unlockWithPin}
         onUnlockWithSecurityKey={vault.unlockWithSecurityKey}
+      />
+
+      {/* Status Bar */}
+      <StatusBar
+        visible={statusBarVisible}
+        vaultConfigured={vault.status?.exists ?? false}
+        vaultLocked={!vault.status?.isUnlocked}
+        onVaultClick={() => {
+          if (vault.status?.isUnlocked) {
+            lockVault();
+          } else {
+            openVaultUnlock();
+          }
+        }}
       />
     </div>
   );
