@@ -30,6 +30,7 @@ pub struct SecurityKeyInfo {
 }
 
 /// Stored FIDO2 credential configuration
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Fido2Config {

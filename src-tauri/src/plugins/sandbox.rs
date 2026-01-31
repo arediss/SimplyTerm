@@ -34,6 +34,7 @@ impl PermissionValidator {
     }
 
     /// Validate multiple permissions (all must be granted)
+    #[allow(dead_code)]
     pub fn require_all(&self, permissions: &[Permission]) -> Result<(), String> {
         for perm in permissions {
             self.require(perm)?;
@@ -42,6 +43,7 @@ impl PermissionValidator {
     }
 
     /// Validate at least one permission is granted
+    #[allow(dead_code)]
     pub fn require_any(&self, permissions: &[Permission]) -> Result<(), String> {
         for perm in permissions {
             if self.has_permission(perm) {
@@ -56,6 +58,7 @@ impl PermissionValidator {
 }
 
 /// Backend API whitelist - functions that plugins can call
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BackendApi {
     /// Execute a command on SSH session
@@ -70,6 +73,7 @@ pub enum BackendApi {
     WriteFileSftp,
 }
 
+#[allow(dead_code)]
 impl BackendApi {
     /// Get required permission for this API
     pub fn required_permission(&self) -> Permission {
@@ -96,6 +100,7 @@ impl BackendApi {
 }
 
 /// Validate a backend API call from a plugin
+#[allow(dead_code)]
 pub fn validate_backend_call(
     validator: &PermissionValidator,
     api_name: &str,

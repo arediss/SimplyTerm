@@ -236,6 +236,7 @@ impl EditWatcher {
     }
 
     /// Check if a file is being tracked
+    #[allow(dead_code)]
     pub fn is_tracking(&self, local_path: &PathBuf) -> bool {
         self.tracked_files.read().contains_key(local_path)
     }

@@ -11,6 +11,7 @@ pub trait Session: Send + Sync + Debug {
     fn resize(&self, cols: u32, rows: u32) -> Result<(), String>;
 
     /// Retourne le type de session pour le logging/debug
+    #[allow(dead_code)]
     fn session_type(&self) -> &'static str;
 
     /// Ferme proprement la session

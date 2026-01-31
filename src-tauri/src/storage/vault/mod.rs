@@ -21,6 +21,5 @@ mod types;
 
 // Re-export types for external use
 pub use commands::*;
-pub use fido2::SecurityKeyInfo;
 pub use state::VaultState;
-pub use types::{UnlockMethod, VaultCredentialType, VaultStatus};
+pub use types::VaultCredentialType;

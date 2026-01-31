@@ -13,6 +13,7 @@ use std::sync::Arc;
 /// Plugin API context for a specific plugin
 pub struct PluginApi {
     /// Plugin ID
+    #[allow(dead_code)]
     plugin_id: String,
     /// Permission validator
     validator: PermissionValidator,
@@ -21,6 +22,7 @@ pub struct PluginApi {
 }
 
 /// Session info exposed to plugins
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionInfo {
     pub id: String,
@@ -32,6 +34,7 @@ pub struct SessionInfo {
 }
 
 /// Result of a backend API call
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ApiResult {
@@ -67,6 +70,7 @@ impl PluginApi {
     }
 
     /// Check if plugin has a permission
+    #[allow(dead_code)]
     pub fn has_permission(&self, permission: &Permission) -> bool {
         self.validator.has_permission(permission)
     }
@@ -168,10 +172,12 @@ fn sanitize_key(key: &str) -> String {
 }
 
 /// Plugin API registry - manages API instances for multiple plugins
+#[allow(dead_code)]
 pub struct PluginApiRegistry {
     apis: parking_lot::RwLock<HashMap<String, Arc<PluginApi>>>,
 }
 
+#[allow(dead_code)]
 impl PluginApiRegistry {
     pub fn new() -> Self {
         Self {

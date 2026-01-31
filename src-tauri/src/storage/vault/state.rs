@@ -573,7 +573,7 @@ impl VaultState {
         let new_key = crypto::derive_key(new_password, &new_salt)?;
 
         // Re-encrypt PIN config if present
-        if let Some(ref mut pin_config) = meta.pin_config {
+        if meta.pin_config.is_some() {
             // We need to re-encrypt the master key with the existing PIN
             // But we don't know the PIN, so we need to preserve the old encrypted key
             // Actually, we should update the encrypted master key with the new key

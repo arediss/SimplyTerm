@@ -11,7 +11,4 @@ mod sandbox;
 
 pub use api::PluginApi;
 pub use manager::PluginManager;
-pub use manifest::{
-    CommandConfig, PanelConfig, PanelPosition, Permission, PluginManifest, PluginState,
-    PluginStatus,
-};
+pub use manifest::{PanelPosition, PluginState, PluginStatus};

@@ -29,6 +29,7 @@ pub enum HostKeyVerification {
 }
 
 /// Information about a host key for the frontend
+#[allow(dead_code)]
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct HostKeyInfo {
     pub host: String,
@@ -329,6 +330,7 @@ pub struct PendingHostKey {
     pub port: u16,
     pub key_type: String,
     pub key_base64: String,
+    #[allow(dead_code)]
     pub fingerprint: String,
 }
 

@@ -159,6 +159,7 @@ impl TunnelManager {
     }
 
     /// Stop all tunnels for a specific session
+    #[allow(dead_code)]
     pub fn stop_session_tunnels(&self, session_id: &str) {
         let mut tunnels = self.tunnels.write();
         for handle in tunnels.values_mut() {

@@ -10,4 +10,4 @@ pub mod local_forward;
 pub mod remote_forward;
 pub mod dynamic_forward;
 
-pub use manager::{TunnelManager, TunnelInfo, TunnelType};
+pub use manager::{TunnelManager, TunnelInfo};

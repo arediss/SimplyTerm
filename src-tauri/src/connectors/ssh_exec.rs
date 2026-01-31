@@ -121,7 +121,8 @@ pub async fn ssh_exec(config: &SshConfig, command: &str) -> Result<String, Strin
     String::from_utf8(output).map_err(|e| format!("Invalid UTF-8: {}", e))
 }
 
-/// Server statistics
+/// Server statistics (reserved for future plugin use)
+#[allow(dead_code)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub struct ServerStats {
     pub cpu_percent: f32,
@@ -133,7 +134,8 @@ pub struct ServerStats {
     pub uptime: String,
 }
 
-/// Fetch server stats via SSH
+/// Fetch server stats via SSH (reserved for future plugin use)
+#[allow(dead_code)]
 pub async fn get_server_stats(config: &SshConfig) -> Result<ServerStats, String> {
     // Combined command to get all stats at once
     let command = r#"

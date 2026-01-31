@@ -129,6 +129,7 @@ impl PluginManifest {
     }
 
     /// Check if plugin has a specific permission
+    #[allow(dead_code)]
     pub fn has_permission(&self, permission: &Permission) -> bool {
         self.permissions.contains(permission)
     }
@@ -170,6 +171,7 @@ impl PluginState {
         }
     }
 
+    #[allow(dead_code)]
     pub fn with_error(mut self, error: String) -> Self {
         self.status = PluginStatus::Error;
         self.error = Some(error);

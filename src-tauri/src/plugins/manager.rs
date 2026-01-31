@@ -163,6 +163,7 @@ impl PluginManager {
     }
 
     /// Get plugin manifest by ID
+    #[allow(dead_code)]
     pub fn get_manifest(&self, id: &str) -> Option<PluginManifest> {
         self.plugins.read().get(id).map(|s| s.manifest.clone())
     }
@@ -235,6 +236,7 @@ impl PluginManager {
     }
 
     /// Get all enabled plugins
+    #[allow(dead_code)]
     pub fn get_enabled_plugins(&self) -> Vec<PluginState> {
         self.plugins
             .read()
@@ -283,6 +285,7 @@ impl Default for PluginManager {
 }
 
 /// Thread-safe wrapper for use in Tauri state
+#[allow(dead_code)]
 pub type SharedPluginManager = Arc<PluginManager>;
 
 #[cfg(test)]

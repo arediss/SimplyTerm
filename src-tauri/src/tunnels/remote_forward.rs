@@ -19,7 +19,9 @@ use crate::connectors::known_hosts::{verify_host_key, HostKeyVerification};
 /// Message to handle incoming forwarded connections
 struct ForwardedConnection {
     channel: Channel<Msg>,
+    #[allow(dead_code)]
     originator_address: String,
+    #[allow(dead_code)]
     originator_port: u32,
 }
 
