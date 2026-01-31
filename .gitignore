@@ -33,3 +33,7 @@ src-tauri/Cargo.lock
 .claude/
 .serena/
 BRAINSTORM.md
+
+# Local files (not for repo)
+AUDIT.md
+ETA.md
