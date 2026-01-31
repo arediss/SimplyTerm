@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import Sidebar from "./components/Sidebar";
@@ -8,6 +8,7 @@ import Modal from "./components/Modal";
 import HostKeyModal, { HostKeyCheckResult } from "./components/HostKeyModal";
 import ConnectionForm, { SshConnectionConfig } from "./components/ConnectionForm";
 import SettingsModal from "./components/SettingsModal";
+import { CommandPalette, useCommandPalette, CommandHandlers, CommandContext } from "./components/CommandPalette";
 import { PluginHost, pluginManager, type SessionInfo, type ModalConfig, type NotificationType } from "./plugins";
 import {
   SplitPane,
@@ -1146,6 +1147,116 @@ function App() {
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
 
+  // Command Palette handlers and context
+  const commandHandlers: CommandHandlers = useMemo(
+    () => ({
+      newSshConnection: handleOpenConnectionModal,
+      closeTab: () => {
+        if (activeTabId) handleCloseTab(activeTabId);
+      },
+      duplicateTab: () => {
+        if (activeTab?.sshConfig) {
+          // Trigger a new SSH connection with the same config
+          setInitialConnectionConfig(activeTab.sshConfig);
+          setIsConnectionModalOpen(true);
+        }
+      },
+      renameTab: () => {
+        if (activeTabId) {
+          const newName = window.prompt("Enter new tab name:", activeTab?.title);
+          if (newName && newName.trim()) {
+            setTabs(tabs.map((t) =>
+              t.id === activeTabId ? { ...t, title: newName.trim() } : t
+            ));
+          }
+        }
+      },
+      splitPane: () => handleSplitPane("vertical"),
+      focusNextPane: () => {
+        if (!activeTab) return;
+        const paneIds = getAllTerminalPaneIds(activeTab.paneTree);
+        if (paneIds.length <= 1) return;
+        const currentIndex = paneIds.indexOf(activeTab.focusedPaneId || "");
+        const nextIndex = (currentIndex + 1) % paneIds.length;
+        handleFocusPane(paneIds[nextIndex]);
+      },
+      focusPrevPane: () => {
+        if (!activeTab) return;
+        const paneIds = getAllTerminalPaneIds(activeTab.paneTree);
+        if (paneIds.length <= 1) return;
+        const currentIndex = paneIds.indexOf(activeTab.focusedPaneId || "");
+        const prevIndex = currentIndex <= 0 ? paneIds.length - 1 : currentIndex - 1;
+        handleFocusPane(paneIds[prevIndex]);
+      },
+      nextTab: () => {
+        if (tabs.length <= 1) return;
+        const currentIndex = tabs.findIndex((t) => t.id === activeTabId);
+        const nextIndex = (currentIndex + 1) % tabs.length;
+        setActiveTabId(tabs[nextIndex].id);
+      },
+      prevTab: () => {
+        if (tabs.length <= 1) return;
+        const currentIndex = tabs.findIndex((t) => t.id === activeTabId);
+        const prevIndex = currentIndex <= 0 ? tabs.length - 1 : currentIndex - 1;
+        setActiveTabId(tabs[prevIndex].id);
+      },
+      openSettings: () => setIsSettingsOpen(true),
+      openSftp: () => {
+        if (activeTab?.type === "ssh" && activeTab.sshConfig) {
+          // Find matching saved session to open SFTP
+          const matchingSaved = savedSessions.find(
+            (s) =>
+              s.host === activeTab.sshConfig?.host &&
+              s.username === activeTab.sshConfig?.username
+          );
+          if (matchingSaved) {
+            handleOpenSftpTab(matchingSaved);
+          }
+        }
+      },
+    }),
+    [
+      activeTabId,
+      activeTab,
+      tabs,
+      savedSessions,
+      handleCloseTab,
+      handleSplitPane,
+      handleFocusPane,
+      handleOpenSftpTab,
+    ]
+  );
+
+  const commandContext: CommandContext = useMemo(
+    () => ({
+      hasActiveTab: !!activeTab,
+      hasMultipleTabs: tabs.length > 1,
+      hasMultiplePanes: activeTab
+        ? getAllTerminalPaneIds(activeTab.paneTree).length > 1
+        : false,
+      isActiveTabSsh: activeTab?.type === "ssh",
+    }),
+    [activeTab, tabs.length]
+  );
+
+  const commandPalette = useCommandPalette({
+    handlers: commandHandlers,
+    context: commandContext,
+  });
+
+  // Global keyboard shortcut for Command Palette (Ctrl+Shift+P)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === "P") {
+        e.preventDefault();
+        commandPalette.toggle();
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [commandPalette.toggle]);
+
   // Plugin callbacks
   const handleShowNotification = useCallback((message: string, type: NotificationType) => {
     setNotification({ message, type });
@@ -1392,6 +1503,19 @@ function App() {
         onSettingsChange={handleSettingsChange}
         savedSessionsCount={savedSessions.length}
         onClearAllSessions={() => clearAllSavedSessions(savedSessions)}
+      />
+
+      {/* Command Palette */}
+      <CommandPalette
+        isOpen={commandPalette.isOpen}
+        query={commandPalette.query}
+        onQueryChange={commandPalette.setQuery}
+        selectedIndex={commandPalette.selectedIndex}
+        onSelectedIndexChange={commandPalette.setSelectedIndex}
+        filteredCommands={commandPalette.filteredCommands}
+        onClose={commandPalette.close}
+        onExecuteCommand={commandPalette.executeCommand}
+        onKeyDown={commandPalette.handleKeyDown}
       />
 
       {/* Tunnel Manager Modal (for SSH session tunnels) */}

@@ -680,6 +680,47 @@ export default {
   },
 
   // ============================================
+  // COMMAND PALETTE - CommandPalette.tsx
+  // ============================================
+  commandPalette: {
+    // Placeholder de recherche
+    searchPlaceholder: "Rechercher une commande...",
+    // Message aucun résultat
+    noResults: "Aucune commande trouvée",
+    // Indication footer : naviguer
+    navigate: "naviguer",
+    // Indication footer : exécuter
+    execute: "sélectionner",
+    // Indication footer : fermer
+    close: "fermer",
+    // Labels des commandes
+    commands: {
+      // Nouvelle connexion SSH
+      newSshConnection: "Nouvelle connexion SSH",
+      // Fermer l'onglet actuel
+      closeTab: "Fermer l'onglet",
+      // Dupliquer l'onglet actuel
+      duplicateTab: "Dupliquer l'onglet",
+      // Renommer l'onglet actuel
+      renameTab: "Renommer l'onglet",
+      // Diviser le panneau
+      splitPane: "Diviser le panneau",
+      // Focus panneau suivant
+      focusNextPane: "Focus panneau suivant",
+      // Focus panneau précédent
+      focusPrevPane: "Focus panneau précédent",
+      // Onglet suivant
+      nextTab: "Onglet suivant",
+      // Onglet précédent
+      prevTab: "Onglet précédent",
+      // Ouvrir les paramètres
+      openSettings: "Ouvrir les paramètres",
+      // Ouvrir le navigateur SFTP
+      openSftp: "Ouvrir le navigateur SFTP",
+    },
+  },
+
+  // ============================================
   // APP - App.tsx (état vide, modals, onglets)
   // ============================================
   app: {

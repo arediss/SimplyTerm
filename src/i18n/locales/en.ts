@@ -680,6 +680,47 @@ export default {
   },
 
   // ============================================
+  // COMMAND PALETTE - CommandPalette.tsx
+  // ============================================
+  commandPalette: {
+    // Search input placeholder
+    searchPlaceholder: "Search commands...",
+    // No results message
+    noResults: "No commands found",
+    // Footer hint: navigate
+    navigate: "navigate",
+    // Footer hint: execute
+    execute: "select",
+    // Footer hint: close
+    close: "close",
+    // Command labels
+    commands: {
+      // New SSH connection command
+      newSshConnection: "New SSH Connection",
+      // Close current tab
+      closeTab: "Close Tab",
+      // Duplicate current tab
+      duplicateTab: "Duplicate Tab",
+      // Rename current tab
+      renameTab: "Rename Tab",
+      // Split pane vertically
+      splitPane: "Split Pane",
+      // Focus next pane
+      focusNextPane: "Focus Next Pane",
+      // Focus previous pane
+      focusPrevPane: "Focus Previous Pane",
+      // Go to next tab
+      nextTab: "Next Tab",
+      // Go to previous tab
+      prevTab: "Previous Tab",
+      // Open settings
+      openSettings: "Open Settings",
+      // Open SFTP browser
+      openSftp: "Open SFTP Browser",
+    },
+  },
+
+  // ============================================
   // APP - App.tsx (empty state, modals, tabs)
   // ============================================
   app: {
