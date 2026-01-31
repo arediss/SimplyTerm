@@ -104,6 +104,16 @@
     background: var(--color-accent);
     color: var(--color-crust);
   }
+
+  /* Remove default focus outline on modals/dialogs */
+  [role="dialog"]:focus,
+  [role="dialog"]:focus-visible,
+  .modal:focus,
+  .modal:focus-visible,
+  div[tabindex="-1"]:focus,
+  div[tabindex="-1"]:focus-visible {
+    outline: none;
+  }
 }
 
 @layer components {
