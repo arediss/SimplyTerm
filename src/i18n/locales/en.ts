@@ -466,32 +466,32 @@ export default {
     unlock: {
       // Modal title
       title: "Unlock Vault",
-      // PIN locked warning
-      pinLockedWarning: "PIN locked. Use your master password or security key.",
-      // FIDO2 tab label
-      fido2Tab: "FIDO2 Key",
-      // PIN tab label
-      pinTab: "PIN",
-      // Password tab label
-      passwordTab: "Password",
-      // Security key prompt
-      securityKeyPrompt: "Insert your security key and touch it",
+      // PIN locked warning (used in component)
+      pinLocked: "PIN locked. Use your master password or security key.",
+      // FIDO2 tab label (used in component)
+      fido2Key: "FIDO2 Key",
+      // PIN tab label (used in component)
+      pin: "PIN",
+      // Password tab label (used in component)
+      password: "Password",
+      // Security key prompt (used in component)
+      insertSecurityKey: "Insert your security key and touch it",
       // Unlock with FIDO2 button
       unlockWithFido2: "Unlock with FIDO2 key",
       // Touch your key status
       touchingKey: "Touch your key...",
-      // Touch key error fallback
-      touchKeyError: "Touch your security key",
-      // PIN prompt
-      pinPrompt: "Enter your PIN code to unlock",
+      // Touch key error fallback (used in component)
+      touchSecurityKey: "Touch your security key",
+      // PIN prompt (used in component)
+      enterPin: "Enter your PIN code to unlock",
       // PIN attempts remaining - singular
       attemptsRemaining_one: "{{count}} attempt remaining",
       // PIN attempts remaining - plural
       attemptsRemaining_other: "{{count}} attempts remaining",
       // Master password label
       masterPassword: "Master password",
-      // Password placeholder
-      passwordPlaceholder: "Enter your password",
+      // Password placeholder (used in component)
+      enterPassword: "Enter your password",
       // Incorrect password error
       incorrectPassword: "Incorrect password",
       // Incorrect PIN error
@@ -502,8 +502,8 @@ export default {
       unlocking: "Unlocking...",
       // Continue without unlocking button
       continueWithout: "Continue without unlocking",
-      // Continue without unlock warning
-      continueWarning: "Saved passwords won't be available",
+      // Continue without unlock warning (used in component)
+      passwordsUnavailable: "Saved passwords won't be available",
     },
   },
 

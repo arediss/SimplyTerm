@@ -466,32 +466,32 @@ export default {
     unlock: {
       // Titre du modal
       title: "Déverrouiller le Vault",
-      // Avertissement PIN verrouillé
-      pinLockedWarning: "Code PIN verrouillé. Utilisez votre mot de passe principal ou clé de sécurité.",
-      // Label onglet FIDO2
-      fido2Tab: "Clé FIDO2",
-      // Label onglet PIN
-      pinTab: "PIN",
-      // Label onglet mot de passe
-      passwordTab: "Mot de passe",
-      // Invitation clé de sécurité
-      securityKeyPrompt: "Insérez votre clé de sécurité et touchez-la",
+      // Avertissement PIN verrouillé (utilisé dans le composant)
+      pinLocked: "Code PIN verrouillé. Utilisez votre mot de passe principal ou clé de sécurité.",
+      // Label onglet FIDO2 (utilisé dans le composant)
+      fido2Key: "Clé FIDO2",
+      // Label onglet PIN (utilisé dans le composant)
+      pin: "PIN",
+      // Label onglet mot de passe (utilisé dans le composant)
+      password: "Mot de passe",
+      // Invitation clé de sécurité (utilisé dans le composant)
+      insertSecurityKey: "Insérez votre clé de sécurité et touchez-la",
       // Bouton déverrouiller avec FIDO2
       unlockWithFido2: "Déverrouiller avec clé FIDO2",
       // Statut touche ta clé
       touchingKey: "Touchez votre clé...",
-      // Erreur fallback touche ta clé
-      touchKeyError: "Touchez votre clé de sécurité",
-      // Invitation PIN
-      pinPrompt: "Entrez votre code PIN pour déverrouiller",
+      // Erreur fallback touche ta clé (utilisé dans le composant)
+      touchSecurityKey: "Touchez votre clé de sécurité",
+      // Invitation PIN (utilisé dans le composant)
+      enterPin: "Entrez votre code PIN pour déverrouiller",
       // Tentatives restantes - singulier
       attemptsRemaining_one: "{{count}} tentative restante",
       // Tentatives restantes - pluriel
       attemptsRemaining_other: "{{count}} tentatives restantes",
       // Label mot de passe principal
       masterPassword: "Mot de passe principal",
-      // Placeholder mot de passe
-      passwordPlaceholder: "Entrez votre mot de passe",
+      // Placeholder mot de passe (utilisé dans le composant)
+      enterPassword: "Entrez votre mot de passe",
       // Erreur mot de passe incorrect
       incorrectPassword: "Mot de passe incorrect",
       // Erreur PIN incorrect
@@ -502,8 +502,8 @@ export default {
       unlocking: "Déverrouillage...",
       // Bouton continuer sans déverrouiller
       continueWithout: "Continuer sans déverrouiller",
-      // Avertissement continuer sans déverrouiller
-      continueWarning: "Les mots de passe sauvegardés ne seront pas disponibles",
+      // Avertissement continuer sans déverrouiller (utilisé dans le composant)
+      passwordsUnavailable: "Les mots de passe sauvegardés ne seront pas disponibles",
     },
   },
 
