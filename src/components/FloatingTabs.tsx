@@ -104,7 +104,7 @@ function FloatingTabs({
               transition-all duration-200 hover:bg-surface-0/50
               ${isSidebarOpen ? "text-accent" : "text-text-muted hover:text-text"}
             `}
-            title="Menu"
+            title={t("header.menu")}
           >
             <Menu size={14} />
           </button>
@@ -134,7 +134,7 @@ function FloatingTabs({
               transition-all duration-200 hover:bg-surface-0/50
               ${isTunnelSidebarOpen ? "text-accent" : "text-text-muted hover:text-text"}
             `}
-            title="Port Forwarding (Tunnels)"
+            title={t("header.tunnels")}
           >
             <ArrowLeftRight size={14} />
             {activeTunnelCount > 0 && (
@@ -162,7 +162,7 @@ function FloatingTabs({
               <button
                 onClick={onNewTab}
                 className="shrink-0 w-7 h-7 flex items-center justify-center rounded-l-lg text-text-muted hover:text-text hover:bg-white/5 transition-all duration-200"
-                title="Nouvelle connexion SSH"
+                title={t("header.newSshConnection")}
               >
                 <Plus size={14} />
               </button>
@@ -185,7 +185,7 @@ function FloatingTabs({
                     ? "bg-white/10 text-text"
                     : "text-text-muted hover:text-text hover:bg-white/5"
                 }`}
-                title="Connexions rapides"
+                title={t("header.quickConnections")}
               >
                 <ChevronDown size={12} className={`transition-transform duration-200 ${isDropdownOpen ? "rotate-180" : ""}`} />
               </button>
@@ -200,7 +200,7 @@ function FloatingTabs({
           <button
             onClick={handleMinimize}
             className="w-11 h-10 flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-0/50 transition-colors"
-            title="Réduire"
+            title={t("header.minimize")}
           >
             <Minus size={14} />
           </button>
@@ -209,7 +209,7 @@ function FloatingTabs({
           <button
             onClick={handleMaximize}
             className="w-11 h-10 flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-0/50 transition-colors"
-            title={isMaximized ? "Restaurer" : "Agrandir"}
+            title={isMaximized ? t("header.restore") : t("header.maximize")}
           >
             {isMaximized ? <Square size={12} /> : <Copy size={13} className="rotate-90" />}
           </button>
@@ -218,7 +218,7 @@ function FloatingTabs({
           <button
             onClick={handleClose}
             className="w-11 h-10 flex items-center justify-center text-text-muted hover:text-white hover:bg-error transition-colors"
-            title="Fermer"
+            title={t("header.close")}
           >
             <X size={15} />
           </button>

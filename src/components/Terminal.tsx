@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
@@ -18,6 +19,7 @@ interface TerminalProps {
 const RESIZE_DEBOUNCE_MS = 100;
 
 function Terminal({ sessionId, type, onExit, isActive = true }: TerminalProps) {
+  const { t } = useTranslation();
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -166,7 +168,7 @@ function Terminal({ sessionId, type, onExit, isActive = true }: TerminalProps) {
         );
 
         unlistenExit = await listen(`pty-exit-${sessionId}`, () => {
-          xterm.write("\r\n\x1b[38;5;244m[Session terminée]\x1b[0m\r\n");
+          xterm.write(`\r\n\x1b[38;5;244m${t("terminalView.sessionEnded")}\x1b[0m\r\n`);
           onExit?.();
         });
 
@@ -184,7 +186,7 @@ function Terminal({ sessionId, type, onExit, isActive = true }: TerminalProps) {
         });
       } catch (error) {
         console.error("[Terminal] Setup error:", error);
-        xterm.write(`\x1b[31mErreur: ${error}\x1b[0m\r\n`);
+        xterm.write(`\x1b[31m${t("terminalView.errorPrefix")}${error}\x1b[0m\r\n`);
       }
     };
 
@@ -343,7 +345,7 @@ function Terminal({ sessionId, type, onExit, isActive = true }: TerminalProps) {
                 ? "bg-accent/20 text-accent"
                 : "text-text-muted hover:text-text hover:bg-surface-0/50"
             }`}
-            title="Sensible à la casse (Aa)"
+            title={t("terminalView.caseSensitive")}
           >
             <CaseSensitive size={14} />
           </button>
@@ -359,7 +361,7 @@ function Terminal({ sessionId, type, onExit, isActive = true }: TerminalProps) {
                 ? "bg-accent/20 text-accent"
                 : "text-text-muted hover:text-text hover:bg-surface-0/50"
             }`}
-            title="Expression régulière (.*)"
+            title={t("terminalView.regex")}
           >
             <Regex size={14} />
           </button>
@@ -372,7 +374,7 @@ function Terminal({ sessionId, type, onExit, isActive = true }: TerminalProps) {
             onClick={() => handleSearch("prev")}
             disabled={!searchQuery}
             className="p-1.5 text-text-muted hover:text-text hover:bg-surface-0/50 rounded-lg transition-colors disabled:opacity-30"
-            title="Précédent (Shift+Enter)"
+            title={t("terminalView.previousResult")}
           >
             <ChevronUp size={14} />
           </button>
@@ -382,7 +384,7 @@ function Terminal({ sessionId, type, onExit, isActive = true }: TerminalProps) {
             onClick={() => handleSearch("next")}
             disabled={!searchQuery}
             className="p-1.5 text-text-muted hover:text-text hover:bg-surface-0/50 rounded-lg transition-colors disabled:opacity-30"
-            title="Suivant (Enter)"
+            title={t("terminalView.nextResult")}
           >
             <ChevronDown size={14} />
           </button>

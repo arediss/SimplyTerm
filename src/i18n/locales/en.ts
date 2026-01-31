@@ -519,34 +519,32 @@ export default {
     reconnectTitle: "SSH Reconnection",
     // Modal title for SFTP connection
     sftpTitle: "SFTP Connection",
-    // Name field label
-    nameLabel: "Name (optional)",
+    // Name field label (optional)
+    nameOptional: "Name (optional)",
     // Name field placeholder
     namePlaceholder: "My server",
     // Host field label
-    hostLabel: "Host",
+    host: "Host",
     // Host field placeholder
     hostPlaceholder: "192.168.1.1",
     // Port field label
-    portLabel: "Port",
+    port: "Port",
     // Username field label
-    usernameLabel: "Username",
+    username: "Username",
     // Username field placeholder
     usernamePlaceholder: "root",
     // Authentication section label
-    authLabel: "Authentication",
+    authentication: "Authentication",
     // Password auth tab
-    authPassword: "Password",
+    password: "Password",
     // SSH key auth tab
-    authKey: "SSH Key",
-    // Password field label
-    passwordLabel: "Password",
+    sshKey: "SSH Key",
     // Key path field label
-    keyPathLabel: "Key path",
+    keyPath: "Key path",
     // Key path placeholder
     keyPathPlaceholder: "~/.ssh/id_rsa",
-    // Passphrase field label
-    passphraseLabel: "Passphrase (optional)",
+    // Passphrase field label (optional)
+    passphraseOptional: "Passphrase (optional)",
     // Connect button
     connect: "Connect",
     // Connecting status
@@ -784,5 +782,42 @@ export default {
     enterPasswordConnect: "Enter your password to connect",
     // Please enter password
     pleaseEnterPassword: "Please enter your password",
+  },
+
+  // ============================================
+  // HEADER - FloatingTabs.tsx
+  // ============================================
+  header: {
+    // Menu button tooltip
+    menu: "Menu",
+    // Tunnels button tooltip
+    tunnels: "Port Forwarding (Tunnels)",
+    // New SSH connection button tooltip
+    newSshConnection: "New SSH connection",
+    // Quick connections dropdown tooltip
+    quickConnections: "Quick connections",
+    // Window controls
+    minimize: "Minimize",
+    maximize: "Maximize",
+    restore: "Restore",
+    close: "Close",
+  },
+
+  // ============================================
+  // TERMINAL VIEW - Terminal.tsx
+  // ============================================
+  terminalView: {
+    // Session ended message
+    sessionEnded: "[Session ended]",
+    // Error prefix
+    errorPrefix: "Error: ",
+    // Search: case sensitive tooltip
+    caseSensitive: "Case sensitive (Aa)",
+    // Search: regex tooltip
+    regex: "Regular expression (.*)",
+    // Search: previous result tooltip
+    previousResult: "Previous (Shift+Enter)",
+    // Search: next result tooltip
+    nextResult: "Next (Enter)",
   },
 };

@@ -519,34 +519,32 @@ export default {
     reconnectTitle: "Reconnexion SSH",
     // Titre du modal pour connexion SFTP
     sftpTitle: "Connexion SFTP",
-    // Label du champ nom
-    nameLabel: "Nom (optionnel)",
+    // Label du champ nom (optionnel)
+    nameOptional: "Nom (optionnel)",
     // Placeholder du champ nom
     namePlaceholder: "Mon serveur",
     // Label du champ hôte
-    hostLabel: "Hôte",
+    host: "Hôte",
     // Placeholder du champ hôte
     hostPlaceholder: "192.168.1.1",
     // Label du champ port
-    portLabel: "Port",
+    port: "Port",
     // Label du champ utilisateur
-    usernameLabel: "Utilisateur",
+    username: "Utilisateur",
     // Placeholder du champ utilisateur
     usernamePlaceholder: "root",
     // Label de la section authentification
-    authLabel: "Authentification",
+    authentication: "Authentification",
     // Onglet authentification par mot de passe
-    authPassword: "Mot de passe",
+    password: "Mot de passe",
     // Onglet authentification par clé SSH
-    authKey: "Clé SSH",
-    // Label du champ mot de passe
-    passwordLabel: "Mot de passe",
+    sshKey: "Clé SSH",
     // Label du champ chemin de la clé
-    keyPathLabel: "Chemin de la clé",
+    keyPath: "Chemin de la clé",
     // Placeholder du chemin de la clé
     keyPathPlaceholder: "~/.ssh/id_rsa",
-    // Label du champ passphrase
-    passphraseLabel: "Passphrase (optionnel)",
+    // Label du champ passphrase (optionnel)
+    passphraseOptional: "Passphrase (optionnel)",
     // Bouton connecter
     connect: "Se connecter",
     // Statut connexion en cours
@@ -784,5 +782,42 @@ export default {
     enterPasswordConnect: "Entrez votre mot de passe pour vous connecter",
     // Veuillez entrer votre mot de passe
     pleaseEnterPassword: "Veuillez entrer votre mot de passe",
+  },
+
+  // ============================================
+  // HEADER - FloatingTabs.tsx
+  // ============================================
+  header: {
+    // Tooltip bouton menu
+    menu: "Menu",
+    // Tooltip bouton tunnels
+    tunnels: "Port Forwarding (Tunnels)",
+    // Tooltip bouton nouvelle connexion SSH
+    newSshConnection: "Nouvelle connexion SSH",
+    // Tooltip dropdown connexions rapides
+    quickConnections: "Connexions rapides",
+    // Contrôles de fenêtre
+    minimize: "Réduire",
+    maximize: "Agrandir",
+    restore: "Restaurer",
+    close: "Fermer",
+  },
+
+  // ============================================
+  // TERMINAL VIEW - Terminal.tsx
+  // ============================================
+  terminalView: {
+    // Message session terminée
+    sessionEnded: "[Session terminée]",
+    // Préfixe erreur
+    errorPrefix: "Erreur : ",
+    // Recherche: tooltip sensible à la casse
+    caseSensitive: "Sensible à la casse (Aa)",
+    // Recherche: tooltip regex
+    regex: "Expression régulière (.*)",
+    // Recherche: tooltip résultat précédent
+    previousResult: "Précédent (Shift+Enter)",
+    // Recherche: tooltip résultat suivant
+    nextResult: "Suivant (Enter)",
   },
 };
