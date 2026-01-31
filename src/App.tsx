@@ -32,6 +32,7 @@ import TunnelSidebar from "./components/TunnelSidebar";
 import { useSessions, useAppSettings, useVaultFlow } from "./hooks";
 import { SavedSession, RecentSession, Tab } from "./types";
 import { generateSessionId, generateTabId, expandHomeDir } from "./utils";
+import { applyTheme } from "./themes";
 
 function App() {
   const { t } = useTranslation();
@@ -71,6 +72,12 @@ function App() {
     openVaultUnlock,
     lockVault,
   } = useVaultFlow();
+
+  // Apply theme
+  useEffect(() => {
+    const themeId = appSettings.appearance?.theme ?? "dark";
+    applyTheme(themeId);
+  }, [appSettings.appearance?.theme]);
 
   // Sidebar state - un seul sidebar ouvert à la fois
   const [openSidebar, setOpenSidebar] = useState<"none" | "menu" | "tunnel">("none");
@@ -1404,6 +1411,7 @@ function App() {
                       sessionId={ptySessionId}
                       type={tab.type as "local" | "ssh"}
                       isActive={tab.id === activeTabId && isFocused}
+                      appTheme={appSettings.appearance?.theme ?? "dark"}
                     />
                   )}
                   renderSftp={(_paneId, sessionId, initialPath) => (

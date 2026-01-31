@@ -1,7 +1,11 @@
 @import "tailwindcss";
 
 @theme {
-  /* Warm Dark Theme */
+  /*
+   * Default theme colors (dark)
+   * These are overridden at runtime by the theme system.
+   * See src/themes/ for theme definitions.
+   */
   --color-base: #1F1E1B;
   --color-mantle: #1A1917;
   --color-crust: #141311;
@@ -22,14 +26,13 @@
   --color-warning: #E8C878;
   --color-error: #E88B8B;
 
-  /* Warm borders */
   --color-border-soft: rgba(255, 245, 235, 0.06);
   --color-border-strong: rgba(255, 245, 235, 0.12);
 
-  /* Glass effect colors - warm */
   --color-glass: rgba(26, 25, 23, 0.85);
   --color-glass-border: rgba(38, 36, 33, 0.6);
   --color-glass-hover: rgba(31, 30, 27, 0.9);
+  --color-glass-subtle: rgba(26, 25, 23, 0.6);
 
   /* Fonts */
   --font-sans: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -54,16 +57,14 @@
   body {
     font-family: var(--font-sans);
     font-size: 13px;
-    background: radial-gradient(
-      1200px circle at 50% 30%,
-      #1F1E1B 0%,
-      #161513 60%
-    );
+    /* Background is set dynamically by theme system */
+    background: var(--color-base);
     color: var(--color-text);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     user-select: none;
     -webkit-user-select: none;
+    transition: background 0.3s ease, color 0.3s ease;
   }
 
   ::-webkit-scrollbar {
@@ -87,17 +88,21 @@
   /* xterm terminal scrollbar - hidden by default, shown when scrolling */
   .xterm .slider {
     width: 6px !important;
-    background: rgba(255, 255, 255, 0.15) !important;
+    background: var(--color-text-muted) !important;
+    opacity: 0.3 !important;
     border-radius: 3px !important;
-    opacity: 0;
     transition: opacity 0.3s ease;
     right: 2px;
     left: auto !important;
   }
 
+  .xterm .slider:hover {
+    opacity: 0.5 !important;
+  }
+
   /* Show scrollbar when terminal has .is-scrolling class */
   .xterm.is-scrolling .slider {
-    opacity: 1;
+    opacity: 0.4 !important;
   }
 
   ::selection {
@@ -125,7 +130,7 @@
     -webkit-app-region: no-drag;
   }
 
-  /* Glass morphism effect - warm */
+  /* Glass morphism effect */
   .glass {
     background: var(--color-glass);
     backdrop-filter: blur(12px);
@@ -134,15 +139,21 @@
   }
 
   .glass-subtle {
-    background: rgba(26, 25, 23, 0.6);
+    background: var(--color-glass-subtle);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
   }
 
-  /* Floating shadow for tabs - warmer */
+  /* Floating shadow for tabs */
   .float-shadow {
     box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.6),
       0 2px 8px -2px rgba(0, 0, 0, 0.4);
+  }
+
+  /* Light variant shadow */
+  [data-theme-variant="light"] .float-shadow {
+    box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.15),
+      0 2px 8px -2px rgba(0, 0, 0, 0.1);
   }
 
   /* Input field */
@@ -164,7 +175,7 @@
 
   .input-field:focus {
     border-color: var(--color-accent);
-    box-shadow: 0 0 0 3px rgba(125, 166, 232, 0.15);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 15%, transparent);
   }
 
   /* Animations */

@@ -8,17 +8,19 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { X, ChevronUp, ChevronDown, CaseSensitive, Regex } from "lucide-react";
 import "@xterm/xterm/css/xterm.css";
+import { getTerminalTheme } from "../themes";
 
 interface TerminalProps {
   sessionId: string;
   type: "local" | "ssh";
   onExit?: () => void;
   isActive?: boolean;
+  appTheme?: string;
 }
 
 const RESIZE_DEBOUNCE_MS = 100;
 
-function Terminal({ sessionId, type, onExit, isActive = true }: TerminalProps) {
+function Terminal({ sessionId, type, onExit, isActive = true, appTheme = "dark" }: TerminalProps) {
   const { t } = useTranslation();
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
@@ -61,32 +63,7 @@ function Terminal({ sessionId, type, onExit, isActive = true }: TerminalProps) {
       letterSpacing: 0,
       scrollback: 10000,
       allowProposedApi: true,
-      theme: {
-        // Warm dark theme
-        background: "#181715",
-        foreground: "#E6E2DC",
-        cursor: "#7DA6E8",
-        cursorAccent: "#181715",
-        selectionBackground: "rgba(125, 166, 232, 0.3)",
-        selectionForeground: undefined,
-        // ANSI colors - warm variants
-        black: "#38352F",
-        red: "#E88B8B",
-        green: "#9CD68D",
-        yellow: "#E8C878",
-        blue: "#7DA6E8",
-        magenta: "#D4A5D9",
-        cyan: "#7FCFCF",
-        white: "#B6B0A7",
-        brightBlack: "#5A564E",
-        brightRed: "#F0A0A0",
-        brightGreen: "#B0E0A0",
-        brightYellow: "#F0D090",
-        brightBlue: "#8FB2EC",
-        brightMagenta: "#E0B0E5",
-        brightCyan: "#90E0E0",
-        brightWhite: "#E6E2DC",
-      },
+      theme: getTerminalTheme(appTheme),
     });
 
     const fitAddon = new FitAddon();
@@ -226,7 +203,14 @@ function Terminal({ sessionId, type, onExit, isActive = true }: TerminalProps) {
       unlistenExit?.();
       xterm.dispose();
     };
-  }, [sessionId, type, onExit, sendResize]);
+  }, [sessionId, type, onExit, sendResize, appTheme]);
+
+  // Update terminal theme when app theme changes
+  useEffect(() => {
+    if (xtermRef.current) {
+      xtermRef.current.options.theme = getTerminalTheme(appTheme);
+    }
+  }, [appTheme]);
 
   // Refocus and refit when terminal becomes active
   useEffect(() => {

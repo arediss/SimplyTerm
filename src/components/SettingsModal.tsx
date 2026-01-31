@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { usePlugins, type PluginManifest } from "../plugins";
 import { useVault } from "../hooks/useVault";
+import { getThemes } from "../themes";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -49,7 +50,8 @@ export interface AppSettings {
     scrollback: number;
   };
   appearance: {
-    theme: "dark" | "light";
+    /** Theme ID (e.g., "dark", "light", or custom theme IDs from plugins) */
+    theme: string;
     accentColor: string;
   };
   ui: {
@@ -102,6 +104,16 @@ function SettingsModal({
     onSettingsChange({
       ...settings,
       terminal: { ...settings.terminal, [key]: value },
+    });
+  };
+
+  const updateAppearanceSetting = <K extends keyof AppSettings["appearance"]>(
+    key: K,
+    value: AppSettings["appearance"][K]
+  ) => {
+    onSettingsChange({
+      ...settings,
+      appearance: { ...settings.appearance, [key]: value },
     });
   };
 
@@ -175,7 +187,10 @@ function SettingsModal({
             {/* Content area */}
             <div className="flex-1 overflow-y-auto p-6">
               {activeSection === "appearance" && (
-                <AppearanceSettings settings={settings} />
+                <AppearanceSettings
+                  settings={settings}
+                  onChange={updateAppearanceSetting}
+                />
               )}
               {activeSection === "terminal" && (
                 <TerminalSettings
@@ -204,8 +219,18 @@ function SettingsModal({
 // Settings Sections
 // ============================================================================
 
-function AppearanceSettings({ settings }: { settings: AppSettings }) {
+function AppearanceSettings({
+  settings,
+  onChange,
+}: {
+  settings: AppSettings;
+  onChange: <K extends keyof AppSettings["appearance"]>(
+    key: K,
+    value: AppSettings["appearance"][K]
+  ) => void;
+}) {
   const { t } = useTranslation();
+  const themes = getThemes();
 
   const languages = [
     { code: 'en', label: 'English', flag: '🇬🇧' },
@@ -215,19 +240,16 @@ function AppearanceSettings({ settings }: { settings: AppSettings }) {
   return (
     <div className="space-y-6">
       <SettingGroup title={t("settings.appearance.themeTitle")} description={t("settings.appearance.themeDesc")}>
-        <div className="flex gap-3">
-          <ThemeCard
-            name={t("settings.appearance.themeDark")}
-            active={settings.appearance.theme === "dark"}
-            colors={["#181715", "#1F1E1B", "#262421"]}
-          />
-          <ThemeCard
-            name={t("settings.appearance.themeLight")}
-            active={settings.appearance.theme === "light"}
-            colors={["#F5F5F5", "#FFFFFF", "#E8E8E8"]}
-            disabled
-            badge={t("common.comingSoon")}
-          />
+        <div className="flex flex-wrap gap-3">
+          {themes.map((theme) => (
+            <ThemeCard
+              key={theme.meta.id}
+              name={theme.meta.name}
+              active={settings.appearance.theme === theme.meta.id}
+              colors={theme.meta.preview}
+              onClick={() => onChange("theme", theme.meta.id)}
+            />
+          ))}
         </div>
       </SettingGroup>
 
@@ -236,6 +258,7 @@ function AppearanceSettings({ settings }: { settings: AppSettings }) {
           {["#7DA6E8", "#9CD68D", "#E8C878", "#D4A5D9", "#E88B8B"].map((color) => (
             <button
               key={color}
+              onClick={() => onChange("accentColor", color)}
               className={`
                 w-8 h-8 rounded-full transition-transform hover:scale-110
                 ${settings.appearance.accentColor === color ? "ring-2 ring-white ring-offset-2 ring-offset-mantle" : ""}
@@ -1494,25 +1517,21 @@ function ThemeCard({
   name,
   active,
   colors,
-  disabled,
-  badge,
+  onClick,
 }: {
   name: string;
   active: boolean;
   colors: string[];
-  disabled?: boolean;
-  badge?: string;
+  onClick?: () => void;
 }) {
   return (
     <button
-      disabled={disabled}
+      onClick={onClick}
       className={`
         relative flex flex-col items-center gap-2 p-3 rounded-xl transition-all
         ${active
           ? "ring-2 ring-accent bg-accent/10"
-          : disabled
-            ? "opacity-50 cursor-not-allowed"
-            : "hover:bg-white/5"
+          : "hover:bg-white/5"
         }
       `}
     >
@@ -1526,11 +1545,6 @@ function ThemeCard({
         ))}
       </div>
       <span className="text-xs text-text-muted">{name}</span>
-      {badge && (
-        <span className="absolute -top-1 -right-1 px-1.5 py-0.5 bg-accent/20 text-accent text-[10px] rounded-full">
-          {badge}
-        </span>
-      )}
     </button>
   );
 }
