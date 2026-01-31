@@ -170,7 +170,7 @@ function HostKeyModal({
             disabled={isLoading}
             className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 ${
               isMismatch
-                ? "text-red bg-red/20 hover:bg-red/30"
+                ? "bg-error text-white hover:bg-error/90"
                 : "text-green bg-green/20 hover:bg-green/30"
             }`}
           >
