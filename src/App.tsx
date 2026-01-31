@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import Sidebar from "./components/Sidebar";
 import FloatingTabs from "./components/FloatingTabs";
@@ -31,7 +32,7 @@ import { SavedSession, RecentSession, Tab } from "./types";
 import { generateSessionId, generateTabId, expandHomeDir } from "./utils";
 
 function App() {
-  
+  const { t } = useTranslation();
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
 
@@ -210,7 +211,7 @@ function App() {
         authType: saved.auth_type,
         keyPath: saved.key_path,
       });
-      setConnectionError("Entrez votre mot de passe pour ouvrir SFTP");
+      setConnectionError(t('app.enterPasswordSftp'));
       setIsConnectionModalOpen(true);
     };
 
@@ -410,7 +411,7 @@ function App() {
         return;
       } catch (error) {
         console.error("Failed to open SFTP:", error);
-        setConnectionError(`Erreur SFTP: ${error}`);
+        setConnectionError(t('app.sftpError', { error }));
         setIsConnecting(false);
         return;
       }
@@ -588,7 +589,7 @@ function App() {
       } catch (err) {
         // Vault probablement verrouillé ou non configuré - ouvrir le formulaire
 
-        openConnectionForm("Entrez votre mot de passe pour vous connecter");
+        openConnectionForm(t('app.enterPasswordConnect'));
         return;
       }
 
@@ -599,7 +600,7 @@ function App() {
 
       // Si password manquant, ouvrir le formulaire pré-rempli
       if (needsPassword) {
-        openConnectionForm("Veuillez entrer votre mot de passe");
+        openConnectionForm(t('app.pleaseEnterPassword'));
         return;
       }
 
@@ -920,7 +921,7 @@ function App() {
           authType: saved.auth_type,
           keyPath: saved.key_path,
         });
-        setConnectionError("Veuillez entrer votre mot de passe");
+        setConnectionError(t('app.pleaseEnterPassword'));
         setIsConnectionModalOpen(true);
       };
 
@@ -1309,7 +1310,7 @@ function App() {
           setEditingSessionId(null);
           setPendingSftpSession(null);
         }}
-        title={editingSessionId ? "Modifier la connexion" : (pendingSftpSession ? "Connexion SFTP" : (initialConnectionConfig ? "Reconnexion SSH" : "Nouvelle connexion SSH"))}
+        title={editingSessionId ? t('app.editConnection') : (pendingSftpSession ? t('app.sftpConnection') : (initialConnectionConfig ? t('app.reconnectSsh') : t('app.newSshConnection')))}
         width="md"
       >
         <ConnectionForm
@@ -1335,14 +1336,14 @@ function App() {
           setPendingSaveConfig(null);
           setEditingSessionId(null);
         }}
-        title={editingSessionId ? "Mettre à jour la connexion ?" : "Sauvegarder la connexion ?"}
+        title={editingSessionId ? t('app.updateConnection') : t('app.saveConnection')}
         width="sm"
       >
         <div className="flex flex-col gap-4">
           <p className="text-sm text-text-muted">
             {editingSessionId
-              ? "Voulez-vous mettre à jour cette connexion avec les nouvelles informations ?"
-              : "Voulez-vous sauvegarder cette connexion pour y accéder rapidement ?"
+              ? t('app.updateConnectionDesc')
+              : t('app.saveConnectionDesc')
             }
           </p>
           {pendingSaveConfig && (
@@ -1362,13 +1363,13 @@ function App() {
               }}
               className="flex-1 py-2.5 bg-surface-0/50 text-text-secondary text-sm rounded-lg hover:bg-surface-0 transition-colors"
             >
-              Non merci
+              {t('app.noThanks')}
             </button>
             <button
               onClick={handleSaveSession}
               className="flex-1 py-2.5 bg-accent text-base font-medium text-sm rounded-lg hover:bg-accent/90 transition-colors"
             >
-              {editingSessionId ? "Mettre à jour" : "Sauvegarder"}
+              {editingSessionId ? t('app.update') : t('common.save')}
             </button>
           </div>
         </div>
@@ -1464,6 +1465,7 @@ function App() {
 }
 
 function EmptyState({ onNewConnection }: { onNewConnection: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="h-full flex flex-col items-center justify-center">
       {/* Subtle gradient background */}
@@ -1484,7 +1486,7 @@ function EmptyState({ onNewConnection }: { onNewConnection: () => void }) {
             SimplyTerm
           </h1>
           <p className="text-sm text-text-muted max-w-xs">
-            Terminal SSH moderne, rapide et élégant
+            {t('app.tagline')}
           </p>
         </div>
 
@@ -1494,21 +1496,13 @@ function EmptyState({ onNewConnection }: { onNewConnection: () => void }) {
             onClick={onNewConnection}
             className="px-5 py-2.5 bg-accent text-crust text-sm font-medium rounded-xl hover:bg-accent-hover transition-colors"
           >
-            Nouvelle connexion
+            {t('app.newConnection')}
           </button>
         </div>
 
         {/* Keyboard shortcut hint */}
         <p className="text-xs text-text-muted/60">
-          Appuyez sur{" "}
-          <kbd className="px-1.5 py-0.5 bg-surface-0/30 rounded text-text-muted">
-            ⌘
-          </kbd>{" "}
-          +{" "}
-          <kbd className="px-1.5 py-0.5 bg-surface-0/30 rounded text-text-muted">
-            N
-          </kbd>{" "}
-          pour créer une connexion
+          {t('app.shortcutHint')}
         </p>
       </div>
     </div>

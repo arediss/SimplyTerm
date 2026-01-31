@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 import {
   Monitor,
   Plus,
@@ -63,6 +64,7 @@ function Sidebar({
   onDeleteFolder,
   onMoveSessionToFolder: _onMoveSessionToFolder,
 }: SidebarProps) {
+  const { t } = useTranslation();
   const [isAnimating, setIsAnimating] = useState(false);
   const [shouldRender, setShouldRender] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -202,7 +204,7 @@ function Sidebar({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Rechercher..."
+              placeholder={t('sidebar.searchPlaceholder')}
               className="w-full pl-9 pr-8 py-2 bg-crust rounded-lg text-sm text-text placeholder:text-text-muted/50 border border-transparent focus:border-accent/50 focus:outline-none transition-colors"
             />
             {searchQuery && (
@@ -223,13 +225,13 @@ function Sidebar({
           {/* Section sessions sauvegardées */}
           <SectionHeader
             icon={<Folder size={12} />}
-            label="Sauvegardées"
+            label={t('sidebar.saved')}
             action={
               !searchQuery ? (
                 <button
                   onClick={() => setIsCreatingFolder(true)}
                   className="p-1 rounded hover:bg-surface-0/50 text-text-muted hover:text-accent transition-colors"
-                  title="Nouveau dossier"
+                  title={t('sidebar.newFolder')}
                 >
                   <FolderPlus size={12} />
                 </button>
@@ -252,7 +254,7 @@ function Sidebar({
                     setNewFolderName("");
                   }
                 }}
-                placeholder="Nom du dossier..."
+                placeholder={t('sidebar.folderNamePlaceholder')}
                 className="flex-1 bg-crust rounded px-2 py-1 text-sm text-text placeholder:text-text-muted/50 border border-transparent focus:border-accent/50 focus:outline-none"
                 autoFocus
               />
@@ -278,8 +280,8 @@ function Sidebar({
             {filteredSavedSessions.length === 0 && folders.length === 0 ? (
               <p className="text-xs text-text-muted px-3 py-4 text-center">
                 {searchQuery
-                  ? "Aucun résultat"
-                  : "Aucune connexion sauvegardée"}
+                  ? t('sidebar.noResults')
+                  : t('sidebar.noSavedConnections')}
               </p>
             ) : (
               <>
@@ -325,14 +327,14 @@ function Sidebar({
           {/* Section récentes */}
           <SectionHeader
             icon={<Clock size={12} />}
-            label="Récentes"
+            label={t('sidebar.recent')}
             action={
               recentSessions.length > 0 && !searchQuery ? (
                 <button
                   onClick={onClearRecentSessions}
                   className="text-[10px] text-text-muted hover:text-error transition-colors"
                 >
-                  Effacer
+                  {t('sidebar.clear')}
                 </button>
               ) : undefined
             }
@@ -340,7 +342,7 @@ function Sidebar({
           <div className="space-y-1">
             {filteredRecentSessions.length === 0 ? (
               <p className="text-xs text-text-muted px-3 py-4 text-center">
-                {searchQuery ? "Aucun résultat" : "Aucune connexion récente"}
+                {searchQuery ? t('sidebar.noResults') : t('sidebar.noRecentConnections')}
               </p>
             ) : (
               filteredRecentSessions.map((session) => (
@@ -362,7 +364,7 @@ function Sidebar({
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-muted hover:text-text hover:bg-white/5 transition-colors"
           >
             <Settings size={16} />
-            <span className="text-sm">Paramètres</span>
+            <span className="text-sm">{t('sidebar.settings')}</span>
           </button>
         </div>
       </div>
@@ -413,6 +415,7 @@ function SavedSessionItem({
   folders = [],
   onMoveToFolder,
 }: SavedSessionItemProps) {
+  const { t } = useTranslation();
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [showFolderSubmenu, setShowFolderSubmenu] = useState(false);
 
@@ -495,21 +498,21 @@ function SavedSessionItem({
             className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-text hover:bg-surface-0/50 transition-colors"
           >
             <Terminal size={12} />
-            <span>Connecter</span>
+            <span>{t('sidebar.connect')}</span>
           </button>
           <button
             onClick={() => handleAction(onSftp)}
             className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-text hover:bg-surface-0/50 transition-colors"
           >
             <FolderOpen size={12} />
-            <span>Ouvrir SFTP</span>
+            <span>{t('sidebar.openSftp')}</span>
           </button>
           <button
             onClick={() => handleAction(onTunnel)}
             className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-blue hover:bg-blue/10 transition-colors"
           >
             <ArrowLeftRight size={12} />
-            <span>Tunnel Only</span>
+            <span>{t('sidebar.tunnelOnly')}</span>
           </button>
           <div className="h-px bg-surface-0/30 my-1" />
           {folders.length > 0 && onMoveToFolder && (
@@ -521,7 +524,7 @@ function SavedSessionItem({
               <button className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-xs text-text hover:bg-surface-0/50 transition-colors">
                 <div className="flex items-center gap-2">
                   <FolderInput size={12} />
-                  <span>Déplacer vers</span>
+                  <span>{t('sidebar.moveTo')}</span>
                 </div>
                 <ChevronRight size={12} />
               </button>
@@ -533,7 +536,7 @@ function SavedSessionItem({
                       className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-text hover:bg-surface-0/50 transition-colors"
                     >
                       <Home size={12} />
-                      <span>Racine</span>
+                      <span>{t('sidebar.root')}</span>
                     </button>
                   )}
                   {folders.filter(f => f.id !== session.folder_id).map((folder) => (
@@ -555,7 +558,7 @@ function SavedSessionItem({
             className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-text hover:bg-surface-0/50 transition-colors"
           >
             <Pencil size={12} />
-            <span>Modifier</span>
+            <span>{t('sidebar.edit')}</span>
           </button>
           <div className="h-px bg-surface-0/30 my-1" />
           <button
@@ -563,7 +566,7 @@ function SavedSessionItem({
             className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-error hover:bg-error/10 transition-colors"
           >
             <Trash2 size={12} />
-            <span>Supprimer</span>
+            <span>{t('common.delete')}</span>
           </button>
         </div>,
         document.body
@@ -601,6 +604,7 @@ function FolderItem({
   allFolders,
   onMoveSessionToFolder,
 }: FolderItemProps) {
+  const { t } = useTranslation();
   const [isDragOver, setIsDragOver] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
@@ -685,7 +689,7 @@ function FolderItem({
             className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-error hover:bg-error/10 transition-colors"
           >
             <Trash2 size={12} />
-            <span>Supprimer le dossier</span>
+            <span>{t('sidebar.deleteFolder')}</span>
           </button>
         </div>,
         document.body
@@ -762,6 +766,7 @@ function RecentSessionItem({
   onClick,
   onDelete,
 }: RecentSessionItemProps) {
+  const { t, i18n } = useTranslation();
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
@@ -773,11 +778,11 @@ function RecentSessionItem({
     const now = Date.now() / 1000;
     const diff = now - timestamp;
 
-    if (diff < 60) return "maintenant";
-    if (diff < 3600) return `il y a ${Math.floor(diff / 60)}min`;
-    if (diff < 86400) return `il y a ${Math.floor(diff / 3600)}h`;
-    if (diff < 604800) return `il y a ${Math.floor(diff / 86400)}j`;
-    return new Date(timestamp * 1000).toLocaleDateString("fr-FR", {
+    if (diff < 60) return t('sidebar.timeNow');
+    if (diff < 3600) return t('sidebar.timeMinutesAgo', { count: Math.floor(diff / 60) });
+    if (diff < 86400) return t('sidebar.timeHoursAgo', { count: Math.floor(diff / 3600) });
+    if (diff < 604800) return t('sidebar.timeDaysAgo', { count: Math.floor(diff / 86400) });
+    return new Date(timestamp * 1000).toLocaleDateString(i18n.language === 'fr' ? 'fr-FR' : 'en-US', {
       day: "numeric",
       month: "short",
     });
@@ -803,7 +808,7 @@ function RecentSessionItem({
       <button
         onClick={handleDelete}
         className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-error/20 text-text-muted hover:text-error transition-all"
-        title="Supprimer"
+        title={t('common.delete')}
       >
         <Trash2 size={14} />
       </button>

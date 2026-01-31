@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import {
   X,
@@ -41,6 +42,7 @@ export default function TunnelSidebar({
   savedSessions,
   onTunnelCountChange
 }: TunnelSidebarProps) {
+  const { t } = useTranslation();
   const [isAnimating, setIsAnimating] = useState(false);
   const [shouldRender, setShouldRender] = useState(false);
   const [tunnels, setTunnels] = useState<Tunnel[]>([]);
@@ -101,7 +103,7 @@ export default function TunnelSidebar({
   const createTunnel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSessionId) {
-      setError("Sélectionnez une connexion");
+      setError(t('tunnelSidebar.selectConnection'));
       return;
     }
 
@@ -120,14 +122,14 @@ export default function TunnelSidebar({
           { id: session.id }
         );
       } catch (err) {
-        setError("Vault verrouillé - déverrouillez le vault d'abord");
+        setError(t('tunnelSidebar.vaultLocked'));
         setCreating(false);
         return;
       }
 
       // Check if we have the required credentials
       if (session.auth_type === "password" && !credentials.password) {
-        setError("Mot de passe non trouvé dans le vault");
+        setError(t('tunnelSidebar.passwordNotFound'));
         setCreating(false);
         return;
       }
@@ -241,7 +243,7 @@ export default function TunnelSidebar({
         <div className="flex items-center justify-between px-4 py-3 border-b border-surface-0/30">
           <div className="flex items-center gap-2">
             <ArrowLeftRight size={16} className="text-accent" />
-            <span className="text-sm font-medium text-text">Port Forwarding</span>
+            <span className="text-sm font-medium text-text">{t('tunnelSidebar.title')}</span>
             {activeTunnels.length > 0 && (
               <span className="px-1.5 py-0.5 text-[10px] font-medium bg-accent/20 text-accent rounded-full">
                 {activeTunnels.length}
@@ -253,7 +255,7 @@ export default function TunnelSidebar({
               onClick={loadTunnels}
               disabled={loading}
               className="p-1.5 text-text-muted hover:text-text hover:bg-surface-0/50 rounded-lg transition-colors"
-              title="Rafraîchir"
+              title={t('common.refresh')}
             >
               <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
             </button>
@@ -276,19 +278,19 @@ export default function TunnelSidebar({
                 className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-accent hover:bg-accent-hover text-crust rounded-xl text-sm font-medium transition-colors"
               >
                 <Plus size={14} />
-                Nouveau tunnel
+                {t('tunnelSidebar.newTunnel')}
               </button>
             ) : (
               <form onSubmit={createTunnel} className="space-y-3">
                 {/* Session selector */}
                 <div>
-                  <label className="block text-xs text-text-muted mb-1">Connexion SSH</label>
+                  <label className="block text-xs text-text-muted mb-1">{t('tunnelSidebar.sshConnection')}</label>
                   <select
                     value={selectedSessionId}
                     onChange={(e) => setSelectedSessionId(e.target.value)}
                     className="w-full px-2.5 py-2 bg-surface-0/50 border border-surface-0 rounded-xl text-sm text-text focus:outline-none focus:border-accent/50"
                   >
-                    <option value="">Sélectionner...</option>
+                    <option value="">{t('tunnelSidebar.selectPlaceholder')}</option>
                     {savedSessions.map(session => (
                       <option key={session.id} value={session.id}>
                         {session.name} ({session.username}@{session.host})
@@ -299,7 +301,7 @@ export default function TunnelSidebar({
 
                 {/* Tunnel type */}
                 <div>
-                  <label className="block text-xs text-text-muted mb-1">Type</label>
+                  <label className="block text-xs text-text-muted mb-1">{t('tunnelSidebar.type')}</label>
                   <div className="flex gap-1">
                     {(["local", "remote", "dynamic"] as const).map(type => (
                       <button
@@ -321,7 +323,7 @@ export default function TunnelSidebar({
                 {/* Port config */}
                 <div className="flex gap-2">
                   <div className="flex-1">
-                    <label className="block text-xs text-text-muted mb-1">Port local</label>
+                    <label className="block text-xs text-text-muted mb-1">{t('tunnelSidebar.localPort')}</label>
                     <input
                       type="number"
                       value={localPort}
@@ -332,7 +334,7 @@ export default function TunnelSidebar({
                   </div>
                   {tunnelType !== "dynamic" && (
                     <div className="flex-1">
-                      <label className="block text-xs text-text-muted mb-1">Port distant</label>
+                      <label className="block text-xs text-text-muted mb-1">{t('tunnelSidebar.remotePort')}</label>
                       <input
                         type="number"
                         value={remotePort}
@@ -347,7 +349,7 @@ export default function TunnelSidebar({
                 {/* Remote host */}
                 {tunnelType !== "dynamic" && (
                   <div>
-                    <label className="block text-xs text-text-muted mb-1">Hôte distant</label>
+                    <label className="block text-xs text-text-muted mb-1">{t('tunnelSidebar.remoteHost')}</label>
                     <input
                       type="text"
                       value={remoteHost}
@@ -374,7 +376,7 @@ export default function TunnelSidebar({
                     }}
                     className="flex-1 px-3 py-2 text-sm text-text-muted hover:text-text border border-surface-0 hover:border-surface-0/80 rounded-xl transition-colors"
                   >
-                    Annuler
+                    {t('common.cancel')}
                   </button>
                   <button
                     type="submit"
@@ -386,7 +388,7 @@ export default function TunnelSidebar({
                     ) : (
                       <Plus size={14} />
                     )}
-                    Créer
+                    {t('common.create')}
                   </button>
                 </div>
               </form>
@@ -397,7 +399,7 @@ export default function TunnelSidebar({
           {activeTunnels.length > 0 && (
             <div className="p-3">
               <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">
-                Actifs
+                {t('tunnelSidebar.active')}
               </span>
               <div className="mt-2 space-y-2">
                 {activeTunnels.map(tunnel => (
@@ -418,7 +420,7 @@ export default function TunnelSidebar({
           {inactiveTunnels.length > 0 && (
             <div className="p-3 border-t border-surface-0/30">
               <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">
-                Historique
+                {t('tunnelSidebar.history')}
               </span>
               <div className="mt-2 space-y-2">
                 {inactiveTunnels.map(tunnel => (
@@ -439,9 +441,9 @@ export default function TunnelSidebar({
           {tunnels.length === 0 && !loading && (
             <div className="p-8 text-center">
               <ArrowLeftRight size={32} className="mx-auto text-text-muted/30 mb-3" />
-              <p className="text-sm text-text-muted">Aucun tunnel actif</p>
+              <p className="text-sm text-text-muted">{t('tunnelSidebar.noActiveTunnels')}</p>
               <p className="text-xs text-text-muted/70 mt-1">
-                Créez un tunnel pour accéder à des services distants
+                {t('tunnelSidebar.createTunnelHint')}
               </p>
             </div>
           )}
@@ -477,6 +479,7 @@ interface TunnelItemProps {
 }
 
 function TunnelItem({ tunnel, onStop, onRemove, getTunnelIcon, getStatusColor }: TunnelItemProps) {
+  const { t } = useTranslation();
   const isActive = tunnel.status.state === "Active" || tunnel.status.state === "Starting";
 
   return (
@@ -519,7 +522,7 @@ function TunnelItem({ tunnel, onStop, onRemove, getTunnelIcon, getStatusColor }:
         <button
           onClick={isActive ? onStop : onRemove}
           className="p-1.5 text-text-muted hover:text-red hover:bg-red/10 rounded-lg transition-colors"
-          title={isActive ? "Arrêter" : "Supprimer"}
+          title={isActive ? t('tunnelSidebar.stop') : t('common.delete')}
         >
           <X size={14} />
         </button>

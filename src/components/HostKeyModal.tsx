@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { X, ShieldAlert, ShieldQuestion, AlertTriangle } from "lucide-react";
 
 export interface HostKeyCheckResult {
@@ -26,6 +27,7 @@ function HostKeyModal({
   onReject,
   isLoading = false,
 }: HostKeyModalProps) {
+  const { t } = useTranslation();
   const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -73,7 +75,7 @@ function HostKeyModal({
               <ShieldQuestion className="text-yellow" size={22} />
             )}
             <h2 className="text-base font-semibold text-text">
-              {isMismatch ? "Host Key Changed" : "Unknown Host"}
+              {isMismatch ? t('hostKey.keyChanged') : t('hostKey.unknownHost')}
             </h2>
           </div>
           <button
@@ -91,10 +93,9 @@ function HostKeyModal({
             <div className="flex items-start gap-3 p-4 bg-red/10 border border-red/30 rounded-xl">
               <AlertTriangle className="text-red shrink-0 mt-0.5" size={20} />
               <div className="text-sm text-red">
-                <p className="font-semibold mb-1">Warning: Potential Security Risk</p>
+                <p className="font-semibold mb-1">{t('hostKey.warningTitle')}</p>
                 <p className="text-red/80">
-                  The host key for this server has changed. This could indicate a
-                  man-in-the-middle attack, or the server may have been reconfigured.
+                  {t('hostKey.warningDesc')}
                 </p>
               </div>
             </div>
@@ -102,14 +103,13 @@ function HostKeyModal({
 
           {isUnknown && (
             <p className="text-sm text-text-muted">
-              The authenticity of host <span className="text-text font-medium">{result.host}</span> cannot be established.
-              This is the first time you're connecting to this server.
+              {t('hostKey.unknownHostDesc', { host: result.host })}
             </p>
           )}
 
           <div className="space-y-3 p-4 bg-surface-0/30 rounded-xl">
             <div className="flex justify-between text-sm">
-              <span className="text-text-muted">Host</span>
+              <span className="text-text-muted">{t('hostKey.host')}</span>
               <span className="text-text font-mono">
                 {result.host}:{result.port}
               </span>
@@ -117,7 +117,7 @@ function HostKeyModal({
 
             {result.key_type && (
               <div className="flex justify-between text-sm">
-                <span className="text-text-muted">Key Type</span>
+                <span className="text-text-muted">{t('hostKey.keyType')}</span>
                 <span className="text-text font-mono">{result.key_type}</span>
               </div>
             )}
@@ -125,7 +125,7 @@ function HostKeyModal({
             {result.fingerprint && (
               <div className="text-sm">
                 <span className="text-text-muted block mb-1">
-                  {isMismatch ? "New Fingerprint" : "Fingerprint"}
+                  {isMismatch ? t('hostKey.newFingerprint') : t('hostKey.fingerprint')}
                 </span>
                 <span className="text-text font-mono text-xs break-all bg-crust px-2 py-1.5 rounded-lg block">
                   {result.fingerprint}
@@ -135,7 +135,7 @@ function HostKeyModal({
 
             {isMismatch && result.expected_fingerprint && (
               <div className="text-sm">
-                <span className="text-text-muted block mb-1">Expected Fingerprint</span>
+                <span className="text-text-muted block mb-1">{t('hostKey.expectedFingerprint')}</span>
                 <span className="text-red/80 font-mono text-xs break-all bg-crust px-2 py-1.5 rounded-lg block">
                   {result.expected_fingerprint}
                 </span>
@@ -145,13 +145,13 @@ function HostKeyModal({
 
           {isUnknown && (
             <p className="text-sm text-text-muted">
-              Do you want to trust this host and add it to your known hosts?
+              {t('hostKey.trustPrompt')}
             </p>
           )}
 
           {isMismatch && (
             <p className="text-sm text-text-muted">
-              Only proceed if you are certain the server key has legitimately changed.
+              {t('hostKey.mismatchWarning')}
             </p>
           )}
         </div>
@@ -163,7 +163,7 @@ function HostKeyModal({
             disabled={isLoading}
             className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text bg-surface-0/50 hover:bg-surface-0 rounded-lg transition-colors disabled:opacity-50"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             onClick={onAccept}
@@ -175,10 +175,10 @@ function HostKeyModal({
             }`}
           >
             {isLoading
-              ? "Processing..."
+              ? t('hostKey.processing')
               : isMismatch
-              ? "Update & Connect"
-              : "Trust & Connect"}
+              ? t('hostKey.updateConnect')
+              : t('hostKey.trustConnect')}
           </button>
         </div>
       </div>

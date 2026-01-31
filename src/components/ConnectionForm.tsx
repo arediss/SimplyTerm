@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Key, Lock, Server, User } from "lucide-react";
 
 export interface SshConnectionConfig {
@@ -27,6 +28,7 @@ function ConnectionForm({
   error,
   initialConfig,
 }: ConnectionFormProps) {
+  const { t } = useTranslation();
   const [name, setName] = useState(initialConfig?.name || "");
   const [host, setHost] = useState(initialConfig?.host || "");
   const [port, setPort] = useState(initialConfig?.port || 22);
@@ -67,16 +69,16 @@ function ConnectionForm({
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       {/* Row 1: Name + Host */}
       <div className="grid grid-cols-2 gap-3">
-        <FormField label="Nom (optionnel)">
+        <FormField label={t('connection.nameOptional')}>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Mon serveur"
+            placeholder={t('connection.namePlaceholder')}
             className="input-field"
           />
         </FormField>
-        <FormField label="Hôte" icon={<Server size={12} />}>
+        <FormField label={t('connection.host')} icon={<Server size={12} />}>
           <input
             type="text"
             value={host}
@@ -90,7 +92,7 @@ function ConnectionForm({
 
       {/* Row 2: Port + Username */}
       <div className="grid grid-cols-2 gap-3">
-        <FormField label="Port">
+        <FormField label={t('connection.port')}>
           <input
             type="number"
             value={port}
@@ -100,7 +102,7 @@ function ConnectionForm({
             className="input-field"
           />
         </FormField>
-        <FormField label="Utilisateur" icon={<User size={12} />}>
+        <FormField label={t('connection.username')} icon={<User size={12} />}>
           <input
             type="text"
             value={username}
@@ -115,27 +117,27 @@ function ConnectionForm({
       {/* Auth Type Tabs */}
       <div>
         <label className="block text-xs text-text-muted mb-2">
-          Authentification
+          {t('connection.authentication')}
         </label>
         <div className="flex p-1 bg-crust rounded-lg">
           <AuthTab
             active={authType === "password"}
             onClick={() => setAuthType("password")}
             icon={<Lock size={14} />}
-            label="Mot de passe"
+            label={t('connection.password')}
           />
           <AuthTab
             active={authType === "key"}
             onClick={() => setAuthType("key")}
             icon={<Key size={14} />}
-            label="Clé SSH"
+            label={t('connection.sshKey')}
           />
         </div>
       </div>
 
       {/* Auth Fields */}
       {authType === "password" ? (
-        <FormField label="Mot de passe">
+        <FormField label={t('connection.password')}>
           <input
             type="password"
             value={password}
@@ -146,7 +148,7 @@ function ConnectionForm({
         </FormField>
       ) : (
         <div className="grid grid-cols-2 gap-3">
-          <FormField label="Chemin de la clé">
+          <FormField label={t('connection.keyPath')}>
             <input
               type="text"
               value={keyPath}
@@ -156,7 +158,7 @@ function ConnectionForm({
               className="input-field"
             />
           </FormField>
-          <FormField label="Passphrase (optionnel)">
+          <FormField label={t('connection.passphraseOptional')}>
             <input
               type="password"
               value={keyPassphrase}
@@ -181,14 +183,14 @@ function ConnectionForm({
           onClick={onCancel}
           className="flex-1 py-2.5 bg-surface-0/50 text-text-secondary text-sm rounded-lg hover:bg-surface-0 transition-colors"
         >
-          Annuler
+          {t('common.cancel')}
         </button>
         <button
           type="submit"
           disabled={isConnecting}
           className="flex-1 py-2.5 bg-accent text-base font-medium text-sm rounded-lg hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isConnecting ? "Connexion..." : "Se connecter"}
+          {isConnecting ? t('connection.connecting') : t('connection.connect')}
         </button>
       </div>
     </form>

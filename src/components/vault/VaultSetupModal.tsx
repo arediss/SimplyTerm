@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, Lock, KeyRound, Shield } from 'lucide-react';
 import Modal from '../Modal';
 import PinInput from './PinInput';
@@ -14,6 +15,7 @@ interface VaultSetupModalProps {
 type SetupStep = 'intro' | 'password' | 'pin' | 'settings';
 
 export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = true }: VaultSetupModalProps) {
+  const { t } = useTranslation();
   const [step, setStep] = useState<SetupStep>('intro');
   const [masterPassword, setMasterPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -53,11 +55,11 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
 
   const validatePassword = () => {
     if (masterPassword.length < 8) {
-      setError('Le mot de passe doit contenir au moins 8 caractères');
+      setError(t('vault.setup.passwordTooShort'));
       return false;
     }
     if (masterPassword !== confirmPassword) {
-      setError('Les mots de passe ne correspondent pas');
+      setError(t('vault.setup.passwordMismatch'));
       return false;
     }
     return true;
@@ -75,7 +77,7 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
       setPinStep('confirm');
     } else {
       if (enteredPin !== pin) {
-        setError('Les PINs ne correspondent pas');
+        setError(t('vault.setup.pinMismatch'));
         setPin('');
         setPinStep('enter');
         return;
@@ -106,21 +108,21 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
     if (result.success) {
       resetForm();
     } else {
-      setError(result.error || 'Erreur lors de la création du vault');
+      setError(result.error || t('vault.setup.creationError'));
     }
   };
 
   const autoLockOptions = [
-    { value: 0, label: 'Jamais' },
-    { value: 60, label: '1 minute' },
-    { value: 300, label: '5 minutes' },
-    { value: 600, label: '10 minutes' },
-    { value: 1800, label: '30 minutes' },
-    { value: 3600, label: '1 heure' },
+    { value: 0, label: t('settings.security.autoLockNever') },
+    { value: 60, label: t('settings.security.autoLock1min') },
+    { value: 300, label: t('settings.security.autoLock5min') },
+    { value: 600, label: t('settings.security.autoLock10min') },
+    { value: 1800, label: t('settings.security.autoLock30min') },
+    { value: 3600, label: t('settings.security.autoLock1hour') },
   ];
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Configuration du Vault" width="md">
+    <Modal isOpen={isOpen} onClose={handleClose} title={t('vault.setup.title')} width="md">
       <div className="flex flex-col gap-6">
         {/* Progress indicator - only show after intro */}
         {step !== 'intro' && (
@@ -160,11 +162,10 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-text mb-2">
-                  Protégez vos connexions
+                  {t('vault.setup.introTitle')}
                 </h3>
                 <p className="text-sm text-text-muted max-w-sm">
-                  Le vault chiffre et stocke vos mots de passe localement.
-                  Vous pourrez vous reconnecter à vos serveurs sans les ressaisir.
+                  {t('vault.setup.introDesc')}
                 </p>
               </div>
             </div>
@@ -173,15 +174,15 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
               <div className="flex items-start gap-3">
                 <Lock className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
                 <div>
-                  <p className="text-sm font-medium text-text">Chiffrement AES-256</p>
-                  <p className="text-xs text-text-muted">Vos secrets ne quittent jamais votre machine</p>
+                  <p className="text-sm font-medium text-text">{t('vault.setup.encryptionTitle')}</p>
+                  <p className="text-xs text-text-muted">{t('vault.setup.encryptionDesc')}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <KeyRound className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
                 <div>
-                  <p className="text-sm font-medium text-text">Déverrouillage rapide</p>
-                  <p className="text-xs text-text-muted">Code PIN optionnel pour un accès facile</p>
+                  <p className="text-sm font-medium text-text">{t('vault.setup.quickUnlockTitle')}</p>
+                  <p className="text-xs text-text-muted">{t('vault.setup.quickUnlockDesc')}</p>
                 </div>
               </div>
             </div>
@@ -191,7 +192,7 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
                 onClick={() => setStep('password')}
                 className="w-full py-3 bg-accent text-crust font-medium rounded-xl hover:bg-accent-hover transition-colors"
               >
-                Configurer le vault
+                {t('vault.setup.configureVault')}
               </button>
 
               {canSkip && (
@@ -199,15 +200,14 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
                   onClick={handleSkip}
                   className="w-full py-2.5 text-text-muted text-sm hover:text-text transition-colors"
                 >
-                  Passer pour l'instant
+                  {t('vault.setup.skipForNow')}
                 </button>
               )}
             </div>
 
             {canSkip && (
               <p className="text-xs text-text-muted/70 text-center">
-                Sans vault, les mots de passe ne seront pas sauvegardés.
-                Vous pourrez le configurer plus tard dans les paramètres.
+                {t('vault.setup.skipWarning')}
               </p>
             )}
           </div>
@@ -219,21 +219,20 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
             <div className="flex items-center gap-3 p-4 bg-accent/10 rounded-xl">
               <Shield className="w-5 h-5 text-accent flex-shrink-0" />
               <p className="text-sm text-text-secondary">
-                Créez un mot de passe principal pour protéger vos credentials.
-                Vous en aurez besoin pour déverrouiller le vault.
+                {t('vault.setup.passwordInfo')}
               </p>
             </div>
 
             <div className="flex flex-col gap-4">
               <label className="flex flex-col gap-2">
-                <span className="text-sm text-text-secondary">Mot de passe principal</span>
+                <span className="text-sm text-text-secondary">{t('vault.setup.masterPassword')}</span>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={masterPassword}
                     onChange={(e) => setMasterPassword(e.target.value)}
-                    placeholder="Au moins 8 caractères"
+                    placeholder={t('vault.setup.passwordPlaceholder')}
                     className="w-full pl-10 pr-10 py-3 bg-surface-0/30 border border-surface-0/50 rounded-xl text-text placeholder-text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                     autoFocus
                   />
@@ -248,14 +247,14 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
               </label>
 
               <label className="flex flex-col gap-2">
-                <span className="text-sm text-text-secondary">Confirmer le mot de passe</span>
+                <span className="text-sm text-text-secondary">{t('vault.setup.confirmPassword')}</span>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                   <input
                     type={showConfirm ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Confirmez votre mot de passe"
+                    placeholder={t('vault.setup.confirmPlaceholder')}
                     className="w-full pl-10 pr-10 py-3 bg-surface-0/30 border border-surface-0/50 rounded-xl text-text placeholder-text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                   />
                   <button
@@ -278,7 +277,7 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
               disabled={!masterPassword || !confirmPassword}
               className="w-full py-3 bg-accent text-crust font-medium rounded-xl hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Continuer
+              {t('common.continue')}
             </button>
           </div>
         )}
@@ -291,9 +290,9 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
               <p className="text-sm text-text-secondary">
                 {enablePin
                   ? pinStep === 'enter'
-                    ? 'Entrez un code PIN (4-6 chiffres) pour un déverrouillage rapide.'
-                    : 'Confirmez votre code PIN.'
-                  : 'Configurez un code PIN pour déverrouiller rapidement le vault.'}
+                    ? t('vault.setup.pinInfoEnter')
+                    : t('vault.setup.pinInfoConfirm')
+                  : t('vault.setup.pinInfoDisabled')}
               </p>
             </div>
 
@@ -303,13 +302,13 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
                   onClick={() => setEnablePin(true)}
                   className="w-full py-3 bg-accent text-crust font-medium rounded-xl hover:bg-accent-hover transition-colors"
                 >
-                  Configurer un code PIN
+                  {t('vault.setup.setupPin')}
                 </button>
                 <button
                   onClick={handlePinSkip}
                   className="w-full py-3 bg-surface-0/50 text-text-secondary font-medium rounded-xl hover:bg-surface-0 transition-colors"
                 >
-                  Passer cette étape
+                  {t('vault.setup.skipStep')}
                 </button>
               </div>
             ) : (
@@ -324,7 +323,7 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
                   onClick={handlePinSkip}
                   className="text-sm text-text-muted hover:text-text transition-colors"
                 >
-                  Annuler
+                  {t('common.cancel')}
                 </button>
               </div>
             )}
@@ -337,12 +336,12 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
             <div className="flex items-center gap-3 p-4 bg-accent/10 rounded-xl">
               <Shield className="w-5 h-5 text-accent flex-shrink-0" />
               <p className="text-sm text-text-secondary">
-                Configurez le verrouillage automatique pour sécuriser vos credentials.
+                {t('vault.setup.settingsInfo')}
               </p>
             </div>
 
             <label className="flex flex-col gap-2">
-              <span className="text-sm text-text-secondary">Verrouillage automatique après</span>
+              <span className="text-sm text-text-secondary">{t('vault.setup.autoLockLabel')}</span>
               <select
                 value={autoLockTimeout}
                 onChange={(e) => setAutoLockTimeout(Number(e.target.value))}
@@ -355,11 +354,11 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
             </label>
 
             <div className="p-4 bg-surface-0/20 rounded-xl">
-              <h4 className="text-sm font-medium text-text mb-2">Récapitulatif</h4>
+              <h4 className="text-sm font-medium text-text mb-2">{t('vault.setup.summaryTitle')}</h4>
               <ul className="text-sm text-text-secondary space-y-1">
-                <li>Mot de passe principal configuré</li>
-                <li>{enablePin && pin ? 'Code PIN configuré' : 'Code PIN non configuré'}</li>
-                <li>Verrouillage auto: {autoLockOptions.find(o => o.value === autoLockTimeout)?.label}</li>
+                <li>{t('vault.setup.passwordConfigured')}</li>
+                <li>{enablePin && pin ? t('vault.setup.pinConfigured') : t('vault.setup.pinNotConfigured')}</li>
+                <li>{t('vault.setup.autoLockSummary', { timeout: autoLockOptions.find(o => o.value === autoLockTimeout)?.label })}</li>
               </ul>
             </div>
 
@@ -372,14 +371,14 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
                 onClick={() => setStep('pin')}
                 className="flex-1 py-3 bg-surface-0/50 text-text-secondary font-medium rounded-xl hover:bg-surface-0 transition-colors"
               >
-                Retour
+                {t('common.back')}
               </button>
               <button
                 onClick={handleSubmit}
                 disabled={isSubmitting}
                 className="flex-1 py-3 bg-accent text-crust font-medium rounded-xl hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSubmitting ? 'Création...' : 'Créer le vault'}
+                {isSubmitting ? t('vault.setup.creating') : t('vault.setup.createVault')}
               </button>
             </div>
           </div>

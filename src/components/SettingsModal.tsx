@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import i18n from "../i18n";
 import {
   X,
   Palette,
@@ -77,6 +79,7 @@ function SettingsModal({
   savedSessionsCount,
   onClearAllSessions,
 }: SettingsModalProps) {
+  const { t } = useTranslation();
   const [activeSection, setActiveSection] = useState<SettingsSection>("appearance");
 
   if (!isOpen) return null;
@@ -96,12 +99,12 @@ function SettingsModal({
   };
 
   const sections: { id: SettingsSection; label: string; icon: React.ReactNode }[] = [
-    { id: "appearance", label: "Apparence", icon: <Palette size={18} /> },
-    { id: "terminal", label: "Terminal", icon: <Terminal size={18} /> },
-    { id: "connections", label: "Connexions", icon: <Link2 size={18} /> },
-    { id: "security", label: "Sécurité", icon: <Shield size={18} /> },
-    { id: "plugins", label: "Plugins", icon: <Puzzle size={18} /> },
-    { id: "about", label: "À propos", icon: <Info size={18} /> },
+    { id: "appearance", label: t("settings.sections.appearance"), icon: <Palette size={18} /> },
+    { id: "terminal", label: t("settings.sections.terminal"), icon: <Terminal size={18} /> },
+    { id: "connections", label: t("settings.sections.connections"), icon: <Link2 size={18} /> },
+    { id: "security", label: t("settings.sections.security"), icon: <Shield size={18} /> },
+    { id: "plugins", label: t("settings.sections.plugins"), icon: <Puzzle size={18} /> },
+    { id: "about", label: t("settings.sections.about"), icon: <Info size={18} /> },
   ];
 
   return (
@@ -122,7 +125,7 @@ function SettingsModal({
           <div className="w-56 bg-crust flex flex-col border-r border-surface-0/30">
             {/* Header */}
             <div className="p-4 border-b border-surface-0/30">
-              <h2 className="text-sm font-semibold text-text">Paramètres</h2>
+              <h2 className="text-sm font-semibold text-text">{t("settings.title")}</h2>
             </div>
 
             {/* Navigation */}
@@ -152,7 +155,7 @@ function SettingsModal({
                 className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs text-text-muted hover:text-warning hover:bg-warning/10 transition-colors"
               >
                 <RotateCcw size={14} />
-                Réinitialiser
+                {t("settings.reset")}
               </button>
             </div>
           </div>
@@ -205,26 +208,33 @@ function SettingsModal({
 // ============================================================================
 
 function AppearanceSettings({ settings }: { settings: AppSettings }) {
+  const { t } = useTranslation();
+
+  const languages = [
+    { code: 'en', label: 'English', flag: '🇬🇧' },
+    { code: 'fr', label: 'Français', flag: '🇫🇷' },
+  ];
+
   return (
     <div className="space-y-6">
-      <SettingGroup title="Thème" description="Personnalisez l'apparence de l'application">
+      <SettingGroup title={t("settings.appearance.themeTitle")} description={t("settings.appearance.themeDesc")}>
         <div className="flex gap-3">
           <ThemeCard
-            name="Sombre"
+            name={t("settings.appearance.themeDark")}
             active={settings.appearance.theme === "dark"}
             colors={["#181715", "#1F1E1B", "#262421"]}
           />
           <ThemeCard
-            name="Clair"
+            name={t("settings.appearance.themeLight")}
             active={settings.appearance.theme === "light"}
             colors={["#F5F5F5", "#FFFFFF", "#E8E8E8"]}
             disabled
-            badge="Bientôt"
+            badge={t("common.comingSoon")}
           />
         </div>
       </SettingGroup>
 
-      <SettingGroup title="Couleur d'accent" description="Couleur utilisée pour les éléments interactifs">
+      <SettingGroup title={t("settings.appearance.accentTitle")} description={t("settings.appearance.accentDesc")}>
         <div className="flex gap-2">
           {["#7DA6E8", "#9CD68D", "#E8C878", "#D4A5D9", "#E88B8B"].map((color) => (
             <button
@@ -236,6 +246,27 @@ function AppearanceSettings({ settings }: { settings: AppSettings }) {
               style={{ backgroundColor: color }}
               title={color}
             />
+          ))}
+        </div>
+      </SettingGroup>
+
+      <SettingGroup title={t("settings.appearance.languageTitle")} description={t("settings.appearance.languageDesc")}>
+        <div className="flex gap-3">
+          {languages.map((lang) => (
+            <button
+              key={lang.code}
+              onClick={() => i18n.changeLanguage(lang.code)}
+              className={`
+                px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2
+                ${i18n.language === lang.code
+                  ? "bg-accent/20 text-accent border border-accent/30"
+                  : "bg-surface-0/30 text-text-muted hover:text-text border border-transparent"
+                }
+              `}
+            >
+              <span>{lang.flag}</span>
+              {lang.label}
+            </button>
           ))}
         </div>
       </SettingGroup>
@@ -253,9 +284,11 @@ function TerminalSettings({
     value: AppSettings["terminal"][K]
   ) => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div className="space-y-6">
-      <SettingGroup title="Police" description="Police utilisée dans le terminal">
+      <SettingGroup title={t("settings.terminal.fontTitle")} description={t("settings.terminal.fontDesc")}>
         <div className="flex gap-3">
           {["JetBrains Mono", "Fira Code", "SF Mono", "Consolas"].map((font) => (
             <button
@@ -276,7 +309,7 @@ function TerminalSettings({
         </div>
       </SettingGroup>
 
-      <SettingGroup title="Taille de police" description="Taille du texte dans le terminal">
+      <SettingGroup title={t("settings.terminal.fontSizeTitle")} description={t("settings.terminal.fontSizeDesc")}>
         <div className="flex items-center gap-4">
           <input
             type="range"
@@ -292,12 +325,12 @@ function TerminalSettings({
         </div>
       </SettingGroup>
 
-      <SettingGroup title="Style du curseur" description="Apparence du curseur dans le terminal">
+      <SettingGroup title={t("settings.terminal.cursorTitle")} description={t("settings.terminal.cursorDesc")}>
         <div className="flex gap-3">
           {[
-            { value: "bar", label: "Barre", icon: <div className="w-0.5 h-4 bg-current" /> },
-            { value: "block", label: "Bloc", icon: <div className="w-3 h-4 bg-current" /> },
-            { value: "underline", label: "Souligné", icon: <div className="w-3 h-0.5 bg-current mt-3" /> },
+            { value: "bar", label: t("settings.terminal.cursorBar"), icon: <div className="w-0.5 h-4 bg-current" /> },
+            { value: "block", label: t("settings.terminal.cursorBlock"), icon: <div className="w-3 h-4 bg-current" /> },
+            { value: "underline", label: t("settings.terminal.cursorUnderline"), icon: <div className="w-3 h-0.5 bg-current mt-3" /> },
           ].map((cursor) => (
             <button
               key={cursor.value}
@@ -319,8 +352,8 @@ function TerminalSettings({
 
       <SettingRow
         icon={<MousePointer2 size={18} />}
-        title="Clignotement du curseur"
-        description="Faire clignoter le curseur"
+        title={t("settings.terminal.cursorBlinkTitle")}
+        description={t("settings.terminal.cursorBlinkDesc")}
       >
         <Toggle
           checked={settings.cursorBlink}
@@ -328,7 +361,7 @@ function TerminalSettings({
         />
       </SettingRow>
 
-      <SettingGroup title="Historique (scrollback)" description="Nombre de lignes conservées">
+      <SettingGroup title={t("settings.terminal.scrollbackTitle")} description={t("settings.terminal.scrollbackDesc")}>
         <div className="flex items-center gap-4">
           <input
             type="range"
@@ -355,6 +388,7 @@ function ConnectionsSettings({
   savedSessionsCount: number;
   onClearAllSessions: () => void;
 }) {
+  const { t } = useTranslation();
   const [confirmClear, setConfirmClear] = useState(false);
 
   const handleClearAll = () => {
@@ -370,8 +404,8 @@ function ConnectionsSettings({
   return (
     <div className="space-y-6">
       <SettingGroup
-        title="Sessions sauvegardées"
-        description="Gérez vos connexions enregistrées"
+        title={t("settings.connections.savedTitle")}
+        description={t("settings.connections.savedDesc")}
       >
         <div className="flex items-center justify-between p-4 bg-surface-0/20 rounded-lg">
           <div className="flex items-center gap-3">
@@ -380,10 +414,10 @@ function ConnectionsSettings({
             </div>
             <div>
               <div className="text-sm font-medium text-text">
-                {savedSessionsCount} session{savedSessionsCount !== 1 ? "s" : ""} sauvegardée{savedSessionsCount !== 1 ? "s" : ""}
+                {t("settings.connections.savedCount", { count: savedSessionsCount })}
               </div>
               <div className="text-xs text-text-muted">
-                Stockées localement avec credentials sécurisés
+                {t("settings.connections.storedSecurely")}
               </div>
             </div>
           </div>
@@ -391,8 +425,8 @@ function ConnectionsSettings({
       </SettingGroup>
 
       <SettingGroup
-        title="Supprimer les données"
-        description="Effacer toutes les sessions sauvegardées et leurs credentials"
+        title={t("settings.connections.deleteTitle")}
+        description={t("settings.connections.deleteDesc")}
       >
         <button
           onClick={handleClearAll}
@@ -407,11 +441,11 @@ function ConnectionsSettings({
           `}
         >
           <Trash2 size={16} />
-          {confirmClear ? "Confirmer la suppression" : "Tout supprimer"}
+          {confirmClear ? t("settings.connections.confirmDelete") : t("settings.connections.deleteAll")}
         </button>
         {confirmClear && (
           <p className="text-xs text-error mt-2">
-            Cliquez à nouveau pour confirmer. Cette action est irréversible.
+            {t("settings.connections.deleteWarning")}
           </p>
         )}
       </SettingGroup>
@@ -420,6 +454,7 @@ function ConnectionsSettings({
 }
 
 function SecuritySettings() {
+  const { t } = useTranslation();
   const vault = useVault();
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [showPinSetup, setShowPinSetup] = useState(false);
@@ -461,12 +496,12 @@ function SecuritySettings() {
   const hasSecurityKey = vault.status?.unlockMethods.includes('security_key') || false;
 
   const autoLockOptions = [
-    { value: 0, label: 'Jamais' },
-    { value: 60, label: '1 minute' },
-    { value: 300, label: '5 minutes' },
-    { value: 600, label: '10 minutes' },
-    { value: 1800, label: '30 minutes' },
-    { value: 3600, label: '1 heure' },
+    { value: 0, label: t("settings.security.autoLockNever") },
+    { value: 60, label: t("settings.security.autoLock1min") },
+    { value: 300, label: t("settings.security.autoLock5min") },
+    { value: 600, label: t("settings.security.autoLock10min") },
+    { value: 1800, label: t("settings.security.autoLock30min") },
+    { value: 3600, label: t("settings.security.autoLock1hour") },
   ];
 
   const handleAutoLockChange = async (value: number) => {
@@ -478,11 +513,11 @@ function SecuritySettings() {
     setPasswordSuccess(false);
 
     if (newPassword.length < 8) {
-      setPasswordError('Le nouveau mot de passe doit contenir au moins 8 caractères');
+      setPasswordError(t("settings.security.passwordTooShort"));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setPasswordError('Les mots de passe ne correspondent pas');
+      setPasswordError(t("settings.security.passwordMismatchError"));
       return;
     }
 
@@ -497,7 +532,7 @@ function SecuritySettings() {
         setPasswordSuccess(false);
       }, 2000);
     } else {
-      setPasswordError(result.error || 'Erreur lors du changement de mot de passe');
+      setPasswordError(result.error || t("settings.security.passwordChangeError"));
     }
   };
 
@@ -506,11 +541,11 @@ function SecuritySettings() {
     setPinSuccess(false);
 
     if (newPin.length < 4 || newPin.length > 6 || !/^\d+$/.test(newPin)) {
-      setPinError('Le PIN doit contenir 4 à 6 chiffres');
+      setPinError(t("settings.security.pinValidationError"));
       return;
     }
     if (newPin !== confirmPin) {
-      setPinError('Les PINs ne correspondent pas');
+      setPinError(t("settings.security.pinMismatchError"));
       return;
     }
 
@@ -524,14 +559,14 @@ function SecuritySettings() {
         setPinSuccess(false);
       }, 2000);
     } else {
-      setPinError(result.error || 'Erreur lors de la configuration du PIN');
+      setPinError(result.error || t("settings.security.pinSetupError"));
     }
   };
 
   const handleRemovePin = async () => {
     const result = await vault.removePin();
     if (!result.success) {
-      setPinError(result.error || 'Erreur lors de la suppression du PIN');
+      setPinError(result.error || t("settings.security.pinRemoveError"));
     }
   };
 
@@ -578,14 +613,14 @@ function SecuritySettings() {
         setSecurityKeySuccess(false);
       }, 2000);
     } else {
-      setSecurityKeyError(result.error || 'Erreur lors de la configuration de la clé de sécurité');
+      setSecurityKeyError(result.error || t("settings.security.keySetupError"));
     }
   };
 
   const handleRemoveSecurityKey = async () => {
     const result = await vault.removeSecurityKey();
     if (!result.success) {
-      setSecurityKeyError(result.error || 'Erreur lors de la suppression de la clé de sécurité');
+      setSecurityKeyError(result.error || t("settings.security.keyRemoveError"));
     }
   };
 
@@ -597,7 +632,7 @@ function SecuritySettings() {
       setDeletePassword('');
       // The app will show the setup modal automatically
     } else {
-      setDeleteError(result.error || 'Mot de passe incorrect');
+      setDeleteError(result.error || t("settings.security.incorrectPassword"));
     }
   };
 
@@ -616,11 +651,11 @@ function SecuritySettings() {
   const handleInlineSetup = async () => {
     setSetupError(null);
     if (setupPassword.length < 8) {
-      setSetupError('Le mot de passe doit contenir au moins 8 caractères');
+      setSetupError(t("settings.security.passwordTooShort"));
       return;
     }
     if (setupPassword !== setupConfirmPassword) {
-      setSetupError('Les mots de passe ne correspondent pas');
+      setSetupError(t("settings.security.passwordMismatchError"));
       return;
     }
     setSetupLoading(true);
@@ -634,19 +669,18 @@ function SecuritySettings() {
       setSetupPassword('');
       setSetupConfirmPassword('');
     } else {
-      setSetupError(result.error || 'Erreur lors de la création');
+      setSetupError(result.error || t("settings.security.passwordChangeError"));
     }
   };
 
   if (!vault.status?.exists) {
     return (
       <div className="space-y-6">
-        <SettingGroup title="Vault non configuré" description="Protégez vos mots de passe avec un vault chiffré">
+        <SettingGroup title={t("settings.security.vaultNotConfigured")} description={t("settings.security.vaultNotConfiguredDesc")}>
           <div className="flex items-center gap-3 p-4 bg-accent/10 rounded-xl mb-4">
             <Shield className="w-5 h-5 text-accent flex-shrink-0" />
             <p className="text-sm text-text-secondary">
-              Sans vault, les mots de passe de vos connexions ne seront pas sauvegardés.
-              Vous devrez les saisir à chaque connexion.
+              {t("settings.security.noVaultWarning")}
             </p>
           </div>
 
@@ -655,7 +689,7 @@ function SecuritySettings() {
               onClick={() => setShowInlineSetup(true)}
               className="w-full py-3 bg-accent text-crust font-medium rounded-xl hover:bg-accent-hover transition-colors"
             >
-              Configurer le vault
+              {t("settings.security.configureVault")}
             </button>
           ) : (
             <div className="p-4 bg-surface-0/20 rounded-lg space-y-4">
@@ -663,7 +697,7 @@ function SecuritySettings() {
                 <div className="relative">
                   <input
                     type={showSetupPwd ? 'text' : 'password'}
-                    placeholder="Mot de passe principal (min. 8 car.)"
+                    placeholder={t("settings.security.newPasswordPlaceholder")}
                     value={setupPassword}
                     onChange={(e) => setSetupPassword(e.target.value)}
                     className="w-full px-4 py-3 pr-10 bg-surface-0/30 border border-surface-0/50 rounded-xl text-text placeholder-text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
@@ -678,7 +712,7 @@ function SecuritySettings() {
                 </div>
                 <input
                   type="password"
-                  placeholder="Confirmer le mot de passe"
+                  placeholder={t("settings.security.confirmNewPasswordPlaceholder")}
                   value={setupConfirmPassword}
                   onChange={(e) => setSetupConfirmPassword(e.target.value)}
                   className="w-full px-4 py-3 bg-surface-0/30 border border-surface-0/50 rounded-xl text-text placeholder-text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
@@ -690,14 +724,14 @@ function SecuritySettings() {
                   onClick={() => { setShowInlineSetup(false); setSetupPassword(''); setSetupConfirmPassword(''); setSetupError(null); }}
                   className="flex-1 py-2 bg-surface-0/50 text-text-muted text-sm rounded-lg hover:bg-surface-0 transition-colors"
                 >
-                  Annuler
+                  {t("common.cancel")}
                 </button>
                 <button
                   onClick={handleInlineSetup}
                   disabled={setupLoading}
                   className="flex-1 py-2 bg-accent text-crust text-sm font-medium rounded-lg hover:bg-accent-hover transition-colors disabled:opacity-50"
                 >
-                  {setupLoading ? 'Création...' : 'Créer le vault'}
+                  {setupLoading ? t("settings.security.creating") : t("settings.security.createVault")}
                 </button>
               </div>
             </div>
@@ -710,7 +744,7 @@ function SecuritySettings() {
   return (
     <div className="space-y-6">
       {/* Vault Status */}
-      <SettingGroup title="État du vault" description="Stockage chiffré de vos credentials">
+      <SettingGroup title={t("settings.security.vaultStatusTitle")} description={t("settings.security.vaultStatusDesc")}>
         <div className="flex items-center justify-between p-4 bg-surface-0/20 rounded-lg">
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
@@ -720,12 +754,13 @@ function SecuritySettings() {
             </div>
             <div>
               <div className="text-sm font-medium text-text">
-                {vault.status?.isUnlocked ? 'Vault déverrouillé' : 'Vault verrouillé'}
+                {vault.status?.isUnlocked ? t("settings.security.vaultUnlocked") : t("settings.security.vaultLocked")}
               </div>
               <div className="text-xs text-text-muted">
-                Méthodes: {vault.status?.unlockMethods.map(m =>
-                  m === 'master_password' ? 'Mot de passe' :
-                  m === 'pin' ? 'PIN' : m
+                {t("settings.security.methods")}: {vault.status?.unlockMethods.map(m =>
+                  m === 'master_password' ? t("settings.security.methodPassword") :
+                  m === 'pin' ? t("settings.security.methodPin") :
+                  m === 'security_key' ? t("settings.security.methodSecurityKey") : m
                 ).join(', ')}
               </div>
             </div>
@@ -735,14 +770,14 @@ function SecuritySettings() {
               onClick={handleLock}
               className="px-3 py-1.5 bg-surface-0/50 text-text-muted text-xs rounded-lg hover:bg-surface-0 transition-colors"
             >
-              Verrouiller
+              {t("settings.security.lock")}
             </button>
           )}
         </div>
       </SettingGroup>
 
       {/* Auto-lock */}
-      <SettingGroup title="Verrouillage automatique" description="Délai avant le verrouillage automatique">
+      <SettingGroup title={t("settings.security.autoLockTitle")} description={t("settings.security.autoLockDesc")}>
         <select
           value={vault.status?.autoLockTimeout ?? 300}
           onChange={(e) => handleAutoLockChange(Number(e.target.value))}
@@ -756,7 +791,7 @@ function SecuritySettings() {
       </SettingGroup>
 
       {/* Maximum Security Mode */}
-      <SettingGroup title="Mode sécurité maximale" description="Exige le déverrouillage du vault à chaque connexion SSH">
+      <SettingGroup title={t("settings.security.maxSecurityTitle")} description={t("settings.security.maxSecurityDesc")}>
         <div className="flex items-center justify-between p-4 bg-surface-0/20 rounded-lg">
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
@@ -766,12 +801,12 @@ function SecuritySettings() {
             </div>
             <div>
               <div className="text-sm font-medium text-text">
-                {vault.status?.requireUnlockOnConnect ? 'Activé' : 'Désactivé'}
+                {vault.status?.requireUnlockOnConnect ? t("common.enabled") : t("common.disabled")}
               </div>
               <div className="text-xs text-text-muted">
                 {vault.status?.requireUnlockOnConnect
-                  ? 'Le vault sera verrouillé après chaque connexion'
-                  : 'Les credentials restent accessibles selon le timeout'}
+                  ? t("settings.security.maxSecurityEnabled")
+                  : t("settings.security.maxSecurityDisabled")}
               </div>
             </div>
           </div>
@@ -785,13 +820,13 @@ function SecuritySettings() {
         {vault.status?.requireUnlockOnConnect && (
           <p className="text-xs text-warning mt-2 flex items-center gap-2">
             <AlertCircle size={14} />
-            Vous devrez saisir votre PIN/mot de passe à chaque connexion SSH
+            {t("settings.security.maxSecurityWarning")}
           </p>
         )}
       </SettingGroup>
 
       {/* PIN Management */}
-      <SettingGroup title="Code PIN" description="Déverrouillage rapide avec un code PIN">
+      <SettingGroup title={t("settings.security.pinTitle")} description={t("settings.security.pinDesc")}>
         {!showPinSetup ? (
           <div className="flex items-center justify-between p-4 bg-surface-0/20 rounded-lg">
             <div className="flex items-center gap-3">
@@ -802,10 +837,10 @@ function SecuritySettings() {
               </div>
               <div>
                 <div className="text-sm font-medium text-text">
-                  {hasPin ? 'PIN configuré' : 'PIN non configuré'}
+                  {hasPin ? t("settings.security.pinConfigured") : t("settings.security.pinNotConfigured")}
                 </div>
                 <div className="text-xs text-text-muted">
-                  {hasPin ? 'Déverrouillage rapide activé' : 'Ajoutez un PIN pour un accès rapide'}
+                  {hasPin ? t("settings.security.pinQuickUnlock") : t("settings.security.pinSetupPrompt")}
                 </div>
               </div>
             </div>
@@ -816,7 +851,7 @@ function SecuritySettings() {
                   disabled={!vault.status?.isUnlocked}
                   className="px-3 py-1.5 bg-error/10 text-error text-xs rounded-lg hover:bg-error/20 transition-colors disabled:opacity-50"
                 >
-                  Supprimer
+                  {t("common.remove")}
                 </button>
               )}
               <button
@@ -824,7 +859,7 @@ function SecuritySettings() {
                 disabled={!vault.status?.isUnlocked}
                 className="px-3 py-1.5 bg-accent/20 text-accent text-xs rounded-lg hover:bg-accent/30 transition-colors disabled:opacity-50"
               >
-                {hasPin ? 'Modifier' : 'Configurer'}
+                {hasPin ? t("common.modify") : t("common.configure")}
               </button>
             </div>
           </div>
@@ -835,7 +870,7 @@ function SecuritySettings() {
                 type="password"
                 inputMode="numeric"
                 maxLength={6}
-                placeholder="Nouveau PIN (4-6 chiffres)"
+                placeholder={t("settings.security.newPinPlaceholder")}
                 value={newPin}
                 onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
                 className="w-full px-4 py-3 bg-surface-0/30 border border-surface-0/50 rounded-xl text-text placeholder-text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
@@ -844,7 +879,7 @@ function SecuritySettings() {
                 type="password"
                 inputMode="numeric"
                 maxLength={6}
-                placeholder="Confirmer le PIN"
+                placeholder={t("settings.security.confirmPinPlaceholder")}
                 value={confirmPin}
                 onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
                 className="w-full px-4 py-3 bg-surface-0/30 border border-surface-0/50 rounded-xl text-text placeholder-text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
@@ -853,7 +888,7 @@ function SecuritySettings() {
             {pinError && <p className="text-sm text-error">{pinError}</p>}
             {pinSuccess && (
               <p className="text-sm text-success flex items-center gap-2">
-                <Check size={16} /> PIN configuré avec succès
+                <Check size={16} /> {t("settings.security.pinSetupSuccess")}
               </p>
             )}
             <div className="flex gap-2">
@@ -861,13 +896,13 @@ function SecuritySettings() {
                 onClick={() => { setShowPinSetup(false); setNewPin(''); setConfirmPin(''); setPinError(null); }}
                 className="flex-1 py-2 bg-surface-0/50 text-text-muted text-sm rounded-lg hover:bg-surface-0 transition-colors"
               >
-                Annuler
+                {t("common.cancel")}
               </button>
               <button
                 onClick={handlePinSetup}
                 className="flex-1 py-2 bg-accent text-crust text-sm font-medium rounded-lg hover:bg-accent-hover transition-colors"
               >
-                Enregistrer
+                {t("common.save")}
               </button>
             </div>
           </div>
@@ -875,7 +910,7 @@ function SecuritySettings() {
       </SettingGroup>
 
       {/* Biometric Authentication */}
-      <SettingGroup title="Authentification biométrique" description="Déverrouillez avec Windows Hello ou Touch ID">
+      <SettingGroup title={t("settings.security.biometricTitle")} description={t("settings.security.biometricDesc")}>
         <div className="flex items-center justify-between p-4 bg-surface-0/20 rounded-lg">
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
@@ -887,27 +922,27 @@ function SecuritySettings() {
             </div>
             <div>
               <div className="text-sm font-medium text-text">
-                {vault.status?.biometricType === 'windows_hello' ? 'Windows Hello' :
-                 vault.status?.biometricType === 'touch_id' ? 'Touch ID' :
-                 'Biométrie'}
+                {vault.status?.biometricType === 'windows_hello' ? t("settings.security.windowsHello") :
+                 vault.status?.biometricType === 'touch_id' ? t("settings.security.touchId") :
+                 t("settings.security.biometric")}
               </div>
               <div className="text-xs text-text-muted">
                 {vault.status?.unlockMethods.includes('biometric')
-                  ? 'Activé'
+                  ? t("common.enabled")
                   : vault.status?.biometricAvailable
-                    ? 'Non configuré'
-                    : 'Non disponible sur ce système'}
+                    ? t("common.notConfigured")
+                    : t("settings.security.biometricNotAvailable")}
               </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {!vault.status?.biometricAvailable ? (
               <span className="px-2 py-1 bg-surface-0/50 text-text-muted text-[10px] rounded-full">
-                Non supporté
+                {t("common.notSupported")}
               </span>
             ) : (
               <span className="px-2 py-1 bg-accent/20 text-accent text-[10px] rounded-full">
-                Bientôt
+                {t("common.comingSoon")}
               </span>
             )}
           </div>
@@ -915,7 +950,7 @@ function SecuritySettings() {
       </SettingGroup>
 
       {/* FIDO2 Security Key Authentication */}
-      <SettingGroup title="Clé de sécurité FIDO2" description="Déverrouillez en touchant votre clé (YubiKey, SoloKey, etc.)">
+      <SettingGroup title={t("settings.security.fido2Title")} description={t("settings.security.fido2Desc")}>
         {!showSecurityKeySetup ? (
           <div className="flex items-center justify-between p-4 bg-surface-0/20 rounded-lg">
             <div className="flex items-center gap-3">
@@ -926,10 +961,10 @@ function SecuritySettings() {
               </div>
               <div>
                 <div className="text-sm font-medium text-text">
-                  Clé FIDO2
+                  {t("settings.security.fido2Key")}
                 </div>
                 <div className="text-xs text-text-muted">
-                  {hasSecurityKey ? 'Configurée - Touch to unlock' : 'Clé de sécurité matérielle'}
+                  {hasSecurityKey ? t("settings.security.fido2Configured") : t("settings.security.fido2NotConfigured")}
                 </div>
               </div>
             </div>
@@ -940,7 +975,7 @@ function SecuritySettings() {
                   disabled={!vault.status?.isUnlocked}
                   className="px-3 py-1.5 bg-error/10 text-error text-xs rounded-lg hover:bg-error/20 transition-colors disabled:opacity-50"
                 >
-                  Supprimer
+                  {t("common.remove")}
                 </button>
               )}
               <button
@@ -948,7 +983,7 @@ function SecuritySettings() {
                 disabled={!vault.status?.isUnlocked}
                 className="px-3 py-1.5 bg-accent/20 text-accent text-xs rounded-lg hover:bg-accent/30 transition-colors disabled:opacity-50"
               >
-                {hasSecurityKey ? 'Modifier' : 'Configurer'}
+                {hasSecurityKey ? t("common.modify") : t("common.configure")}
               </button>
             </div>
           </div>
@@ -959,32 +994,32 @@ function SecuritySettings() {
                 <div className="w-16 h-16 rounded-2xl bg-accent/20 flex items-center justify-center">
                   <Key size={32} className="text-accent animate-pulse" />
                 </div>
-                <p className="text-sm text-text-muted">Touchez votre clé de sécurité...</p>
+                <p className="text-sm text-text-muted">{t("settings.security.touchKey")}</p>
               </div>
             ) : securityKeyAvailable === false ? (
               <div className="p-4 bg-warning/10 rounded-lg">
                 <p className="text-sm text-warning flex items-center gap-2">
                   <AlertCircle size={16} />
-                  Aucune clé de sécurité détectée
+                  {t("settings.security.noKeyDetected")}
                 </p>
                 <p className="text-xs text-text-muted mt-2">
-                  Insérez une clé FIDO2 (YubiKey, SoloKey, Google Titan, etc.)
+                  {t("settings.security.insertKeyPrompt")}
                 </p>
               </div>
             ) : detectedSecurityKeys.length === 0 ? (
               <div className="p-4 bg-surface-0/30 rounded-lg">
                 <p className="text-sm text-text-muted text-center">
-                  Aucune clé détectée
+                  {t("settings.security.noKeyDetected")}
                 </p>
                 <p className="text-xs text-text-muted/70 text-center mt-1">
-                  Insérez une clé de sécurité FIDO2
+                  {t("settings.security.insertKeyPrompt")}
                 </p>
                 <button
                   onClick={handleRefreshSecurityKeys}
                   className="mt-3 w-full py-2 bg-surface-0/50 text-text-muted text-xs rounded-lg hover:bg-surface-0 transition-colors flex items-center justify-center gap-2"
                 >
                   <RefreshCw size={14} />
-                  Actualiser
+                  {t("common.refresh")}
                 </button>
               </div>
             ) : (
@@ -993,7 +1028,7 @@ function SecuritySettings() {
                 <div className="p-3 bg-success/10 rounded-lg">
                   <p className="text-sm text-success flex items-center gap-2">
                     <Check size={16} />
-                    {detectedSecurityKeys.length} clé{detectedSecurityKeys.length > 1 ? 's' : ''} détectée{detectedSecurityKeys.length > 1 ? 's' : ''}
+                    {t("settings.security.keyDetected", { count: detectedSecurityKeys.length })}
                   </p>
                   <p className="text-xs text-text-muted mt-1">
                     {detectedSecurityKeys.map(k => k.productName).join(', ')}
@@ -1001,10 +1036,10 @@ function SecuritySettings() {
                 </div>
 
                 <div className="p-3 bg-surface-0/30 rounded-lg">
-                  <p className="text-sm text-text">Configuration en 2 étapes :</p>
+                  <p className="text-sm text-text">{t("settings.security.setupSteps")}</p>
                   <ol className="text-xs text-text-muted mt-2 space-y-1 list-decimal list-inside">
-                    <li>Touchez votre clé pour l'enregistrer</li>
-                    <li>Touchez-la à nouveau pour confirmer</li>
+                    <li>{t("settings.security.setupStep1")}</li>
+                    <li>{t("settings.security.setupStep2")}</li>
                   </ol>
                 </div>
 
@@ -1013,7 +1048,7 @@ function SecuritySettings() {
                   className="text-xs text-text-muted hover:text-text flex items-center gap-1"
                 >
                   <RefreshCw size={12} />
-                  Actualiser la liste
+                  {t("settings.security.refreshKeyList")}
                 </button>
               </>
             )}
@@ -1021,7 +1056,7 @@ function SecuritySettings() {
             {securityKeyError && <p className="text-sm text-error">{securityKeyError}</p>}
             {securityKeySuccess && (
               <p className="text-sm text-success flex items-center gap-2">
-                <Check size={16} /> Clé de sécurité configurée avec succès
+                <Check size={16} /> {t("settings.security.keySetupSuccess")}
               </p>
             )}
 
@@ -1033,14 +1068,14 @@ function SecuritySettings() {
                 }}
                 className="flex-1 py-2 bg-surface-0/50 text-text-muted text-sm rounded-lg hover:bg-surface-0 transition-colors"
               >
-                Annuler
+                {t("common.cancel")}
               </button>
               <button
                 onClick={handleSetupSecurityKey}
                 disabled={securityKeyLoading || detectedSecurityKeys.length === 0}
                 className="flex-1 py-2 bg-accent text-crust text-sm font-medium rounded-lg hover:bg-accent-hover transition-colors disabled:opacity-50"
               >
-                {securityKeyLoading ? 'Touchez votre clé...' : 'Configurer'}
+                {securityKeyLoading ? t("settings.security.touchKey") : t("common.configure")}
               </button>
             </div>
           </div>
@@ -1048,14 +1083,14 @@ function SecuritySettings() {
       </SettingGroup>
 
       {/* Change Password */}
-      <SettingGroup title="Mot de passe principal" description="Modifiez votre mot de passe principal">
+      <SettingGroup title={t("settings.security.masterPasswordTitle")} description={t("settings.security.masterPasswordDesc")}>
         {!showPasswordChange ? (
           <button
             onClick={() => setShowPasswordChange(true)}
             disabled={!vault.status?.isUnlocked}
             className="px-4 py-2.5 bg-surface-0/30 text-text text-sm rounded-lg hover:bg-surface-0/50 transition-colors disabled:opacity-50"
           >
-            Changer le mot de passe
+            {t("settings.security.changePassword")}
           </button>
         ) : (
           <div className="p-4 bg-surface-0/20 rounded-lg space-y-4">
@@ -1063,7 +1098,7 @@ function SecuritySettings() {
               <div className="relative">
                 <input
                   type={showCurrentPwd ? 'text' : 'password'}
-                  placeholder="Mot de passe actuel"
+                  placeholder={t("settings.security.currentPasswordPlaceholder")}
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   className="w-full px-4 py-3 pr-10 bg-surface-0/30 border border-surface-0/50 rounded-xl text-text placeholder-text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
@@ -1079,7 +1114,7 @@ function SecuritySettings() {
               <div className="relative">
                 <input
                   type={showNewPwd ? 'text' : 'password'}
-                  placeholder="Nouveau mot de passe (min. 8 car.)"
+                  placeholder={t("settings.security.newPasswordPlaceholder")}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   className="w-full px-4 py-3 pr-10 bg-surface-0/30 border border-surface-0/50 rounded-xl text-text placeholder-text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
@@ -1094,7 +1129,7 @@ function SecuritySettings() {
               </div>
               <input
                 type="password"
-                placeholder="Confirmer le nouveau mot de passe"
+                placeholder={t("settings.security.confirmNewPasswordPlaceholder")}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="w-full px-4 py-3 bg-surface-0/30 border border-surface-0/50 rounded-xl text-text placeholder-text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
@@ -1103,7 +1138,7 @@ function SecuritySettings() {
             {passwordError && <p className="text-sm text-error">{passwordError}</p>}
             {passwordSuccess && (
               <p className="text-sm text-success flex items-center gap-2">
-                <Check size={16} /> Mot de passe modifié avec succès
+                <Check size={16} /> {t("settings.security.passwordChangeSuccess")}
               </p>
             )}
             <div className="flex gap-2">
@@ -1117,13 +1152,13 @@ function SecuritySettings() {
                 }}
                 className="flex-1 py-2 bg-surface-0/50 text-text-muted text-sm rounded-lg hover:bg-surface-0 transition-colors"
               >
-                Annuler
+                {t("common.cancel")}
               </button>
               <button
                 onClick={handlePasswordChange}
                 className="flex-1 py-2 bg-accent text-crust text-sm font-medium rounded-lg hover:bg-accent-hover transition-colors"
               >
-                Modifier
+                {t("common.modify")}
               </button>
             </div>
           </div>
@@ -1131,23 +1166,23 @@ function SecuritySettings() {
       </SettingGroup>
 
       {/* Delete Vault */}
-      <SettingGroup title="Supprimer le vault" description="Supprime toutes vos données chiffrées de manière irréversible">
+      <SettingGroup title={t("settings.security.deleteVaultTitle")} description={t("settings.security.deleteVaultDesc")}>
         {!showDeleteConfirm ? (
           <button
             onClick={() => setShowDeleteConfirm(true)}
             className="px-4 py-2.5 bg-error/10 text-error text-sm rounded-lg hover:bg-error/20 transition-colors"
           >
             <Trash2 size={16} className="inline mr-2" />
-            Supprimer le vault
+            {t("settings.security.deleteVault")}
           </button>
         ) : (
           <div className="p-4 bg-error/10 rounded-lg border border-error/30 space-y-4">
             <p className="text-sm text-error">
-              Cette action est irréversible. Toutes vos credentials seront perdues.
+              {t("settings.security.deleteVaultWarning")}
             </p>
             <input
               type="password"
-              placeholder="Entrez votre mot de passe principal pour confirmer"
+              placeholder={t("settings.security.deleteVaultPasswordPrompt")}
               value={deletePassword}
               onChange={(e) => setDeletePassword(e.target.value)}
               className="w-full px-4 py-3 bg-surface-0/30 border border-error/30 rounded-xl text-text placeholder-text-muted/50 focus:outline-none focus:ring-2 focus:ring-error"
@@ -1158,14 +1193,14 @@ function SecuritySettings() {
                 onClick={() => { setShowDeleteConfirm(false); setDeletePassword(''); setDeleteError(null); }}
                 className="flex-1 py-2 bg-surface-0/50 text-text-muted text-sm rounded-lg hover:bg-surface-0 transition-colors"
               >
-                Annuler
+                {t("common.cancel")}
               </button>
               <button
                 onClick={handleDeleteVault}
                 disabled={!deletePassword}
                 className="flex-1 py-2 bg-error text-white text-sm font-medium rounded-lg hover:bg-error/90 transition-colors disabled:opacity-50"
               >
-                Supprimer définitivement
+                {t("settings.security.deletePermanently")}
               </button>
             </div>
           </div>
@@ -1176,6 +1211,7 @@ function SecuritySettings() {
 }
 
 function PluginsSettings() {
+  const { t } = useTranslation();
   const { plugins, loading, refresh, enablePlugin, disablePlugin } = usePlugins();
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -1206,12 +1242,12 @@ function PluginsSettings() {
   return (
     <div className="space-y-6">
       <SettingGroup
-        title="Plugins installés"
-        description="Extensions ajoutant des fonctionnalités à SimplyTerm"
+        title={t("settings.plugins.installedTitle")}
+        description={t("settings.plugins.installedDesc")}
       >
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs text-text-muted">
-            {plugins.length} plugin{plugins.length !== 1 ? "s" : ""} trouvé{plugins.length !== 1 ? "s" : ""}
+            {t("settings.plugins.pluginCount", { count: plugins.length })}
           </span>
           <button
             onClick={handleRefresh}
@@ -1219,7 +1255,7 @@ function PluginsSettings() {
             className="flex items-center gap-1.5 px-2 py-1 text-xs text-text-muted hover:text-text transition-colors disabled:opacity-50"
           >
             <RefreshCw size={12} className={actionLoading === "refresh" ? "animate-spin" : ""} />
-            Actualiser
+            {t("common.refresh")}
           </button>
         </div>
 
@@ -1230,9 +1266,9 @@ function PluginsSettings() {
         ) : plugins.length === 0 ? (
           <div className="text-center py-8 text-text-muted">
             <Puzzle size={32} className="mx-auto mb-3 opacity-50" />
-            <p className="text-sm">Aucun plugin installé</p>
+            <p className="text-sm">{t("settings.plugins.noPlugins")}</p>
             <p className="text-xs mt-1">
-              Placez vos plugins dans ~/.simplyterm/plugins/
+              {t("settings.plugins.pluginDirHint")}
             </p>
           </div>
         ) : (
@@ -1264,7 +1300,7 @@ function PluginsSettings() {
                   )}
                   {plugin.author && (
                     <p className="text-[10px] text-text-muted/70">
-                      par {plugin.author}
+                      {t("settings.plugins.byAuthor", { author: plugin.author })}
                     </p>
                   )}
                 </div>
@@ -1285,12 +1321,12 @@ function PluginsSettings() {
                   ) : plugin.status === "enabled" ? (
                     <>
                       <Power size={12} />
-                      Actif
+                      {t("common.active")}
                     </>
                   ) : (
                     <>
                       <PowerOff size={12} />
-                      Inactif
+                      {t("common.inactive")}
                     </>
                   )}
                 </button>
@@ -1301,23 +1337,23 @@ function PluginsSettings() {
       </SettingGroup>
 
       <SettingGroup
-        title="Installation"
-        description="Comment ajouter de nouveaux plugins"
+        title={t("settings.plugins.installationTitle")}
+        description={t("settings.plugins.installationDesc")}
       >
         <div className="p-3 bg-surface-0/20 rounded-lg text-xs text-text-muted space-y-2">
           <p>
-            <strong className="text-text">1.</strong> Créez le dossier{" "}
+            <strong className="text-text">1.</strong> {t("settings.plugins.installStep1")}{" "}
             <code className="px-1 py-0.5 bg-surface-0/50 rounded">~/.simplyterm/plugins/</code>
           </p>
           <p>
-            <strong className="text-text">2.</strong> Ajoutez un dossier pour chaque plugin avec :
+            <strong className="text-text">2.</strong> {t("settings.plugins.installStep2")}
           </p>
           <ul className="ml-4 space-y-1">
-            <li>• <code className="px-1 py-0.5 bg-surface-0/50 rounded">manifest.json</code> - Métadonnées</li>
-            <li>• <code className="px-1 py-0.5 bg-surface-0/50 rounded">index.js</code> - Code du plugin</li>
+            <li>• <code className="px-1 py-0.5 bg-surface-0/50 rounded">manifest.json</code> - {t("settings.plugins.manifestFile")}</li>
+            <li>• <code className="px-1 py-0.5 bg-surface-0/50 rounded">index.js</code> - {t("settings.plugins.indexFile")}</li>
           </ul>
           <p>
-            <strong className="text-text">3.</strong> Actualisez la liste et activez le plugin
+            <strong className="text-text">3.</strong> {t("settings.plugins.installStep3")}
           </p>
         </div>
       </SettingGroup>
@@ -1326,6 +1362,8 @@ function PluginsSettings() {
 }
 
 function AboutSettings() {
+  const { t } = useTranslation();
+
   return (
     <div className="space-y-6">
       {/* App info */}
@@ -1335,14 +1373,14 @@ function AboutSettings() {
         </div>
         <div>
           <h3 className="text-lg font-semibold text-text">SimplyTerm</h3>
-          <p className="text-sm text-text-muted">Version 0.1.0</p>
+          <p className="text-sm text-text-muted">{t("settings.about.version", { version: "0.1.0" })}</p>
           <p className="text-xs text-text-muted mt-1">
-            Terminal SSH moderne, rapide et élégant
+            {t("settings.about.tagline")}
           </p>
         </div>
       </div>
 
-      <SettingGroup title="Technologies" description="Construit avec">
+      <SettingGroup title={t("settings.about.techTitle")} description={t("settings.about.techDesc")}>
         <div className="flex flex-wrap gap-2">
           {["Tauri", "React", "TypeScript", "Rust", "xterm.js"].map((tech) => (
             <span
@@ -1355,18 +1393,18 @@ function AboutSettings() {
         </div>
       </SettingGroup>
 
-      <SettingGroup title="Liens" description="Ressources et communauté">
+      <SettingGroup title={t("settings.about.linksTitle")} description={t("settings.about.linksDesc")}>
         <div className="space-y-2">
           <LinkButton
             icon={<Github size={18} />}
-            title="Code source"
-            description="Voir sur GitHub"
+            title={t("settings.about.sourceCode")}
+            description={t("settings.about.viewOnGithub")}
             href="https://github.com"
           />
           <LinkButton
             icon={<ExternalLink size={18} />}
-            title="Documentation"
-            description="Guide d'utilisation"
+            title={t("settings.about.documentation")}
+            description={t("settings.about.userGuide")}
             href="#"
           />
         </div>
@@ -1374,7 +1412,7 @@ function AboutSettings() {
 
       <div className="pt-4 border-t border-surface-0/30">
         <p className="text-xs text-text-muted text-center">
-          Fait avec passion. Open source sous licence MIT.
+          {t("settings.about.footer")}
         </p>
       </div>
     </div>

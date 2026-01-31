@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, Lock, KeyRound, AlertTriangle, Key, Loader2 } from 'lucide-react';
 import Modal from '../Modal';
 import PinInput from './PinInput';
@@ -27,6 +28,7 @@ export function VaultUnlockModal({
   onUnlockWithPin,
   onUnlockWithSecurityKey,
 }: VaultUnlockModalProps) {
+  const { t } = useTranslation();
   const hasPin = unlockMethods.includes('pin');
   const hasSecurityKey = unlockMethods.includes('security_key');
   const pinLocked = hasPin && pinAttemptsRemaining === 0;
@@ -71,7 +73,7 @@ export function VaultUnlockModal({
     setIsSubmitting(false);
 
     if (!result.success) {
-      setError(result.error || 'Mot de passe incorrect');
+      setError(result.error || t('vault.unlock.incorrectPassword'));
       setPassword('');
     }
   };
@@ -87,7 +89,7 @@ export function VaultUnlockModal({
     setIsSubmitting(false);
 
     if (!result.success) {
-      setError(result.error || 'Code PIN incorrect');
+      setError(result.error || t('vault.unlock.incorrectPin'));
     }
   };
 
@@ -102,7 +104,7 @@ export function VaultUnlockModal({
     setIsSubmitting(false);
 
     if (!result.success) {
-      setError(result.error || 'Touchez votre clé de sécurité');
+      setError(result.error || t('vault.unlock.touchSecurityKey'));
     }
   };
 
@@ -110,14 +112,14 @@ export function VaultUnlockModal({
   const methodCount = [hasSecurityKey, hasPin && !pinLocked, true].filter(Boolean).length;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Déverrouiller le Vault" width="sm">
+    <Modal isOpen={isOpen} onClose={onClose} title={t('vault.unlock.title')} width="sm">
       <div className="flex flex-col gap-6">
         {/* PIN locked warning */}
         {pinLocked && (
           <div className="flex items-center gap-3 p-4 bg-error/10 rounded-xl">
             <AlertTriangle className="w-5 h-5 text-error flex-shrink-0" />
             <p className="text-sm text-error">
-              Code PIN verrouillé. Utilisez votre mot de passe principal ou clé de sécurité.
+              {t('vault.unlock.pinLocked')}
             </p>
           </div>
         )}
@@ -136,7 +138,7 @@ export function VaultUnlockModal({
                 `}
               >
                 <Key size={16} className="inline mr-1" />
-                Clé FIDO2
+                {t('vault.unlock.fido2Key')}
               </button>
             )}
             {hasPin && !pinLocked && (
@@ -150,7 +152,7 @@ export function VaultUnlockModal({
                 `}
               >
                 <KeyRound size={16} className="inline mr-1" />
-                PIN
+                {t('vault.unlock.pin')}
               </button>
             )}
             <button
@@ -163,7 +165,7 @@ export function VaultUnlockModal({
               `}
             >
               <Lock size={16} className="inline mr-1" />
-              Mot de passe
+              {t('vault.unlock.password')}
             </button>
           </div>
         )}
@@ -175,7 +177,7 @@ export function VaultUnlockModal({
               <Key size={32} className="text-accent" />
             </div>
             <p className="text-sm text-text-muted text-center">
-              Insérez votre clé de sécurité et touchez-la
+              {t('vault.unlock.insertSecurityKey')}
             </p>
 
             {error && (
@@ -190,10 +192,10 @@ export function VaultUnlockModal({
               {isSubmitting ? (
                 <>
                   <Loader2 size={18} className="animate-spin" />
-                  Touchez votre clé...
+                  {t('vault.unlock.touchingKey')}
                 </>
               ) : (
-                'Déverrouiller avec clé FIDO2'
+                t('vault.unlock.unlockWithFido2')
               )}
             </button>
           </div>
@@ -203,7 +205,7 @@ export function VaultUnlockModal({
         {mode === 'pin' && !pinLocked && (
           <div className="flex flex-col items-center gap-4">
             <p className="text-sm text-text-muted text-center">
-              Entrez votre code PIN pour déverrouiller
+              {t('vault.unlock.enterPin')}
             </p>
 
             <PinInput
@@ -216,7 +218,7 @@ export function VaultUnlockModal({
 
             {pinAttemptsRemaining !== undefined && pinAttemptsRemaining < 3 && (
               <p className="text-sm text-warning">
-                {pinAttemptsRemaining} tentative{pinAttemptsRemaining > 1 ? 's' : ''} restante{pinAttemptsRemaining > 1 ? 's' : ''}
+                {t('vault.unlock.attemptsRemaining', { count: pinAttemptsRemaining })}
               </p>
             )}
           </div>
@@ -226,14 +228,14 @@ export function VaultUnlockModal({
         {mode === 'password' && (
           <form onSubmit={handlePasswordSubmit} className="flex flex-col gap-4">
             <label className="flex flex-col gap-2">
-              <span className="text-sm text-text-secondary">Mot de passe principal</span>
+              <span className="text-sm text-text-secondary">{t('vault.unlock.masterPassword')}</span>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Entrez votre mot de passe"
+                  placeholder={t('vault.unlock.enterPassword')}
                   className="w-full pl-10 pr-10 py-3 bg-surface-0/30 border border-surface-0/50 rounded-xl text-text placeholder-text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                   autoFocus={mode === 'password'}
                   disabled={isSubmitting}
@@ -257,7 +259,7 @@ export function VaultUnlockModal({
               disabled={!password || isSubmitting}
               className="w-full py-3 bg-accent text-crust font-medium rounded-xl hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? 'Déverrouillage...' : 'Déverrouiller'}
+              {isSubmitting ? t('vault.unlock.unlocking') : t('vault.unlock.unlock')}
             </button>
           </form>
         )}
@@ -268,10 +270,10 @@ export function VaultUnlockModal({
             onClick={onClose}
             className="w-full py-2 text-text-muted text-sm hover:text-text transition-colors"
           >
-            Continuer sans déverrouiller
+            {t('vault.unlock.continueWithout')}
           </button>
           <p className="text-xs text-text-muted/60 text-center mt-2">
-            Les mots de passe sauvegardés ne seront pas disponibles
+            {t('vault.unlock.passwordsUnavailable')}
           </p>
         </div>
       </div>
