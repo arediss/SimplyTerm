@@ -10,6 +10,7 @@ use std::sync::mpsc as std_mpsc;
 use tokio::sync::mpsc as tokio_mpsc;
 
 use crate::session::{OutputMessage, Session};
+use super::known_hosts::{verify_host_key, HostKeyVerification};
 
 /// Configuration SSH
 #[derive(Debug, Clone)]
@@ -31,7 +32,10 @@ pub enum SshAuth {
 }
 
 /// Handler SSH (gestion des événements de connexion)
-struct SshHandler;
+struct SshHandler {
+    host: String,
+    port: u16,
+}
 
 #[async_trait]
 impl Handler for SshHandler {
@@ -39,10 +43,25 @@ impl Handler for SshHandler {
 
     async fn check_server_key(
         &mut self,
-        _server_public_key: &PublicKey,
+        server_public_key: &PublicKey,
     ) -> Result<bool, Self::Error> {
-        // TODO: Implémenter la vérification de clé du serveur
-        Ok(true)
+        match verify_host_key(&self.host, self.port, server_public_key) {
+            HostKeyVerification::Trusted => Ok(true),
+            HostKeyVerification::TrustedNewHost => {
+                // TOFU: First connection, key has been stored
+                Ok(true)
+            }
+            HostKeyVerification::KeyMismatch { expected: _, actual: _ } => {
+                // SECURITY: Key mismatch - potential MITM attack!
+                // Reject the connection
+                Err(russh::Error::UnknownKey)
+            }
+            HostKeyVerification::Error(e) => {
+                eprintln!("Host key verification error: {}", e);
+                // On error, reject for safety
+                Err(russh::Error::UnknownKey)
+            }
+        }
     }
 }
 
@@ -101,7 +120,10 @@ pub async fn connect_ssh(
     on_exit: impl FnOnce() + Send + 'static,
 ) -> Result<SshSession, String> {
     let ssh_config = Config::default();
-    let handler = SshHandler;
+    let handler = SshHandler {
+        host: config.host.clone(),
+        port: config.port,
+    };
 
     let addr = format!("{}:{}", config.host, config.port);
 

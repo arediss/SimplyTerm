@@ -14,6 +14,7 @@ use tokio::sync::oneshot;
 
 use super::manager::{TunnelHandle, TunnelInfo, TunnelManager, TunnelStatus, TunnelType};
 use crate::connectors::{SshAuth, SshConfig};
+use crate::connectors::known_hosts::{verify_host_key, HostKeyVerification};
 
 // SOCKS5 Protocol Constants
 const SOCKS5_VERSION: u8 = 0x05;
@@ -29,7 +30,10 @@ const SOCKS5_REPLY_CMD_NOT_SUPPORTED: u8 = 0x07;
 const SOCKS5_REPLY_ADDR_NOT_SUPPORTED: u8 = 0x08;
 
 /// SSH handler for SOCKS5 proxy connections
-struct Socks5Handler;
+struct Socks5Handler {
+    host: String,
+    port: u16,
+}
 
 #[async_trait::async_trait]
 impl client::Handler for Socks5Handler {
@@ -37,17 +41,23 @@ impl client::Handler for Socks5Handler {
 
     async fn check_server_key(
         &mut self,
-        _server_public_key: &PublicKey,
+        server_public_key: &PublicKey,
     ) -> Result<bool, Self::Error> {
-        // TODO: Proper host key verification
-        Ok(true)
+        match verify_host_key(&self.host, self.port, server_public_key) {
+            HostKeyVerification::Trusted | HostKeyVerification::TrustedNewHost => Ok(true),
+            HostKeyVerification::KeyMismatch { .. } => Err(russh::Error::UnknownKey),
+            HostKeyVerification::Error(_) => Err(russh::Error::UnknownKey),
+        }
     }
 }
 
 /// Create a new SSH session for SOCKS5 proxy
 async fn create_ssh_session(config: &SshConfig) -> Result<Handle<Socks5Handler>, String> {
     let ssh_config = Config::default();
-    let handler = Socks5Handler;
+    let handler = Socks5Handler {
+        host: config.host.clone(),
+        port: config.port,
+    };
 
     let addr = format!("{}:{}", config.host, config.port);
 

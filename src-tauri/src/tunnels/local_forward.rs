@@ -13,13 +13,17 @@ use tokio::sync::oneshot;
 
 use super::manager::{TunnelHandle, TunnelInfo, TunnelManager, TunnelStatus, TunnelType};
 use crate::connectors::{SshAuth, SshConfig};
+use crate::connectors::known_hosts::{verify_host_key, HostKeyVerification};
 
 /// Create a new SSH session for the tunnel (separate from the terminal session)
 async fn create_ssh_session(config: &SshConfig) -> Result<Handle<TunnelHandler>, String> {
     use russh::client::{self, Config};
     
     let ssh_config = Config::default();
-    let handler = TunnelHandler;
+    let handler = TunnelHandler {
+        host: config.host.clone(),
+        port: config.port,
+    };
     
     let addr = format!("{}:{}", config.host, config.port);
     
@@ -51,7 +55,10 @@ async fn create_ssh_session(config: &SshConfig) -> Result<Handle<TunnelHandler>,
 }
 
 /// SSH handler for tunnel connections
-struct TunnelHandler;
+struct TunnelHandler {
+    host: String,
+    port: u16,
+}
 
 #[async_trait::async_trait]
 impl russh::client::Handler for TunnelHandler {
@@ -59,10 +66,13 @@ impl russh::client::Handler for TunnelHandler {
     
     async fn check_server_key(
         &mut self,
-        _server_public_key: &russh::keys::key::PublicKey,
+        server_public_key: &russh::keys::key::PublicKey,
     ) -> Result<bool, Self::Error> {
-        // TODO: Proper host key verification
-        Ok(true)
+        match verify_host_key(&self.host, self.port, server_public_key) {
+            HostKeyVerification::Trusted | HostKeyVerification::TrustedNewHost => Ok(true),
+            HostKeyVerification::KeyMismatch { .. } => Err(russh::Error::UnknownKey),
+            HostKeyVerification::Error(_) => Err(russh::Error::UnknownKey),
+        }
     }
 }
 

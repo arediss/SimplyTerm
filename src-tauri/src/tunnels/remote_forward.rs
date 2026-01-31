@@ -14,6 +14,7 @@ use tokio::sync::{mpsc, oneshot, Mutex};
 
 use super::manager::{TunnelHandle, TunnelInfo, TunnelManager, TunnelStatus, TunnelType};
 use crate::connectors::{SshAuth, SshConfig};
+use crate::connectors::known_hosts::{verify_host_key, HostKeyVerification};
 
 /// Message to handle incoming forwarded connections
 struct ForwardedConnection {
@@ -26,6 +27,8 @@ struct ForwardedConnection {
 struct RemoteForwardHandler {
     /// Channel to send incoming forwarded connections
     forward_tx: mpsc::UnboundedSender<ForwardedConnection>,
+    host: String,
+    port: u16,
 }
 
 #[async_trait::async_trait]
@@ -34,10 +37,13 @@ impl client::Handler for RemoteForwardHandler {
 
     async fn check_server_key(
         &mut self,
-        _server_public_key: &PublicKey,
+        server_public_key: &PublicKey,
     ) -> Result<bool, Self::Error> {
-        // TODO: Proper host key verification
-        Ok(true)
+        match verify_host_key(&self.host, self.port, server_public_key) {
+            HostKeyVerification::Trusted | HostKeyVerification::TrustedNewHost => Ok(true),
+            HostKeyVerification::KeyMismatch { .. } => Err(russh::Error::UnknownKey),
+            HostKeyVerification::Error(_) => Err(russh::Error::UnknownKey),
+        }
     }
 
     /// Called when the server opens a forwarded-tcpip channel (incoming remote connection)
@@ -66,7 +72,11 @@ async fn create_ssh_session_for_remote(
     forward_tx: mpsc::UnboundedSender<ForwardedConnection>,
 ) -> Result<Handle<RemoteForwardHandler>, String> {
     let ssh_config = Config::default();
-    let handler = RemoteForwardHandler { forward_tx };
+    let handler = RemoteForwardHandler { 
+        forward_tx,
+        host: config.host.clone(),
+        port: config.port,
+    };
 
     let addr = format!("{}:{}", config.host, config.port);
 

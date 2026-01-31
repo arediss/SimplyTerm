@@ -9,6 +9,7 @@ pub mod local;
 pub mod ssh;
 pub mod ssh_exec;
 pub mod sftp;
+pub mod known_hosts;
 
 pub use local::create_local_session;
 pub use ssh::{connect_ssh, SshAuth, SshConfig};
