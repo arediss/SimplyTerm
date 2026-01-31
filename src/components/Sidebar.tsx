@@ -20,16 +20,14 @@ import {
   Home,
   ArrowLeftRight,
 } from "lucide-react";
-import { Session, SavedSession, RecentSession, SessionFolder } from "../types";
+import { SavedSession, RecentSession, SessionFolder } from "../types";
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  sessions: Session[];
   savedSessions: SavedSession[];
   folders: SessionFolder[];
   recentSessions: RecentSession[];
-  onSessionSelect: (session: Session) => void;
   onSavedSessionConnect: (session: SavedSession) => void;
   onSavedSessionEdit: (session: SavedSession) => void;
   onSavedSessionDelete: (sessionId: string) => void;
@@ -48,11 +46,9 @@ interface SidebarProps {
 function Sidebar({
   isOpen,
   onClose,
-  sessions: _sessions,
   savedSessions,
   folders,
   recentSessions,
-  onSessionSelect: _onSessionSelect,
   onSavedSessionConnect,
   onSavedSessionEdit,
   onSavedSessionDelete,

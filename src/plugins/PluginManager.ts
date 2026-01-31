@@ -303,7 +303,6 @@ export class PluginManager {
    * Notify all plugins that a session has connected
    */
   notifySessionConnect(session: SessionInfo): void {
-    console.log('[PluginManager] Notifying plugins of session connect:', session.id);
     for (const plugin of this.plugins.values()) {
       if (plugin.onSessionConnectCallback) {
         try {
@@ -319,7 +318,6 @@ export class PluginManager {
    * Notify all plugins that a session has disconnected
    */
   notifySessionDisconnect(sessionId: string): void {
-    console.log('[PluginManager] Notifying plugins of session disconnect:', sessionId);
     for (const plugin of this.plugins.values()) {
       if (plugin.onSessionDisconnectCallback) {
         try {

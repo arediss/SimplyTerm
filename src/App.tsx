@@ -26,11 +26,11 @@ import { VaultSetupModal, VaultUnlockModal } from "./components/vault";
 import TunnelManager from "./components/TunnelManager";
 import TunnelSidebar from "./components/TunnelSidebar";
 import { useSessions, useAppSettings, useVaultFlow } from "./hooks";
-import { Session, SavedSession, RecentSession, Tab } from "./types";
+import { SavedSession, RecentSession, Tab } from "./types";
 import { generateSessionId, generateTabId, expandHomeDir } from "./utils";
 
 function App() {
-  const [sessions] = useState<Session[]>([]);
+  
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
 
@@ -144,7 +144,7 @@ function App() {
         );
       } catch (err) {
         // Vault probablement verrouillé - ouvrir le formulaire
-        console.log("[SFTP] Cannot get credentials (vault locked?):", err);
+
         openSftpConnectionForm();
         return;
       }
@@ -207,14 +207,14 @@ function App() {
           { id: saved.id }
         );
       } catch (err) {
-        console.log("[Tunnel] Cannot get credentials (vault locked?):", err);
+
         // For now, show an error. In the future, we could open a credential prompt.
         return;
       }
 
       const needsPassword = saved.auth_type === "password" && !credentials.password;
       if (needsPassword) {
-        console.log("[Tunnel] Password required but not available");
+
         return;
       }
 
@@ -310,7 +310,7 @@ function App() {
             password: config.password,
             keyPassphrase: config.keyPassphrase,
           });
-          console.log("[SFTP] Credentials saved to vault");
+
           await loadSavedSessions();
         } catch (err) {
           console.error("[SFTP] Failed to save credentials:", err);
@@ -390,7 +390,7 @@ function App() {
             password: config.password,
             keyPassphrase: config.keyPassphrase,
           });
-          console.log("[SavedSession] Credentials saved to vault");
+
           await loadSavedSessions();
         } catch (err) {
           console.error("[SavedSession] Failed to save credentials:", err);
@@ -465,7 +465,7 @@ function App() {
 
     // Helper pour ouvrir le formulaire de connexion
     const openConnectionForm = (message: string) => {
-      console.log("[SavedSession] Opening form:", message);
+
       setEditingSessionId(saved.id); // Important: marquer qu'on édite cette session pour sauvegarder les credentials
       setInitialConnectionConfig({
         name: saved.name,
@@ -489,7 +489,7 @@ function App() {
         );
       } catch (err) {
         // Vault probablement verrouillé ou non configuré - ouvrir le formulaire
-        console.log("[SavedSession] Cannot get credentials (vault locked?):", err);
+
         openConnectionForm("Entrez votre mot de passe pour vous connecter");
         return;
       }
@@ -570,9 +570,17 @@ function App() {
     }
   };
 
-  // Se connecter à une session récente (demande les credentials)
-  const handleConnectToRecentSession = async (_recent: RecentSession) => {
-    // TODO: Pré-remplir le formulaire avec les infos de la session récente
+  // Se connecter à une session récente (pré-remplit le formulaire)
+  const handleConnectToRecentSession = async (recent: RecentSession) => {
+    setInitialConnectionConfig({
+      name: recent.name,
+      host: recent.host,
+      port: recent.port,
+      username: recent.username,
+      authType: recent.auth_type,
+      keyPath: recent.key_path,
+    });
+    setConnectionError(undefined);
     setIsConnectionModalOpen(true);
     setOpenSidebar("none");
   };
@@ -817,7 +825,7 @@ function App() {
           );
         } catch (err) {
           // Vault verrouillé - ouvrir le formulaire
-          console.log("[PanePicker] Cannot get credentials (vault locked?):", err);
+
           openFormForCredentials();
           return;
         }
@@ -936,7 +944,7 @@ function App() {
             keyPassphrase = credentials.key_passphrase;
           }
         } catch (err) {
-          console.log("[SFTP Pane] Could not get stored credentials:", err);
+
         }
 
         // Expand ~ in key path
@@ -1036,7 +1044,7 @@ function App() {
 
   const handleShowModal = useCallback(async (_config: ModalConfig): Promise<unknown> => {
     // TODO: Implement plugin modal support
-    console.log("Plugin modal requested:", _config);
+    // TODO: Implement plugin modal support
     return null;
   }, []);
 
@@ -1164,11 +1172,9 @@ function App() {
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={() => setOpenSidebar("none")}
-        sessions={sessions}
         savedSessions={savedSessions}
         folders={folders}
         recentSessions={recentSessions}
-        onSessionSelect={() => {}}
         onSavedSessionConnect={handleConnectToSavedSession}
         onSavedSessionEdit={handleEditSavedSession}
         onSavedSessionDelete={handleDeleteSavedSession}
