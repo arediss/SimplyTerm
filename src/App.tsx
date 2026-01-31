@@ -1113,32 +1113,87 @@ function App() {
       return [];
     });
 
-  // Keyboard shortcuts for split panes
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip if user is typing in an input/textarea (except terminal)
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA";
+
+      // --- Tab management ---
+      // Ctrl+T: New local terminal
+      if (e.ctrlKey && !e.shiftKey && e.key === "t") {
+        e.preventDefault();
+        handleNewLocalTab();
+        return;
+      }
+      // Ctrl+N: New SSH connection
+      if (e.ctrlKey && !e.shiftKey && e.key === "n") {
+        if (isInput) return;
+        e.preventDefault();
+        handleOpenConnectionModal();
+        return;
+      }
+      // Ctrl+W: Close active tab
+      if (e.ctrlKey && !e.shiftKey && e.key === "w") {
+        e.preventDefault();
+        if (activeTabId) handleCloseTab(activeTabId);
+        return;
+      }
+      // Ctrl+ArrowLeft: Previous tab
+      if (e.ctrlKey && !e.shiftKey && e.key === "ArrowLeft") {
+        e.preventDefault();
+        if (tabs.length > 1) {
+          const currentIndex = tabs.findIndex((t) => t.id === activeTabId);
+          const prevIndex = currentIndex <= 0 ? tabs.length - 1 : currentIndex - 1;
+          setActiveTabId(tabs[prevIndex].id);
+        }
+        return;
+      }
+      // Ctrl+ArrowRight: Next tab
+      if (e.ctrlKey && !e.shiftKey && e.key === "ArrowRight") {
+        e.preventDefault();
+        if (tabs.length > 1) {
+          const currentIndex = tabs.findIndex((t) => t.id === activeTabId);
+          const nextIndex = (currentIndex + 1) % tabs.length;
+          setActiveTabId(tabs[nextIndex].id);
+        }
+        return;
+      }
+      // Ctrl+,: Open settings
+      if (e.ctrlKey && !e.shiftKey && e.key === ",") {
+        e.preventDefault();
+        setIsSettingsOpen(true);
+        return;
+      }
+
+      // --- Pane management (Ctrl+Shift) ---
       // Ctrl+Shift+D: Split vertical
       if (e.ctrlKey && e.shiftKey && e.key === "D") {
         e.preventDefault();
         handleSplitPane("vertical");
+        return;
       }
       // Ctrl+Shift+E: Split horizontal
       if (e.ctrlKey && e.shiftKey && e.key === "E") {
         e.preventDefault();
         handleSplitPane("horizontal");
+        return;
       }
       // Ctrl+Shift+W: Close current pane
       if (e.ctrlKey && e.shiftKey && e.key === "W") {
         e.preventDefault();
-        const activeTab = tabs.find((t) => t.id === activeTabId);
-        if (activeTab?.focusedPaneId) {
-          handleClosePane(activeTab.focusedPaneId);
+        const tab = tabs.find((t) => t.id === activeTabId);
+        if (tab?.focusedPaneId) {
+          handleClosePane(tab.focusedPaneId);
         }
+        return;
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleSplitPane, handleClosePane, tabs, activeTabId]);
+  }, [handleSplitPane, handleClosePane, handleNewLocalTab, handleCloseTab, tabs, activeTabId]);
 
   const handleOpenConnectionModal = () => {
     setConnectionError(undefined);
