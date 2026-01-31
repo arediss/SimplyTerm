@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import { X } from "lucide-react";
 
 interface ModalProps {
   isOpen: boolean;
@@ -45,7 +44,7 @@ function Modal({ isOpen, onClose, title, children, width = "md" }: ModalProps) {
         onClick={onClose}
       />
 
-      {/* Modal */}
+      {/* Modal with floating title */}
       <div
         ref={modalRef}
         tabIndex={-1}
@@ -56,18 +55,11 @@ function Modal({ isOpen, onClose, title, children, width = "md" }: ModalProps) {
           animate-scale-in
         `}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-surface-0/40">
-          <h2 className="text-base font-semibold text-text">{title}</h2>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-text hover:bg-white/5 transition-colors"
-          >
-            <X size={18} />
-          </button>
-        </div>
+        {/* Floating Title - above modal */}
+        <h2 className="absolute -top-10 left-0 right-0 text-center text-lg font-semibold text-text">
+          {title}
+        </h2>
 
-        {/* Content */}
         <div className="p-6">{children}</div>
       </div>
     </div>

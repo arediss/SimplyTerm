@@ -10,7 +10,6 @@ import {
   ChevronRight,
   Monitor,
   MousePointer2,
-  RotateCcw,
   Trash2,
   ExternalLink,
   Github,
@@ -100,10 +99,6 @@ function SettingsModal({
     });
   };
 
-  const resetSettings = () => {
-    onSettingsChange(defaultSettings);
-  };
-
   const sections: { id: SettingsSection; label: string; icon: React.ReactNode }[] = [
     { id: "appearance", label: t("settings.sections.appearance"), icon: <Palette size={18} /> },
     { id: "terminal", label: t("settings.sections.terminal"), icon: <Terminal size={18} /> },
@@ -130,7 +125,7 @@ function SettingsModal({
           {/* Sidebar */}
           <div className="w-56 bg-crust flex flex-col border-r border-surface-0/30">
             {/* Header */}
-            <div className="p-4 border-b border-surface-0/30">
+            <div className="p-4">
               <h2 className="text-sm font-semibold text-text">{t("settings.title")}</h2>
             </div>
 
@@ -154,22 +149,12 @@ function SettingsModal({
               ))}
             </nav>
 
-            {/* Reset button */}
-            <div className="p-3 border-t border-surface-0/30">
-              <button
-                onClick={resetSettings}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs text-text-muted hover:text-warning hover:bg-warning/10 transition-colors"
-              >
-                <RotateCcw size={14} />
-                {t("settings.reset")}
-              </button>
-            </div>
           </div>
 
           {/* Content */}
           <div className="flex-1 flex flex-col">
             {/* Header with close button */}
-            <div className="h-14 px-6 flex items-center justify-between border-b border-surface-0/30">
+            <div className="h-14 px-6 flex items-center justify-between">
               <h3 className="text-base font-medium text-text">
                 {sections.find((s) => s.id === activeSection)?.label}
               </h3>
