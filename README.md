@@ -7,7 +7,7 @@ A modern, secure SSH terminal client built with Tauri, React, and Rust.
 
 ---
 
-## ⚠️ Disclaimer
+## Disclaimer
 
 **SimplyTerm is a learning project.** This is my first open-source project, built primarily for educational purposes and personal use.
 
@@ -37,37 +37,53 @@ If you're an experienced developer and see room for improvement, PRs and issues 
 ## Features
 
 ### Terminal
-- Multi-tab and split-pane interface
+- Multi-tab interface with split panes (horizontal/vertical)
 - Local shell and SSH connections
-- Terminal search (Ctrl+F)
+- Terminal search with regex support (Ctrl+F)
 - Clickable URLs
-- Custom themes (Catppuccin dark)
+- Customizable font, cursor style, and scrollback
 
 ### SSH
-- Password and key-based authentication
-- FIDO2/hardware key support
-- Session management with folders
+- Password and key-based authentication (RSA, ECDSA, ED25519)
+- Host key verification (OpenSSH-compatible known_hosts)
+- Session management with folders and tags
 - Recent connections history
+- Quick reconnect from dropdown menu
 
 ### SFTP
 - Integrated file browser
-- External file editing with auto-sync
-- Create, rename, delete files and folders
+- Upload, download, rename, delete files and folders
+- Create directories
+- External editor integration with auto-sync
 
-### Port Forwarding
+### Port Forwarding (Tunnels)
 - Local forwarding (-L)
 - Remote forwarding (-R)
 - Dynamic SOCKS5 proxy (-D)
+- Real-time transfer statistics
 
 ### Security
 - Encrypted credential vault (AES-256-GCM)
 - Argon2id key derivation
-- PIN code for quick unlock
+- Multiple unlock methods:
+  - Master password
+  - PIN code for quick unlock
+  - FIDO2 hardware security keys
+- Configurable auto-lock timeout
 - Memory zeroization for secrets
 
 ### Extensibility
 - Plugin system for custom functionality
 - Panel and command registration
+- Plugin storage with encryption
+- See [Plugin Documentation](docs/README.md) for details
+
+### Other
+- Command palette (Ctrl+Shift+P)
+- Internationalization (English, French)
+- Dark theme with customizable accent colors
+
+---
 
 ## Installation
 
@@ -75,14 +91,14 @@ If you're an experienced developer and see room for improvement, PRs and issues 
 
 - [Node.js](https://nodejs.org/) (v18+)
 - [Rust](https://rustup.rs/) (latest stable)
-- [Tauri CLI](https://tauri.app/v1/guides/getting-started/prerequisites)
+- [Tauri Prerequisites](https://tauri.app/v1/guides/getting-started/prerequisites)
 
 ### Build from source
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/simplyterm.git
-cd simplyterm
+git clone https://github.com/arediss/SimplyTerm.git
+cd SimplyTerm
 
 # Install dependencies
 npm install
@@ -94,6 +110,8 @@ npm run tauri dev
 npm run tauri build
 ```
 
+---
+
 ## Keyboard Shortcuts
 
 ### Tabs
@@ -102,8 +120,8 @@ npm run tauri build
 | `Ctrl+T` | New local terminal |
 | `Ctrl+N` | New SSH connection |
 | `Ctrl+W` | Close current tab |
-| `Ctrl+←` | Previous tab |
-| `Ctrl+→` | Next tab |
+| `Ctrl+Arrow Left` | Previous tab |
+| `Ctrl+Arrow Right` | Next tab |
 
 ### Panes
 | Shortcut | Action |
@@ -126,40 +144,44 @@ npm run tauri build
 | `Ctrl+Shift+P` | Command palette |
 | `Ctrl+,` | Open settings |
 
+---
+
 ## Project Structure
 
 ```
-simplyterm/
+SimplyTerm/
 ├── src/                    # React frontend
 │   ├── components/         # UI components
 │   ├── hooks/              # Custom React hooks
-│   ├── plugins/            # Plugin system
-│   ├── styles/             # CSS styles
-│   └── utils/              # Utility functions
+│   ├── i18n/               # Internationalization
+│   ├── plugins/            # Plugin system (frontend)
+│   └── styles/             # CSS styles
 ├── src-tauri/              # Rust backend
 │   └── src/
 │       ├── connectors/     # SSH/SFTP connectors
 │       ├── storage/        # Vault and session storage
 │       ├── tunnels/        # Port forwarding
-│       └── plugins/        # Plugin backend
-└── docs/                   # Documentation
+│       └── plugins/        # Plugin system (backend)
+├── docs/                   # Plugin documentation
+└── .github/workflows/      # CI/CD pipelines
 ```
+
+---
 
 ## Development
 
 ```bash
-# Start development server
+# Start development server (frontend + backend)
 npm run tauri dev
 
-# Run frontend only
+# Run frontend only (for UI work)
 npm run dev
 
-# Type check
-npm run typecheck
-
-# Lint
-npm run lint
+# Build for production
+npm run tauri build
 ```
+
+---
 
 ## Contributing
 
@@ -171,15 +193,17 @@ Contributions are welcome! Please read our contributing guidelines before submit
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
+---
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
 
 ## Acknowledgments
 
 - [Tauri](https://tauri.app/) - Desktop app framework
 - [xterm.js](https://xtermjs.org/) - Terminal emulator
-- [Catppuccin](https://github.com/catppuccin/catppuccin) - Color scheme
 - [Lucide](https://lucide.dev/) - Icons
-- [Claude](https://claude.ai/) - AI assistant by Anthropic
-- [JetBrains](https://www.jetbrains.com/) - Development tools
+- [russh](https://github.com/warp-tech/russh) - SSH implementation
