@@ -1,5 +1,7 @@
 /**
  * Status Bar Types
+ *
+ * The status bar is hidden by default and reserved for plugin widgets.
  */
 
 export type StatusBarItemPosition = "left" | "center" | "right";
@@ -16,8 +18,4 @@ export interface StatusBarItem {
 export interface StatusBarProps {
   visible: boolean;
   items?: StatusBarItem[];
-  // Vault status
-  vaultConfigured: boolean;
-  vaultLocked: boolean;
-  onVaultClick: () => void;
 }

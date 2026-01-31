@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, forwardRef } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { Menu, Plus, X, Minus, Square, Copy, ChevronDown, Terminal, Clock, ArrowLeftRight, PanelBottomClose, PanelBottomOpen } from "lucide-react";
+import { Menu, Plus, X, Minus, Square, Copy, ChevronDown, Terminal, Clock, ArrowLeftRight, KeyRound } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Tab, RecentSession } from "../types";
 
@@ -19,8 +19,9 @@ interface FloatingTabsProps {
   onToggleTunnelSidebar: () => void;
   isTunnelSidebarOpen: boolean;
   activeTunnelCount: number;
-  statusBarVisible: boolean;
-  onToggleStatusBar: () => void;
+  vaultConfigured: boolean;
+  vaultLocked: boolean;
+  onVaultClick: () => void;
 }
 
 function FloatingTabs({
@@ -37,8 +38,9 @@ function FloatingTabs({
   onToggleTunnelSidebar,
   isTunnelSidebarOpen,
   activeTunnelCount,
-  statusBarVisible,
-  onToggleStatusBar,
+  vaultConfigured,
+  vaultLocked,
+  onVaultClick,
 }: FloatingTabsProps) {
   const { t } = useTranslation();
   const [isMaximized, setIsMaximized] = useState(false);
@@ -92,9 +94,9 @@ function FloatingTabs({
 
       {/* Container principal */}
       <div className="relative h-full flex items-center justify-between px-2">
-        {/* Partie gauche - Menu + Tabs */}
+        {/* Partie gauche */}
         <div className="flex items-center gap-1.5 no-drag">
-          {/* Bouton menu sidebar */}
+          {/* === Section App (Menu, Vault) === */}
           <button
             onClick={onToggleSidebar}
             className={`
@@ -107,7 +109,24 @@ function FloatingTabs({
             <Menu size={14} />
           </button>
 
-          {/* Bouton tunnels avec badge */}
+          {vaultConfigured && (
+            <button
+              onClick={onVaultClick}
+              className={`
+                shrink-0 w-7 h-7 flex items-center justify-center rounded-lg
+                transition-all duration-200 hover:bg-surface-0/50
+                ${vaultLocked ? "text-text-muted hover:text-text" : "text-success"}
+              `}
+              title={vaultLocked ? t("statusBar.vaultLocked") : t("statusBar.vaultUnlocked")}
+            >
+              <KeyRound size={14} />
+            </button>
+          )}
+
+          {/* Séparateur */}
+          <div className="w-px h-5 bg-surface-0/40 mx-1" />
+
+          {/* === Section Shell (Tunnels, Tabs) === */}
           <button
             onClick={onToggleTunnelSidebar}
             className={`
@@ -123,19 +142,6 @@ function FloatingTabs({
                 {activeTunnelCount}
               </span>
             )}
-          </button>
-
-          {/* Bouton toggle status bar */}
-          <button
-            onClick={onToggleStatusBar}
-            className={`
-              shrink-0 w-7 h-7 flex items-center justify-center rounded-lg
-              transition-all duration-200 hover:bg-surface-0/50
-              ${statusBarVisible ? "text-accent" : "text-text-muted hover:text-text"}
-            `}
-            title={statusBarVisible ? t("statusBar.hide") : t("statusBar.show")}
-          >
-            {statusBarVisible ? <PanelBottomClose size={14} /> : <PanelBottomOpen size={14} />}
           </button>
 
           {/* Tabs */}

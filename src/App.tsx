@@ -1299,8 +1299,8 @@ function App() {
     };
   }, [activeTab]);
 
-  // Status bar height for content padding (bar height + padding + toggle)
-  const statusBarVisible = appSettings.ui?.statusBarVisible ?? true;
+  // Status bar visibility (hidden by default, can be enabled for plugins)
+  const statusBarVisible = appSettings.ui?.statusBarVisible ?? false;
 
   return (
     <div className="relative h-screen bg-terminal overflow-hidden">
@@ -1393,13 +1393,15 @@ function App() {
         onToggleTunnelSidebar={() => setOpenSidebar(openSidebar === "tunnel" ? "none" : "tunnel")}
         isTunnelSidebarOpen={isTunnelSidebarOpen}
         activeTunnelCount={activeTunnelCount}
-        statusBarVisible={statusBarVisible}
-        onToggleStatusBar={() =>
-          handleSettingsChange({
-            ...appSettings,
-            ui: { ...appSettings.ui, statusBarVisible: !appSettings.ui?.statusBarVisible },
-          })
-        }
+        vaultConfigured={vault.status?.exists ?? false}
+        vaultLocked={!vault.status?.isUnlocked}
+        onVaultClick={() => {
+          if (vault.status?.isUnlocked) {
+            lockVault();
+          } else {
+            openVaultUnlock();
+          }
+        }}
       />
 
       {/* Sidebar drawer */}
@@ -1598,19 +1600,8 @@ function App() {
         onUnlockWithSecurityKey={vault.unlockWithSecurityKey}
       />
 
-      {/* Status Bar */}
-      <StatusBar
-        visible={statusBarVisible}
-        vaultConfigured={vault.status?.exists ?? false}
-        vaultLocked={!vault.status?.isUnlocked}
-        onVaultClick={() => {
-          if (vault.status?.isUnlocked) {
-            lockVault();
-          } else {
-            openVaultUnlock();
-          }
-        }}
-      />
+      {/* Status Bar (hidden by default, for plugin widgets) */}
+      <StatusBar visible={statusBarVisible} />
     </div>
   );
 }

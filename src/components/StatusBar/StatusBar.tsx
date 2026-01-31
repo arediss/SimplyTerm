@@ -2,23 +2,13 @@
  * Status Bar Component
  *
  * A status bar positioned below the header bar.
- * Displays vault status, plugin widgets, and other system info.
- * Toggle button is in the header (FloatingTabs).
+ * Hidden by default, reserved for plugin widgets.
+ * Can be enabled in settings when plugins need to display widgets.
  */
 
-import { useTranslation } from "react-i18next";
-import { Lock, LockOpen } from "lucide-react";
 import type { StatusBarProps, StatusBarItem } from "./types";
 
-export function StatusBar({
-  visible,
-  items = [],
-  vaultConfigured,
-  vaultLocked,
-  onVaultClick,
-}: Omit<StatusBarProps, "onToggleVisibility">) {
-  const { t } = useTranslation();
-
+export function StatusBar({ visible, items = [] }: StatusBarProps) {
   if (!visible) {
     return null;
   }
@@ -67,34 +57,6 @@ export function StatusBar({
           {rightItems.map((item) => (
             <StatusBarItemRenderer key={item.id} item={item} />
           ))}
-
-          {/* Vault status indicator */}
-          {vaultConfigured && (
-            <button
-              onClick={onVaultClick}
-              className={`
-                flex items-center gap-1.5 px-2 py-1 rounded
-                transition-colors
-                ${vaultLocked
-                  ? "text-text-muted hover:text-text hover:bg-surface-0/30"
-                  : "text-success hover:bg-success/10"
-                }
-              `}
-              title={vaultLocked ? t("statusBar.vaultLocked") : t("statusBar.vaultUnlocked")}
-            >
-              {vaultLocked ? (
-                <>
-                  <Lock size={12} />
-                  <span className="hidden sm:inline">{t("statusBar.locked")}</span>
-                </>
-              ) : (
-                <>
-                  <LockOpen size={12} />
-                  <span className="hidden sm:inline">{t("statusBar.unlocked")}</span>
-                </>
-              )}
-            </button>
-          )}
         </div>
       </div>
     </div>
