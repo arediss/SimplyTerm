@@ -10,7 +10,7 @@ use std::sync::mpsc as std_mpsc;
 use tokio::sync::mpsc as tokio_mpsc;
 
 use crate::session::{OutputMessage, Session};
-use super::known_hosts::{verify_host_key, HostKeyVerification};
+use super::known_hosts::{verify_host_key, HostKeyVerification, store_pending_key};
 
 /// Configuration SSH
 #[derive(Debug, Clone)]
@@ -31,7 +31,139 @@ pub enum SshAuth {
     },
 }
 
-/// Handler SSH (gestion des événements de connexion)
+/// Result of host key check for frontend
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct HostKeyCheckResult {
+    pub status: String, // "trusted", "unknown", "mismatch", "error"
+    pub host: String,
+    pub port: u16,
+    pub key_type: Option<String>,
+    pub fingerprint: Option<String>,
+    pub expected_fingerprint: Option<String>,
+    pub message: Option<String>,
+}
+
+/// Handler for checking host key only (no full connection)
+struct KeyCheckHandler {
+    host: String,
+    port: u16,
+    result: Arc<SyncMutex<Option<HostKeyCheckResult>>>,
+}
+
+#[async_trait]
+impl Handler for KeyCheckHandler {
+    type Error = russh::Error;
+
+    async fn check_server_key(
+        &mut self,
+        server_public_key: &PublicKey,
+    ) -> Result<bool, Self::Error> {
+        let result = match verify_host_key(&self.host, self.port, server_public_key) {
+            HostKeyVerification::Trusted => HostKeyCheckResult {
+                status: "trusted".to_string(),
+                host: self.host.clone(),
+                port: self.port,
+                key_type: None,
+                fingerprint: None,
+                expected_fingerprint: None,
+                message: None,
+            },
+            HostKeyVerification::UnknownHost { key_type, fingerprint } => {
+                // Store the key for later acceptance
+                store_pending_key(&self.host, self.port, server_public_key);
+                HostKeyCheckResult {
+                    status: "unknown".to_string(),
+                    host: self.host.clone(),
+                    port: self.port,
+                    key_type: Some(key_type),
+                    fingerprint: Some(fingerprint),
+                    expected_fingerprint: None,
+                    message: None,
+                }
+            }
+            HostKeyVerification::KeyMismatch { expected_fingerprint, actual_fingerprint } => {
+                // Store the key for later acceptance (if user chooses to update)
+                store_pending_key(&self.host, self.port, server_public_key);
+                HostKeyCheckResult {
+                    status: "mismatch".to_string(),
+                    host: self.host.clone(),
+                    port: self.port,
+                    key_type: None,
+                    fingerprint: Some(actual_fingerprint),
+                    expected_fingerprint: Some(expected_fingerprint),
+                    message: Some("WARNING: Host key has changed! This could indicate a man-in-the-middle attack.".to_string()),
+                }
+            }
+            HostKeyVerification::Error(e) => HostKeyCheckResult {
+                status: "error".to_string(),
+                host: self.host.clone(),
+                port: self.port,
+                key_type: None,
+                fingerprint: None,
+                expected_fingerprint: None,
+                message: Some(e),
+            },
+        };
+
+        *self.result.lock() = Some(result.clone());
+
+        // Always return true to allow the connection to proceed for key checking
+        // We'll disconnect right after
+        Ok(true)
+    }
+}
+
+/// Check host key before establishing a full connection
+pub async fn check_host_key_only(host: &str, port: u16) -> HostKeyCheckResult {
+    let result = Arc::new(SyncMutex::new(None));
+    let handler = KeyCheckHandler {
+        host: host.to_string(),
+        port,
+        result: result.clone(),
+    };
+
+    let ssh_config = Config::default();
+    let addr = format!("{}:{}", host, port);
+
+    // Try to connect just to get the host key
+    match client::connect(Arc::new(ssh_config), &addr, handler).await {
+        Ok(_session) => {
+            // Connection succeeded (at least TCP + key exchange)
+            // The handler should have stored the result
+            if let Some(r) = result.lock().take() {
+                r
+            } else {
+                HostKeyCheckResult {
+                    status: "error".to_string(),
+                    host: host.to_string(),
+                    port,
+                    key_type: None,
+                    fingerprint: None,
+                    expected_fingerprint: None,
+                    message: Some("Failed to retrieve host key".to_string()),
+                }
+            }
+        }
+        Err(e) => {
+            // Check if we got the result before the error
+            if let Some(r) = result.lock().take() {
+                r
+            } else {
+                HostKeyCheckResult {
+                    status: "error".to_string(),
+                    host: host.to_string(),
+                    port,
+                    key_type: None,
+                    fingerprint: None,
+                    expected_fingerprint: None,
+                    message: Some(format!("Connection failed: {}", e)),
+                }
+            }
+        }
+    }
+}
+
+/// Handler SSH (gestion des événements de connexion) - trusts known hosts only
 struct SshHandler {
     host: String,
     port: u16,
@@ -47,18 +179,16 @@ impl Handler for SshHandler {
     ) -> Result<bool, Self::Error> {
         match verify_host_key(&self.host, self.port, server_public_key) {
             HostKeyVerification::Trusted => Ok(true),
-            HostKeyVerification::TrustedNewHost => {
-                // TOFU: First connection, key has been stored
-                Ok(true)
+            HostKeyVerification::UnknownHost { .. } => {
+                // Host key should have been pre-approved via check_host_key
+                Err(russh::Error::UnknownKey)
             }
-            HostKeyVerification::KeyMismatch { expected: _, actual: _ } => {
-                // SECURITY: Key mismatch - potential MITM attack!
-                // Reject the connection
+            HostKeyVerification::KeyMismatch { .. } => {
+                // Key mismatch - potential MITM attack!
                 Err(russh::Error::UnknownKey)
             }
             HostKeyVerification::Error(e) => {
                 eprintln!("Host key verification error: {}", e);
-                // On error, reject for safety
                 Err(russh::Error::UnknownKey)
             }
         }

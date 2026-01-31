@@ -14,7 +14,10 @@ mod session;
 mod storage;
 mod tunnels;
 
-use connectors::{connect_ssh, create_local_session, ssh_exec::ssh_exec, SshAuth, SshConfig, FileEntry, sftp_read_file};
+use connectors::{
+    connect_ssh, create_local_session, ssh_exec::ssh_exec, SshAuth, SshConfig, FileEntry, sftp_read_file,
+    check_host_key_only, HostKeyCheckResult, accept_pending_key, accept_and_update_pending_key, remove_pending_key,
+};
 use plugins::{PluginManager, PluginState};
 use session::SessionManager;
 use storage::{
@@ -111,6 +114,34 @@ async fn create_ssh_session(
         .session_manager
         .register(session_id, Box::new(session));
 
+    Ok(())
+}
+
+// ============================================================================
+// Host Key Verification Commands
+// ============================================================================
+
+#[tauri::command]
+async fn check_host_key(host: String, port: u16) -> HostKeyCheckResult {
+    check_host_key_only(&host, port).await
+}
+
+#[tauri::command]
+async fn trust_host_key(host: String, port: u16) -> Result<(), String> {
+    let pending_id = format!("{}:{}", host, port);
+    accept_pending_key(&pending_id)
+}
+
+#[tauri::command]
+async fn update_host_key(host: String, port: u16) -> Result<(), String> {
+    let pending_id = format!("{}:{}", host, port);
+    accept_and_update_pending_key(&pending_id)
+}
+
+#[tauri::command]
+async fn reject_host_key(host: String, port: u16) -> Result<(), String> {
+    let pending_id = format!("{}:{}", host, port);
+    remove_pending_key(&pending_id);
     Ok(())
 }
 
@@ -992,6 +1023,11 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             create_pty_session,
             create_ssh_session,
+            // Host key verification
+            check_host_key,
+            trust_host_key,
+            update_host_key,
+            reject_host_key,
             write_to_pty,
             resize_pty,
             close_pty_session,

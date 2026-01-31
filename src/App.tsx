@@ -4,6 +4,7 @@ import Sidebar from "./components/Sidebar";
 import FloatingTabs from "./components/FloatingTabs";
 import TerminalPane from "./components/TerminalPane";
 import Modal from "./components/Modal";
+import HostKeyModal, { HostKeyCheckResult } from "./components/HostKeyModal";
 import ConnectionForm, { SshConnectionConfig } from "./components/ConnectionForm";
 import SettingsModal from "./components/SettingsModal";
 import { PluginHost, pluginManager, type SessionInfo, type ModalConfig, type NotificationType } from "./plugins";
@@ -90,6 +91,12 @@ function App() {
   // Settings state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
+  // Host key verification state
+  const [hostKeyResult, setHostKeyResult] = useState<HostKeyCheckResult | null>(null);
+  const [isHostKeyModalOpen, setIsHostKeyModalOpen] = useState(false);
+  const [hostKeyLoading, setHostKeyLoading] = useState(false);
+  const [pendingHostKeyAction, setPendingHostKeyAction] = useState<(() => Promise<void>) | null>(null);
+
   // Tunnel manager state
   const [tunnelManagerTabId, setTunnelManagerTabId] = useState<string | null>(null);
 
@@ -98,6 +105,79 @@ function App() {
 
   // Notification state (for plugins)
   const [notification, setNotification] = useState<{ message: string; type: NotificationType } | null>(null);
+
+  // Helper to check host key before SSH connection
+  const checkHostKeyBeforeConnect = async (
+    host: string,
+    port: number,
+    onTrusted: () => Promise<void>
+  ): Promise<boolean> => {
+    try {
+      const result = await invoke<HostKeyCheckResult>("check_host_key", { host, port });
+
+      if (result.status === "trusted") {
+        // Host is already trusted, proceed with connection
+        await onTrusted();
+        return true;
+      } else if (result.status === "unknown" || result.status === "mismatch") {
+        // Show modal for user confirmation
+        setHostKeyResult(result);
+        setPendingHostKeyAction(() => onTrusted);
+        setIsHostKeyModalOpen(true);
+        return false; // Connection will proceed after user confirmation
+      } else {
+        // Error checking host key
+        setConnectionError(result.message || "Failed to check host key");
+        return false;
+      }
+    } catch (error) {
+      setConnectionError(`Host key check failed: ${error}`);
+      return false;
+    }
+  };
+
+  // Handle host key acceptance
+  const handleHostKeyAccept = async () => {
+    if (!hostKeyResult || !pendingHostKeyAction) return;
+
+    setHostKeyLoading(true);
+    try {
+      const { host, port, status } = hostKeyResult;
+
+      if (status === "unknown") {
+        await invoke("trust_host_key", { host, port });
+      } else if (status === "mismatch") {
+        await invoke("update_host_key", { host, port });
+      }
+
+      // Close modal and proceed with connection
+      setIsHostKeyModalOpen(false);
+      setHostKeyResult(null);
+
+      // Execute the pending connection action
+      await pendingHostKeyAction();
+    } catch (error) {
+      setConnectionError(`Failed to save host key: ${error}`);
+    } finally {
+      setHostKeyLoading(false);
+      setPendingHostKeyAction(null);
+    }
+  };
+
+  // Handle host key rejection
+  const handleHostKeyReject = async () => {
+    if (hostKeyResult) {
+      try {
+        await invoke("reject_host_key", { host: hostKeyResult.host, port: hostKeyResult.port });
+      } catch {
+        // Ignore errors on rejection
+      }
+    }
+    setIsHostKeyModalOpen(false);
+    setHostKeyResult(null);
+    setPendingHostKeyAction(null);
+    setConnectionError("Connection cancelled: host key not trusted");
+  };
 
   const handleNewLocalTab = () => {
     const ptySessionId = generateSessionId("pty");
@@ -155,40 +235,46 @@ function App() {
         return;
       }
 
-      const sessionId = generateSessionId("sftp");
-      const keyPath = await expandHomeDir(saved.key_path);
+      // Helper function to perform the SFTP connection
+      const performSftpConnection = async () => {
+        const sessionId = generateSessionId("sftp");
+        const keyPath = await expandHomeDir(saved.key_path);
 
-      // Register the SSH config for SFTP use
-      await invoke("register_sftp_session", {
-        sessionId,
-        host: saved.host,
-        port: saved.port,
-        username: saved.username,
-        password: saved.auth_type === "password" ? credentials.password : null,
-        keyPath: saved.auth_type === "key" ? keyPath : null,
-        keyPassphrase: saved.auth_type === "key" ? credentials.key_passphrase : null,
-      });
-
-      // Create SFTP tab - no paneTree needed, we render SftpBrowser directly
-      const newTab: Tab = {
-        id: generateTabId(),
-        sessionId,
-        paneTree: createTerminalNode(sessionId), // Placeholder, not used for SFTP
-        title: `SFTP - ${saved.name}`,
-        type: "sftp",
-        sshConfig: {
-          name: saved.name,
+        // Register the SSH config for SFTP use
+        await invoke("register_sftp_session", {
+          sessionId,
           host: saved.host,
           port: saved.port,
           username: saved.username,
-          authType: saved.auth_type,
-          keyPath: saved.key_path,
-        },
-        focusedPaneId: null,
+          password: saved.auth_type === "password" ? credentials.password : null,
+          keyPath: saved.auth_type === "key" ? keyPath : null,
+          keyPassphrase: saved.auth_type === "key" ? credentials.key_passphrase : null,
+        });
+
+        // Create SFTP tab - no paneTree needed, we render SftpBrowser directly
+        const newTab: Tab = {
+          id: generateTabId(),
+          sessionId,
+          paneTree: createTerminalNode(sessionId), // Placeholder, not used for SFTP
+          title: `SFTP - ${saved.name}`,
+          type: "sftp",
+          sshConfig: {
+            name: saved.name,
+            host: saved.host,
+            port: saved.port,
+            username: saved.username,
+            authType: saved.auth_type,
+            keyPath: saved.key_path,
+          },
+          focusedPaneId: null,
+        };
+
+        setTabs((prev) => [...prev, newTab]);
+        setActiveTabId(newTab.id);
       };
 
-      setTabs((prev) => [...prev, newTab]);
-      setActiveTabId(newTab.id);
+      // Check host key before connecting
+      await checkHostKeyBeforeConnect(saved.host, saved.port, performSftpConnection);
     } catch (error) {
       console.error("Failed to open SFTP tab:", error);
     }
@@ -218,40 +304,46 @@ function App() {
         return;
       }
 
-      const sessionId = generateSessionId("tunnel");
-      const keyPath = await expandHomeDir(saved.key_path);
+      // Helper function to perform the tunnel connection
+      const performTunnelConnection = async () => {
+        const sessionId = generateSessionId("tunnel");
+        const keyPath = await expandHomeDir(saved.key_path);
 
-      // Register the SSH config for tunnel use (reuses SFTP registration)
-      await invoke("register_sftp_session", {
-        sessionId,
-        host: saved.host,
-        port: saved.port,
-        username: saved.username,
-        password: saved.auth_type === "password" ? credentials.password : null,
-        keyPath: saved.auth_type === "key" ? keyPath : null,
-        keyPassphrase: saved.auth_type === "key" ? credentials.key_passphrase : null,
-      });
-
-      // Create Tunnel tab
-      const newTab: Tab = {
-        id: generateTabId(),
-        sessionId,
-        paneTree: createTerminalNode(sessionId), // Placeholder, not used for tunnel
-        title: `Tunnels - ${saved.name}`,
-        type: "tunnel",
-        sshConfig: {
-          name: saved.name,
+        // Register the SSH config for tunnel use (reuses SFTP registration)
+        await invoke("register_sftp_session", {
+          sessionId,
           host: saved.host,
           port: saved.port,
           username: saved.username,
-          authType: saved.auth_type,
-          keyPath: saved.key_path,
-        },
-        focusedPaneId: null,
+          password: saved.auth_type === "password" ? credentials.password : null,
+          keyPath: saved.auth_type === "key" ? keyPath : null,
+          keyPassphrase: saved.auth_type === "key" ? credentials.key_passphrase : null,
+        });
+
+        // Create Tunnel tab
+        const newTab: Tab = {
+          id: generateTabId(),
+          sessionId,
+          paneTree: createTerminalNode(sessionId), // Placeholder, not used for tunnel
+          title: `Tunnels - ${saved.name}`,
+          type: "tunnel",
+          sshConfig: {
+            name: saved.name,
+            host: saved.host,
+            port: saved.port,
+            username: saved.username,
+            authType: saved.auth_type,
+            keyPath: saved.key_path,
+          },
+          focusedPaneId: null,
+        };
+
+        setTabs((prev) => [...prev, newTab]);
+        setActiveTabId(newTab.id);
       };
 
-      setTabs((prev) => [...prev, newTab]);
-      setActiveTabId(newTab.id);
+      // Check host key before connecting
+      await checkHostKeyBeforeConnect(saved.host, saved.port, performTunnelConnection);
     } catch (error) {
       console.error("Failed to open Tunnel tab:", error);
     }
@@ -324,93 +416,99 @@ function App() {
       }
     }
 
-    const ptySessionId = generateSessionId("ssh");
+    // Helper function to perform the actual connection
+    const performSshConnection = async () => {
+      const ptySessionId = generateSessionId("ssh");
 
-    try {
-      const keyPath = await expandHomeDir(config.keyPath);
+      try {
+        const keyPath = await expandHomeDir(config.keyPath);
 
-      await invoke("create_ssh_session", {
-        sessionId: ptySessionId,
-        host: config.host,
-        port: config.port,
-        username: config.username,
-        password: config.password,
-        keyPath,
-        keyPassphrase: config.keyPassphrase,
-      });
+        await invoke("create_ssh_session", {
+          sessionId: ptySessionId,
+          host: config.host,
+          port: config.port,
+          username: config.username,
+          password: config.password,
+          keyPath,
+          keyPassphrase: config.keyPassphrase,
+        });
 
-      const paneTree = createTerminalNode(ptySessionId);
-      const newTab: Tab = {
-        id: generateTabId(),
-        sessionId: `ssh-${config.host}`,
-        paneTree,
-        title: config.name,
-        type: "ssh",
-        sshConfig: config,
-        focusedPaneId: paneTree.id,
-      };
+        const paneTree = createTerminalNode(ptySessionId);
+        const newTab: Tab = {
+          id: generateTabId(),
+          sessionId: `ssh-${config.host}`,
+          paneTree,
+          title: config.name,
+          type: "ssh",
+          sshConfig: config,
+          focusedPaneId: paneTree.id,
+        };
 
-      setTabs((prev) => [...prev, newTab]);
-      setActiveTabId(newTab.id);
-      setIsConnectionModalOpen(false);
-      setOpenSidebar("none");
-      setIsConnecting(false);
+        setTabs((prev) => [...prev, newTab]);
+        setActiveTabId(newTab.id);
+        setIsConnectionModalOpen(false);
+        setOpenSidebar("none");
+        setIsConnecting(false);
 
-      // Notify plugins of session connect (use ptySessionId for backend commands)
-      pluginManager.notifySessionConnect({
-        id: ptySessionId,
-        type: 'ssh',
-        host: config.host,
-        port: config.port,
-        username: config.username,
-        status: 'connected',
-      });
+        // Notify plugins of session connect (use ptySessionId for backend commands)
+        pluginManager.notifySessionConnect({
+          id: ptySessionId,
+          type: 'ssh',
+          host: config.host,
+          port: config.port,
+          username: config.username,
+          status: 'connected',
+        });
 
-      // Ajouter aux sessions récentes
-      await addToRecentSessions({
-        name: config.name,
-        host: config.host,
-        port: config.port,
-        username: config.username,
-        authType: config.authType,
-        keyPath: config.keyPath,
-      });
+        // Ajouter aux sessions récentes
+        await addToRecentSessions({
+          name: config.name,
+          host: config.host,
+          port: config.port,
+          username: config.username,
+          authType: config.authType,
+          keyPath: config.keyPath,
+        });
 
-      // Si on était en mode édition (reconnexion à une session existante), sauvegarder directement les credentials
-      if (editingSessionId) {
-        try {
-          await invoke("save_session", {
-            id: editingSessionId,
-            name: config.name,
-            host: config.host,
-            port: config.port,
-            username: config.username,
-            authType: config.authType,
-            keyPath: config.keyPath,
-            password: config.password,
-            keyPassphrase: config.keyPassphrase,
-          });
+        // Si on était en mode édition (reconnexion à une session existante), sauvegarder directement les credentials
+        if (editingSessionId) {
+          try {
+            await invoke("save_session", {
+              id: editingSessionId,
+              name: config.name,
+              host: config.host,
+              port: config.port,
+              username: config.username,
+              authType: config.authType,
+              keyPath: config.keyPath,
+              password: config.password,
+              keyPassphrase: config.keyPassphrase,
+            });
 
-          await loadSavedSessions();
-        } catch (err) {
-          console.error("[SavedSession] Failed to save credentials:", err);
+            await loadSavedSessions();
+          } catch (err) {
+            console.error("[SavedSession] Failed to save credentials:", err);
+          }
+          setEditingSessionId(null);
+        } else {
+          // Proposer de sauvegarder si pas déjà sauvegardée
+          const isAlreadySaved = savedSessions.some(
+            (s) => s.host === config.host && s.username === config.username && s.port === config.port
+          );
+          if (!isAlreadySaved) {
+            setPendingSaveConfig(config);
+            setIsSaveModalOpen(true);
+          }
         }
-        setEditingSessionId(null);
-      } else {
-        // Proposer de sauvegarder si pas déjà sauvegardée
-        const isAlreadySaved = savedSessions.some(
-          (s) => s.host === config.host && s.username === config.username && s.port === config.port
-        );
-        if (!isAlreadySaved) {
-          setPendingSaveConfig(config);
-          setIsSaveModalOpen(true);
-        }
+      } catch (error) {
+        console.error("SSH connection failed:", error);
+        setConnectionError(String(error));
+        setIsConnecting(false);
       }
-    } catch (error) {
-      console.error("SSH connection failed:", error);
-      setConnectionError(String(error));
-      setIsConnecting(false);
-    }
+    };
+
+    // Check host key before connecting
+    await checkHostKeyBeforeConnect(config.host, config.port, performSshConnection);
   };
 
   // Sauvegarder une session
@@ -505,64 +603,75 @@ function App() {
         return;
       }
 
-      // Credentials trouvés, on se connecte directement
-      setIsConnecting(true);
-      setConnectionError(undefined);
+      // Helper function to perform the actual connection
+      const performSavedSessionConnection = async () => {
+        setIsConnecting(true);
+        setConnectionError(undefined);
 
-      const ptySessionId = generateSessionId("ssh");
-      const keyPath = await expandHomeDir(saved.key_path);
+        const ptySessionId = generateSessionId("ssh");
+        const keyPath = await expandHomeDir(saved.key_path);
 
-      await invoke("create_ssh_session", {
-        sessionId: ptySessionId,
-        host: saved.host,
-        port: saved.port,
-        username: saved.username,
-        password: saved.auth_type === "password" ? credentials.password : null,
-        keyPath: saved.auth_type === "key" ? keyPath : null,
-        keyPassphrase: saved.auth_type === "key" ? credentials.key_passphrase : null,
-      });
+        try {
+          await invoke("create_ssh_session", {
+            sessionId: ptySessionId,
+            host: saved.host,
+            port: saved.port,
+            username: saved.username,
+            password: saved.auth_type === "password" ? credentials.password : null,
+            keyPath: saved.auth_type === "key" ? keyPath : null,
+            keyPassphrase: saved.auth_type === "key" ? credentials.key_passphrase : null,
+          });
 
-      const paneTree = createTerminalNode(ptySessionId);
-      const newTab: Tab = {
-        id: generateTabId(),
-        sessionId: `ssh-${saved.host}`,
-        paneTree,
-        title: saved.name,
-        type: "ssh",
-        sshConfig: {
-          name: saved.name,
-          host: saved.host,
-          port: saved.port,
-          username: saved.username,
-          authType: saved.auth_type,
-          keyPath: saved.key_path,
-        },
-        focusedPaneId: paneTree.id,
+          const paneTree = createTerminalNode(ptySessionId);
+          const newTab: Tab = {
+            id: generateTabId(),
+            sessionId: `ssh-${saved.host}`,
+            paneTree,
+            title: saved.name,
+            type: "ssh",
+            sshConfig: {
+              name: saved.name,
+              host: saved.host,
+              port: saved.port,
+              username: saved.username,
+              authType: saved.auth_type,
+              keyPath: saved.key_path,
+            },
+            focusedPaneId: paneTree.id,
+          };
+
+          setTabs((prev) => [...prev, newTab]);
+          setActiveTabId(newTab.id);
+          setIsConnecting(false);
+
+          // Notify plugins of session connect
+          pluginManager.notifySessionConnect({
+            id: ptySessionId,
+            type: 'ssh',
+            host: saved.host,
+            port: saved.port,
+            username: saved.username,
+            status: 'connected',
+          });
+
+          // Mettre à jour les sessions récentes
+          await addToRecentSessions({
+            name: saved.name,
+            host: saved.host,
+            port: saved.port,
+            username: saved.username,
+            authType: saved.auth_type,
+            keyPath: saved.key_path,
+          });
+        } catch (error) {
+          console.error("[SavedSession] SSH connection failed:", error);
+          setConnectionError(String(error));
+          setIsConnecting(false);
+        }
       };
 
-      setTabs((prev) => [...prev, newTab]);
-      setActiveTabId(newTab.id);
-      setIsConnecting(false);
-
-      // Notify plugins of session connect
-      pluginManager.notifySessionConnect({
-        id: ptySessionId,
-        type: 'ssh',
-        host: saved.host,
-        port: saved.port,
-        username: saved.username,
-        status: 'connected',
-      });
-
-      // Mettre à jour les sessions récentes
-      await addToRecentSessions({
-        name: saved.name,
-        host: saved.host,
-        port: saved.port,
-        username: saved.username,
-        authType: saved.auth_type,
-        keyPath: saved.key_path,
-      });
+      // Check host key before connecting
+      await checkHostKeyBeforeConnect(saved.host, saved.port, performSavedSessionConnection);
     } catch (error) {
       console.error("[SavedSession] SSH connection failed:", error);
       setConnectionError(String(error));
@@ -1264,6 +1373,15 @@ function App() {
           </div>
         </div>
       </Modal>
+
+      {/* Host Key Verification Modal */}
+      <HostKeyModal
+        isOpen={isHostKeyModalOpen}
+        result={hostKeyResult}
+        onAccept={handleHostKeyAccept}
+        onReject={handleHostKeyReject}
+        isLoading={hostKeyLoading}
+      />
 
       {/* Settings Modal */}
       <SettingsModal

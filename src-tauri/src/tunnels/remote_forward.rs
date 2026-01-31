@@ -40,7 +40,8 @@ impl client::Handler for RemoteForwardHandler {
         server_public_key: &PublicKey,
     ) -> Result<bool, Self::Error> {
         match verify_host_key(&self.host, self.port, server_public_key) {
-            HostKeyVerification::Trusted | HostKeyVerification::TrustedNewHost => Ok(true),
+            HostKeyVerification::Trusted => Ok(true),
+            HostKeyVerification::UnknownHost { .. } => Err(russh::Error::UnknownKey),
             HostKeyVerification::KeyMismatch { .. } => Err(russh::Error::UnknownKey),
             HostKeyVerification::Error(_) => Err(russh::Error::UnknownKey),
         }
