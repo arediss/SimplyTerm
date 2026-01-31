@@ -2,6 +2,9 @@
 //!
 //! Used for running quick commands like system stats without
 //! polluting the visible terminal.
+//!
+//! SECURITY: Host key verification is enforced. Only hosts that have been
+//! previously trusted (via the main SSH connection flow) will be accepted.
 
 use russh::client::{self, Config, Handler};
 use russh::keys::key::PublicKey;
@@ -10,9 +13,13 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use super::{SshAuth, SshConfig};
+use super::known_hosts::{verify_host_key, HostKeyVerification};
 
-/// Simple handler for exec connections
-struct ExecHandler;
+/// Handler for exec connections with host key verification
+struct ExecHandler {
+    host: String,
+    port: u16,
+}
 
 #[async_trait]
 impl Handler for ExecHandler {
@@ -20,16 +27,39 @@ impl Handler for ExecHandler {
 
     async fn check_server_key(
         &mut self,
-        _server_public_key: &PublicKey,
+        server_public_key: &PublicKey,
     ) -> Result<bool, Self::Error> {
-        Ok(true)
+        // SECURITY: Only accept hosts that have been previously trusted
+        match verify_host_key(&self.host, self.port, server_public_key) {
+            HostKeyVerification::Trusted => Ok(true),
+            HostKeyVerification::UnknownHost { .. } => {
+                // Host not in known_hosts - reject
+                // User must first connect via the main SSH flow to trust the host
+                Ok(false)
+            }
+            HostKeyVerification::KeyMismatch { .. } => {
+                // Key has changed - reject for security
+                Ok(false)
+            }
+            HostKeyVerification::Error(_) => {
+                // Error checking - reject
+                Ok(false)
+            }
+        }
     }
 }
 
 /// Execute a command on an SSH server and return the output
+///
+/// SECURITY: This function only works with hosts that have been previously
+/// trusted via the main SSH connection flow. Unknown or mismatched host keys
+/// will cause the connection to fail.
 pub async fn ssh_exec(config: &SshConfig, command: &str) -> Result<String, String> {
     let ssh_config = Config::default();
-    let handler = ExecHandler;
+    let handler = ExecHandler {
+        host: config.host.clone(),
+        port: config.port,
+    };
 
     let addr = format!("{}:{}", config.host, config.port);
 

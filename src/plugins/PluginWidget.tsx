@@ -3,10 +3,14 @@
  *
  * Floating widget display for plugins (like DebugStats style).
  * Positioned at bottom-left or bottom-right of the screen.
+ *
+ * SECURITY: Plugin content is sanitized using DOMPurify to prevent XSS attacks.
+ * A MutationObserver monitors for any dynamic changes and sanitizes them.
  */
 
 import { useEffect, useRef, useState } from 'react';
 import type { PanelRegistration } from './types';
+import { sanitizeElement, observeAndSanitize, sanitizeHTML } from './sanitize';
 
 interface PluginWidgetProps {
   pluginId: string;
@@ -18,6 +22,7 @@ interface PluginWidgetProps {
 export function PluginWidget({ pluginId, panel, position, visible }: PluginWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
+  const observerCleanupRef = useRef<(() => void) | null>(null);
   const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
@@ -25,21 +30,43 @@ export function PluginWidget({ pluginId, panel, position, visible }: PluginWidge
       // Clear previous content
       containerRef.current.innerHTML = '';
 
+      // Stop any previous observer
+      if (observerCleanupRef.current) {
+        observerCleanupRef.current();
+        observerCleanupRef.current = null;
+      }
+
       // Call the render function
       try {
         const cleanup = panel.render(containerRef.current);
         if (typeof cleanup === 'function') {
           cleanupRef.current = cleanup;
         }
+
+        // SECURITY: Sanitize the rendered content
+        sanitizeElement(containerRef.current);
+
+        // SECURITY: Set up observer for dynamic changes
+        observerCleanupRef.current = observeAndSanitize(containerRef.current);
       } catch (error) {
         console.error(`Error rendering widget ${panel.id} from plugin ${pluginId}:`, error);
         if (containerRef.current) {
-          containerRef.current.innerHTML = `<span style="color: #e88b8b;">Error</span>`;
+          // Use sanitized error message
+          containerRef.current.innerHTML = sanitizeHTML(
+            `<span style="color: #e88b8b;">Error</span>`
+          );
         }
       }
     }
 
     return () => {
+      // Cleanup observer
+      if (observerCleanupRef.current) {
+        observerCleanupRef.current();
+        observerCleanupRef.current = null;
+      }
+
+      // Cleanup plugin
       if (cleanupRef.current) {
         try {
           cleanupRef.current();

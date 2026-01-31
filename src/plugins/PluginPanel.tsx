@@ -2,10 +2,14 @@
  * Plugin Panel Component
  *
  * Container for rendering plugin panels in the UI.
+ *
+ * SECURITY: Plugin content is sanitized using DOMPurify to prevent XSS attacks.
+ * A MutationObserver monitors for any dynamic changes and sanitizes them.
  */
 
 import { useEffect, useRef } from 'react';
 import type { PanelRegistration } from './types';
+import { sanitizeElement, observeAndSanitize, sanitizeHTML } from './sanitize';
 
 interface PluginPanelProps {
   pluginId: string;
@@ -17,11 +21,18 @@ interface PluginPanelProps {
 export function PluginPanel({ pluginId, panel, visible, onClose }: PluginPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
+  const observerCleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (visible && containerRef.current) {
       // Clear previous content
       containerRef.current.innerHTML = '';
+
+      // Stop any previous observer
+      if (observerCleanupRef.current) {
+        observerCleanupRef.current();
+        observerCleanupRef.current = null;
+      }
 
       // Call the render function
       try {
@@ -29,15 +40,31 @@ export function PluginPanel({ pluginId, panel, visible, onClose }: PluginPanelPr
         if (typeof cleanup === 'function') {
           cleanupRef.current = cleanup;
         }
+
+        // SECURITY: Sanitize the rendered content
+        sanitizeElement(containerRef.current);
+
+        // SECURITY: Set up observer for dynamic changes
+        observerCleanupRef.current = observeAndSanitize(containerRef.current);
       } catch (error) {
         console.error(`Error rendering panel ${panel.id} from plugin ${pluginId}:`, error);
         if (containerRef.current) {
-          containerRef.current.innerHTML = `<div class="text-red-400 p-4">Error loading panel</div>`;
+          // Use sanitized error message
+          containerRef.current.innerHTML = sanitizeHTML(
+            `<div class="text-red-400 p-4">Error loading panel</div>`
+          );
         }
       }
     }
 
     return () => {
+      // Cleanup observer
+      if (observerCleanupRef.current) {
+        observerCleanupRef.current();
+        observerCleanupRef.current = null;
+      }
+
+      // Cleanup plugin
       if (cleanupRef.current) {
         try {
           cleanupRef.current();

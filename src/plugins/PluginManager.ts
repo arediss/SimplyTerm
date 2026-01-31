@@ -146,6 +146,20 @@ export class PluginManager {
 
   /**
    * Execute plugin code in a sandboxed context
+   *
+   * SECURITY WARNING: This uses `new Function()` which is similar to eval().
+   * Plugins have full JavaScript execution capabilities within the renderer process.
+   *
+   * Mitigations in place:
+   * 1. Plugins must be manually installed by the user in ~/.simplyterm/plugins/
+   * 2. Plugin HTML output is sanitized via DOMPurify (see sanitize.ts)
+   * 3. Plugins don't have direct filesystem access (must use Tauri API)
+   * 4. CSP headers restrict external script loading
+   *
+   * Future improvements could include:
+   * - Running plugins in isolated Web Workers (limits DOM access)
+   * - Using sandboxed iframes with postMessage communication
+   * - Implementing a capability-based permission system
    */
   private async executePluginCode(
     code: string,
