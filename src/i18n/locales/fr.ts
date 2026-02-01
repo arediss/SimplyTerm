@@ -670,6 +670,10 @@ export default {
     timeHoursAgo: "il y a {{count}}h",
     // Temps relatif : il y a X jours
     timeDaysAgo: "il y a {{count}}j",
+    // Bouton et info-bulles du coffre
+    vault: "Coffre",
+    vaultLocked: "Coffre verrouillé - Cliquer pour déverrouiller",
+    vaultUnlocked: "Coffre déverrouillé - Cliquer pour verrouiller",
   },
 
   // ============================================

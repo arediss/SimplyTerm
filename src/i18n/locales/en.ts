@@ -670,6 +670,10 @@ export default {
     timeHoursAgo: "{{count}}h ago",
     // Relative time: days ago
     timeDaysAgo: "{{count}}d ago",
+    // Vault button and tooltips
+    vault: "Vault",
+    vaultLocked: "Vault locked - Click to unlock",
+    vaultUnlocked: "Vault unlocked - Click to lock",
   },
 
   // ============================================

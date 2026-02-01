@@ -20,6 +20,8 @@ import {
   FolderInput,
   Home,
   ArrowLeftRight,
+  Lock,
+  LockOpen,
 } from "lucide-react";
 import { SavedSession, RecentSession, SessionFolder } from "../types";
 
@@ -42,6 +44,11 @@ interface SidebarProps {
   onUpdateFolder: (id: string, name?: string, color?: string, expanded?: boolean) => void;
   onDeleteFolder: (id: string) => void;
   onMoveSessionToFolder: (sessionId: string, folderId: string | null) => void;
+  // Vault status
+  vaultExists?: boolean;
+  vaultUnlocked?: boolean;
+  onVaultLock?: () => void;
+  onVaultUnlock?: () => void;
 }
 
 function Sidebar({
@@ -63,6 +70,10 @@ function Sidebar({
   onUpdateFolder,
   onDeleteFolder,
   onMoveSessionToFolder: _onMoveSessionToFolder,
+  vaultExists,
+  vaultUnlocked,
+  onVaultLock,
+  onVaultUnlock,
 }: SidebarProps) {
   const { t } = useTranslation();
   const [isAnimating, setIsAnimating] = useState(false);
@@ -358,14 +369,30 @@ function Sidebar({
         </div>
 
         {/* Footer */}
-        <div className="p-3 border-t border-surface-0/30">
+        <div className="p-3 border-t border-surface-0/30 flex items-center gap-2">
           <button
             onClick={onOpenSettings}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-muted hover:text-text hover:bg-white/5 transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-text-muted hover:text-text hover:bg-white/5 transition-colors"
           >
             <Settings size={16} />
             <span className="text-sm">{t('sidebar.settings')}</span>
           </button>
+
+          {/* Vault button */}
+          {vaultExists && (
+            <button
+              onClick={() => vaultUnlocked ? onVaultLock?.() : onVaultUnlock?.()}
+              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg transition-colors ${
+                vaultUnlocked
+                  ? "text-success hover:bg-success/10"
+                  : "text-text-muted hover:bg-white/5 hover:text-warning"
+              }`}
+              title={vaultUnlocked ? t('sidebar.vaultUnlocked') : t('sidebar.vaultLocked')}
+            >
+              {vaultUnlocked ? <LockOpen size={16} /> : <Lock size={16} />}
+              <span className="text-sm">{t('sidebar.vault')}</span>
+            </button>
+          )}
         </div>
       </div>
     </>

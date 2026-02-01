@@ -1567,15 +1567,6 @@ function App() {
         onToggleTunnelSidebar={() => setOpenSidebar(openSidebar === "tunnel" ? "none" : "tunnel")}
         isTunnelSidebarOpen={isTunnelSidebarOpen}
         activeTunnelCount={activeTunnelCount}
-        vaultConfigured={vault.status?.exists ?? false}
-        vaultLocked={!vault.status?.isUnlocked}
-        onVaultClick={() => {
-          if (vault.status?.isUnlocked) {
-            lockVault();
-          } else {
-            openVaultUnlock();
-          }
-        }}
       />
 
       {/* Sidebar drawer */}
@@ -1598,6 +1589,10 @@ function App() {
         onUpdateFolder={updateFolder}
         onDeleteFolder={deleteFolder}
         onMoveSessionToFolder={moveSessionToFolder}
+        vaultExists={vault.status?.exists}
+        vaultUnlocked={vault.status?.isUnlocked}
+        onVaultLock={lockVault}
+        onVaultUnlock={openVaultUnlock}
       />
 
       {/* Connection Modal */}

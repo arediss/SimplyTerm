@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, forwardRef } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { Menu, Plus, X, Minus, Square, Copy, ChevronDown, Terminal, Clock, ArrowLeftRight, KeyRound } from "lucide-react";
+import { Menu, Plus, X, Minus, Square, Copy, ChevronDown, Terminal, Clock, ArrowLeftRight } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Tab, RecentSession } from "../types";
 
@@ -19,9 +19,6 @@ interface FloatingTabsProps {
   onToggleTunnelSidebar: () => void;
   isTunnelSidebarOpen: boolean;
   activeTunnelCount: number;
-  vaultConfigured: boolean;
-  vaultLocked: boolean;
-  onVaultClick: () => void;
 }
 
 function FloatingTabs({
@@ -38,9 +35,6 @@ function FloatingTabs({
   onToggleTunnelSidebar,
   isTunnelSidebarOpen,
   activeTunnelCount,
-  vaultConfigured,
-  vaultLocked,
-  onVaultClick,
 }: FloatingTabsProps) {
   const { t } = useTranslation();
   const [isMaximized, setIsMaximized] = useState(false);
@@ -108,20 +102,6 @@ function FloatingTabs({
           >
             <Menu size={14} />
           </button>
-
-          {vaultConfigured && (
-            <button
-              onClick={onVaultClick}
-              className={`
-                shrink-0 w-7 h-7 flex items-center justify-center rounded-lg
-                transition-all duration-200 hover:bg-surface-0/50
-                ${vaultLocked ? "text-text-muted hover:text-text" : "text-success"}
-              `}
-              title={vaultLocked ? t("statusBar.vaultLocked") : t("statusBar.vaultUnlocked")}
-            >
-              <KeyRound size={14} />
-            </button>
-          )}
 
           {/* Séparateur */}
           <div className="w-px h-5 bg-surface-0/40 mx-1" />
