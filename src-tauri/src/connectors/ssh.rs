@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 use parking_lot::Mutex as SyncMutex;
-use russh::client::{self, Config, Handler};
+use russh::client::{self, Config, Handle, Handler};
 use russh::keys::key::PublicKey;
 use russh::ChannelMsg;
 use std::sync::Arc;
@@ -12,6 +12,15 @@ use tokio::sync::mpsc as tokio_mpsc;
 use crate::session::{OutputMessage, Session};
 use super::known_hosts::{verify_host_key, HostKeyVerification, store_pending_key};
 
+/// Configuration d'un jump host (bastion)
+#[derive(Debug, Clone)]
+pub struct JumpHostConfig {
+    pub host: String,
+    pub port: u16,
+    pub username: String,
+    pub auth: SshAuth,
+}
+
 /// Configuration SSH
 #[derive(Debug, Clone)]
 pub struct SshConfig {
@@ -19,6 +28,7 @@ pub struct SshConfig {
     pub port: u16,
     pub username: String,
     pub auth: SshAuth,
+    pub jump_host: Option<JumpHostConfig>,
 }
 
 /// Méthode d'authentification SSH
@@ -242,36 +252,22 @@ impl Session for SshSession {
     }
 }
 
-/// Connecte une session SSH
-pub async fn connect_ssh(
-    config: SshConfig,
-    session_id: String,
-    output_tx: std_mpsc::Sender<OutputMessage>,
-    on_exit: impl FnOnce() + Send + 'static,
-) -> Result<SshSession, String> {
-    let ssh_config = Config::default();
-    let handler = SshHandler {
-        host: config.host.clone(),
-        port: config.port,
-    };
-
-    let addr = format!("{}:{}", config.host, config.port);
-
-    let mut session = client::connect(Arc::new(ssh_config), &addr, handler)
-        .await
-        .map_err(|e| format!("Connection failed: {}", e))?;
-
-    // Authentification
-    let authenticated = match &config.auth {
+/// Authentifie une session SSH
+async fn authenticate_session<H: Handler + Send>(
+    session: &mut Handle<H>,
+    username: &str,
+    auth: &SshAuth,
+) -> Result<(), String> {
+    let authenticated = match auth {
         SshAuth::Password(password) => session
-            .authenticate_password(&config.username, password)
+            .authenticate_password(username, password)
             .await
             .map_err(|e| format!("Authentication failed: {}", e))?,
         SshAuth::KeyFile { path, passphrase } => {
             let key = russh_keys::load_secret_key(path, passphrase.as_deref())
                 .map_err(|e| format!("Failed to load key: {}", e))?;
             session
-                .authenticate_publickey(&config.username, Arc::new(key))
+                .authenticate_publickey(username, Arc::new(key))
                 .await
                 .map_err(|e| format!("Key authentication failed: {}", e))?
         }
@@ -280,6 +276,79 @@ pub async fn connect_ssh(
     if !authenticated {
         return Err("Authentication failed".to_string());
     }
+
+    Ok(())
+}
+
+/// Connecte une session SSH (avec support jump host optionnel)
+pub async fn connect_ssh(
+    config: SshConfig,
+    session_id: String,
+    output_tx: std_mpsc::Sender<OutputMessage>,
+    on_exit: impl FnOnce() + Send + 'static,
+) -> Result<SshSession, String> {
+    let ssh_config = Arc::new(Config::default());
+
+    // Variable pour garder la session jump host en vie
+    let _jump_session: Option<Handle<SshHandler>>;
+
+    // Établir la connexion (directe ou via jump host)
+    let mut session = if let Some(ref jump) = config.jump_host {
+        // 1. Connexion au jump host (bastion)
+        let jump_handler = SshHandler {
+            host: jump.host.clone(),
+            port: jump.port,
+        };
+        let jump_addr = format!("{}:{}", jump.host, jump.port);
+
+        let mut jump_sess = client::connect(ssh_config.clone(), &jump_addr, jump_handler)
+            .await
+            .map_err(|e| format!("Jump host connection failed: {}", e))?;
+
+        // 2. Authentification sur le jump host
+        authenticate_session(&mut jump_sess, &jump.username, &jump.auth).await
+            .map_err(|e| format!("Jump host auth failed: {}", e))?;
+
+        // 3. Ouvrir un tunnel direct-tcpip vers la destination finale
+        let channel = jump_sess
+            .channel_open_direct_tcpip(&config.host, config.port as u32, "127.0.0.1", 0)
+            .await
+            .map_err(|e| format!("Failed to open tunnel through jump host: {}", e))?;
+
+        // 4. Convertir le channel en stream pour la connexion SSH finale
+        let stream = channel.into_stream();
+
+        // 5. Établir la connexion SSH à travers le tunnel
+        let dest_handler = SshHandler {
+            host: config.host.clone(),
+            port: config.port,
+        };
+
+        let dest_session = client::connect_stream(ssh_config.clone(), stream, dest_handler)
+            .await
+            .map_err(|e| format!("Destination connection through jump host failed: {}", e))?;
+
+        // Garder la session jump en vie
+        _jump_session = Some(jump_sess);
+
+        dest_session
+    } else {
+        // Connexion directe (sans jump host)
+        let handler = SshHandler {
+            host: config.host.clone(),
+            port: config.port,
+        };
+        let addr = format!("{}:{}", config.host, config.port);
+
+        _jump_session = None;
+
+        client::connect(ssh_config, &addr, handler)
+            .await
+            .map_err(|e| format!("Connection failed: {}", e))?
+    };
+
+    // Authentification sur le serveur destination
+    authenticate_session(&mut session, &config.username, &config.auth).await?;
 
     // Ouvrir un channel et demander un PTY
     let mut channel = session
@@ -303,6 +372,7 @@ pub async fn connect_ssh(
     // Task principale SSH
     tokio::spawn(async move {
         let _session = session; // Garde la session en vie
+        let _jump = _jump_session; // Garde la session jump host en vie (si utilisée)
 
         loop {
             tokio::select! {

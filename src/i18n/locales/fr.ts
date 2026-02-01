@@ -559,6 +559,14 @@ export default {
     enterPasswordSftp: "Entrez votre mot de passe pour ouvrir SFTP",
     // Avertissement Telnet connexion non chiffrée
     telnetWarning: "Les connexions Telnet ne sont pas chiffrées. Utilisez SSH autant que possible pour la sécurité.",
+    // Configuration Jump Host (Bastion)
+    jumpHost: {
+      title: "Jump Host (Bastion)",
+      host: "Hôte de rebond",
+      port: "Port",
+      username: "Utilisateur",
+      sameAsDestination: "Identique à la destination",
+    },
     // Labels des types de connexion
     types: {
       ssh: "SSH",

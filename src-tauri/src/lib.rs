@@ -77,11 +77,18 @@ async fn create_ssh_session(
     password: Option<String>,
     key_path: Option<String>,
     key_passphrase: Option<String>,
+    // Jump host parameters (optional)
+    jump_host: Option<String>,
+    jump_port: Option<u16>,
+    jump_username: Option<String>,
+    jump_password: Option<String>,
+    jump_key_path: Option<String>,
+    jump_key_passphrase: Option<String>,
 ) -> Result<(), String> {
     let state = app.state::<AppState>();
     let output_tx = state.session_manager.output_sender();
 
-    // Déterminer la méthode d'authentification
+    // Déterminer la méthode d'authentification pour la destination
     let auth = if let Some(key) = key_path {
         SshAuth::KeyFile {
             path: key,
@@ -93,11 +100,35 @@ async fn create_ssh_session(
         return Err("No authentication method provided".to_string());
     };
 
+    // Configurer le jump host si spécifié
+    let jump_host_config = if let Some(jh) = jump_host {
+        let jump_auth = if let Some(key) = jump_key_path {
+            SshAuth::KeyFile {
+                path: key,
+                passphrase: jump_key_passphrase,
+            }
+        } else if let Some(pass) = jump_password {
+            SshAuth::Password(pass)
+        } else {
+            return Err("No authentication method provided for jump host".to_string());
+        };
+
+        Some(connectors::ssh::JumpHostConfig {
+            host: jh,
+            port: jump_port.unwrap_or(22),
+            username: jump_username.unwrap_or_else(|| username.clone()),
+            auth: jump_auth,
+        })
+    } else {
+        None
+    };
+
     let config = SshConfig {
         host,
         port,
         username,
         auth,
+        jump_host: jump_host_config,
     };
 
     let app_clone = app.clone();
@@ -439,6 +470,7 @@ async fn register_sftp_session(
         port,
         username,
         auth,
+        jump_host: None, // SFTP doesn't support jump host for now
     };
 
     // Just store the config, don't create a session

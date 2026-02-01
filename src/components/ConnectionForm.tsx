@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Key, Lock, Server, User } from "lucide-react";
+import { Key, Lock, Server, User, ChevronDown, ChevronRight } from "lucide-react";
 
 export interface SshConnectionConfig {
   name: string;
@@ -11,6 +11,15 @@ export interface SshConnectionConfig {
   password?: string;
   keyPath?: string;
   keyPassphrase?: string;
+  // Jump host (bastion) configuration
+  useJumpHost?: boolean;
+  jumpHost?: string;
+  jumpPort?: number;
+  jumpUsername?: string;
+  jumpAuthType?: "password" | "key";
+  jumpPassword?: string;
+  jumpKeyPath?: string;
+  jumpKeyPassphrase?: string;
 }
 
 interface ConnectionFormProps {
@@ -38,6 +47,16 @@ function ConnectionForm({
   const [keyPath, setKeyPath] = useState(initialConfig?.keyPath || "");
   const [keyPassphrase, setKeyPassphrase] = useState("");
 
+  // Jump host states
+  const [useJumpHost, setUseJumpHost] = useState(initialConfig?.useJumpHost || false);
+  const [jumpHost, setJumpHost] = useState(initialConfig?.jumpHost || "");
+  const [jumpPort, setJumpPort] = useState(initialConfig?.jumpPort || 22);
+  const [jumpUsername, setJumpUsername] = useState(initialConfig?.jumpUsername || "");
+  const [jumpAuthType, setJumpAuthType] = useState<"password" | "key">(initialConfig?.jumpAuthType || "password");
+  const [jumpPassword, setJumpPassword] = useState("");
+  const [jumpKeyPath, setJumpKeyPath] = useState(initialConfig?.jumpKeyPath || "");
+  const [jumpKeyPassphrase, setJumpKeyPassphrase] = useState("");
+
   // Update form when initialConfig changes
   useEffect(() => {
     if (initialConfig) {
@@ -47,6 +66,13 @@ function ConnectionForm({
       setUsername(initialConfig.username || "");
       setAuthType(initialConfig.authType || "password");
       setKeyPath(initialConfig.keyPath || "");
+      // Jump host
+      setUseJumpHost(initialConfig.useJumpHost || false);
+      setJumpHost(initialConfig.jumpHost || "");
+      setJumpPort(initialConfig.jumpPort || 22);
+      setJumpUsername(initialConfig.jumpUsername || "");
+      setJumpAuthType(initialConfig.jumpAuthType || "password");
+      setJumpKeyPath(initialConfig.jumpKeyPath || "");
       // Don't set password/passphrase - user needs to enter them
     }
   }, [initialConfig]);
@@ -62,6 +88,15 @@ function ConnectionForm({
       password: authType === "password" ? password : undefined,
       keyPath: authType === "key" ? keyPath : undefined,
       keyPassphrase: authType === "key" ? keyPassphrase : undefined,
+      // Jump host configuration
+      useJumpHost,
+      jumpHost: useJumpHost ? jumpHost : undefined,
+      jumpPort: useJumpHost ? jumpPort : undefined,
+      jumpUsername: useJumpHost ? (jumpUsername || username) : undefined,
+      jumpAuthType: useJumpHost ? jumpAuthType : undefined,
+      jumpPassword: useJumpHost && jumpAuthType === "password" ? jumpPassword : undefined,
+      jumpKeyPath: useJumpHost && jumpAuthType === "key" ? jumpKeyPath : undefined,
+      jumpKeyPassphrase: useJumpHost && jumpAuthType === "key" ? jumpKeyPassphrase : undefined,
     });
   };
 
@@ -168,6 +203,112 @@ function ConnectionForm({
           </FormField>
         </div>
       )}
+
+      {/* Jump Host (Bastion) */}
+      <div className="border-t border-surface-0/50 pt-3">
+        <button
+          type="button"
+          onClick={() => setUseJumpHost(!useJumpHost)}
+          className="flex items-center gap-2 text-xs text-text-muted hover:text-text transition-colors"
+        >
+          {useJumpHost ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          {t('connection.jumpHost.title')}
+        </button>
+
+        {useJumpHost && (
+          <div className="mt-3 pl-4 border-l-2 border-accent/30 flex flex-col gap-3">
+            {/* Jump Host + Port */}
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label={t('connection.jumpHost.host')} icon={<Server size={12} />}>
+                <input
+                  type="text"
+                  value={jumpHost}
+                  onChange={(e) => setJumpHost(e.target.value)}
+                  placeholder="bastion.example.com"
+                  required
+                  className="input-field"
+                />
+              </FormField>
+              <FormField label={t('connection.jumpHost.port')}>
+                <input
+                  type="number"
+                  value={jumpPort}
+                  onChange={(e) => setJumpPort(parseInt(e.target.value) || 22)}
+                  min={1}
+                  max={65535}
+                  className="input-field"
+                />
+              </FormField>
+            </div>
+
+            {/* Jump Username */}
+            <FormField label={t('connection.jumpHost.username')} icon={<User size={12} />}>
+              <input
+                type="text"
+                value={jumpUsername}
+                onChange={(e) => setJumpUsername(e.target.value)}
+                placeholder={username || t('connection.jumpHost.sameAsDestination')}
+                className="input-field"
+              />
+            </FormField>
+
+            {/* Jump Auth Type */}
+            <div>
+              <label className="block text-xs text-text-muted mb-2">
+                {t('connection.authentication')}
+              </label>
+              <div className="flex p-1 bg-crust rounded-lg">
+                <AuthTab
+                  active={jumpAuthType === "password"}
+                  onClick={() => setJumpAuthType("password")}
+                  icon={<Lock size={14} />}
+                  label={t('connection.password')}
+                />
+                <AuthTab
+                  active={jumpAuthType === "key"}
+                  onClick={() => setJumpAuthType("key")}
+                  icon={<Key size={14} />}
+                  label={t('connection.sshKey')}
+                />
+              </div>
+            </div>
+
+            {/* Jump Auth Fields */}
+            {jumpAuthType === "password" ? (
+              <FormField label={t('connection.password')}>
+                <input
+                  type="password"
+                  value={jumpPassword}
+                  onChange={(e) => setJumpPassword(e.target.value)}
+                  required
+                  className="input-field"
+                />
+              </FormField>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <FormField label={t('connection.keyPath')}>
+                  <input
+                    type="text"
+                    value={jumpKeyPath}
+                    onChange={(e) => setJumpKeyPath(e.target.value)}
+                    placeholder="~/.ssh/id_rsa"
+                    required
+                    className="input-field"
+                  />
+                </FormField>
+                <FormField label={t('connection.passphraseOptional')}>
+                  <input
+                    type="password"
+                    value={jumpKeyPassphrase}
+                    onChange={(e) => setJumpKeyPassphrase(e.target.value)}
+                    className="input-field"
+                  />
+                </FormField>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Error */}
       {error && (

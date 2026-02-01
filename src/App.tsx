@@ -439,6 +439,7 @@ function App() {
 
       try {
         const keyPath = await expandHomeDir(config.keyPath);
+        const jumpKeyPath = config.useJumpHost ? await expandHomeDir(config.jumpKeyPath) : undefined;
 
         await invoke("create_ssh_session", {
           sessionId: ptySessionId,
@@ -448,6 +449,13 @@ function App() {
           password: config.password,
           keyPath,
           keyPassphrase: config.keyPassphrase,
+          // Jump host parameters
+          jumpHost: config.useJumpHost ? config.jumpHost : null,
+          jumpPort: config.useJumpHost ? config.jumpPort : null,
+          jumpUsername: config.useJumpHost ? (config.jumpUsername || config.username) : null,
+          jumpPassword: config.useJumpHost && config.jumpAuthType === "password" ? config.jumpPassword : null,
+          jumpKeyPath: config.useJumpHost && config.jumpAuthType === "key" ? jumpKeyPath : null,
+          jumpKeyPassphrase: config.useJumpHost && config.jumpAuthType === "key" ? config.jumpKeyPassphrase : null,
         });
 
         const paneTree = createTerminalNode(ptySessionId);

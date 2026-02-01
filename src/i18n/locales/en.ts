@@ -559,6 +559,14 @@ export default {
     enterPasswordSftp: "Enter your password to open SFTP",
     // Telnet warning about unencrypted connection
     telnetWarning: "Telnet connections are not encrypted. Use SSH whenever possible for security.",
+    // Jump Host (Bastion) configuration
+    jumpHost: {
+      title: "Jump Host (Bastion)",
+      host: "Jump Host",
+      port: "Port",
+      username: "Username",
+      sameAsDestination: "Same as destination",
+    },
     // Connection type labels
     types: {
       ssh: "SSH",
