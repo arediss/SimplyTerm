@@ -88,7 +88,6 @@ async fn create_ssh_session(
     let state = app.state::<AppState>();
     let output_tx = state.session_manager.output_sender();
 
-    // Déterminer la méthode d'authentification pour la destination
     let auth = if let Some(key) = key_path {
         SshAuth::KeyFile {
             path: key,
@@ -100,7 +99,6 @@ async fn create_ssh_session(
         return Err("No authentication method provided".to_string());
     };
 
-    // Configurer le jump host si spécifié
     let jump_host_config = if let Some(jh) = jump_host {
         let jump_auth = if let Some(key) = jump_key_path {
             SshAuth::KeyFile {
@@ -548,13 +546,9 @@ fn save_session(
 ) -> Result<(), String> {
     let state = app.state::<AppState>();
 
-    // Charger les sessions existantes
     let mut sessions = load_sessions()?;
-
-    // Supprimer l'ancienne session si elle existe
     sessions.retain(|s| s.id != id);
 
-    // Créer la nouvelle session
     let auth = match auth_type.as_str() {
         "key" => AuthType::Key,
         _ => AuthType::Password,
@@ -574,11 +568,8 @@ fn save_session(
     };
 
     sessions.push(session);
-
-    // Sauvegarder le fichier JSON
     save_sessions(&sessions)?;
 
-    // Stocker les credentials dans le vault (si déverrouillé)
     if state.vault.is_unlocked() {
         if let Some(pwd) = password {
             if !pwd.is_empty() {
@@ -617,7 +608,7 @@ fn delete_saved_session(app: AppHandle, id: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Récupère les credentials pour une session (pour connexion)
+/// Gets credentials for a session
 #[tauri::command]
 fn get_session_credentials(app: AppHandle, id: String) -> Result<SessionCredentials, String> {
     let state = app.state::<AppState>();

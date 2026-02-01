@@ -1,4 +1,4 @@
-//! Gestionnaire centralisé des sessions avec batching des outputs
+//! Centralized session manager with output batching
 
 use parking_lot::Mutex;
 use std::collections::HashMap;
@@ -11,26 +11,21 @@ use tauri::{AppHandle, Emitter};
 use super::traits::Session;
 use crate::connectors::SshConfig;
 
-/// Configuration du batching
 const BATCH_INTERVAL_MS: u64 = 16; // ~60fps
-const BATCH_MAX_SIZE: usize = 64 * 1024; // 64KB max avant flush forcé
+const BATCH_MAX_SIZE: usize = 64 * 1024; // 64KB max before forced flush
 
-/// Message pour le batching des outputs
 pub struct OutputMessage {
     pub session_id: String,
     pub data: Vec<u8>,
 }
 
-/// Gestionnaire de sessions
 pub struct SessionManager {
     sessions: Mutex<HashMap<String, Box<dyn Session>>>,
-    /// SSH configs for active sessions (for background commands like stats)
     ssh_configs: Mutex<HashMap<String, SshConfig>>,
     output_tx: Sender<OutputMessage>,
 }
 
 impl SessionManager {
-    /// Crée un nouveau SessionManager et démarre le worker de batching
     pub fn new(app: AppHandle) -> Arc<Self> {
         let (output_tx, output_rx) = mpsc::channel();
 
@@ -40,48 +35,39 @@ impl SessionManager {
             output_tx,
         });
 
-        // Démarrer le worker de batching dans un thread std
         Self::spawn_batch_worker(app, output_rx);
 
         manager
     }
 
-    /// Worker qui batch les outputs et les envoie au frontend
     fn spawn_batch_worker(app: AppHandle, output_rx: mpsc::Receiver<OutputMessage>) {
         thread::spawn(move || {
             let mut buffers: HashMap<String, Vec<u8>> = HashMap::new();
             let batch_duration = Duration::from_millis(BATCH_INTERVAL_MS);
 
             loop {
-                // Attendre un message avec timeout
                 match output_rx.recv_timeout(batch_duration) {
                     Ok(msg) => {
                         let buffer = buffers.entry(msg.session_id.clone()).or_default();
                         buffer.extend(msg.data);
 
-                        // Flush immédiat si le buffer est trop gros
                         if buffer.len() >= BATCH_MAX_SIZE {
                             Self::flush_buffer(&app, &msg.session_id, buffer);
                         }
                     }
                     Err(mpsc::RecvTimeoutError::Timeout) => {
-                        // Timer expiré, flush tous les buffers non vides
                         for (session_id, buffer) in buffers.iter_mut() {
                             if !buffer.is_empty() {
                                 Self::flush_buffer(&app, session_id, buffer);
                             }
                         }
                     }
-                    Err(mpsc::RecvTimeoutError::Disconnected) => {
-                        // Channel fermé, arrêter le worker
-                        break;
-                    }
+                    Err(mpsc::RecvTimeoutError::Disconnected) => break,
                 }
             }
         });
     }
 
-    /// Flush un buffer vers le frontend
     fn flush_buffer(app: &AppHandle, session_id: &str, buffer: &mut Vec<u8>) {
         if buffer.is_empty() {
             return;
@@ -92,12 +78,11 @@ impl SessionManager {
         let _ = app.emit(&format!("pty-output-{}", session_id), text);
     }
 
-    /// Obtient le sender pour envoyer des outputs (utilisé par les connecteurs)
     pub fn output_sender(&self) -> Sender<OutputMessage> {
         self.output_tx.clone()
     }
 
-    /// Enregistre une nouvelle session
+    /// Registers a new session
     pub fn register(&self, session_id: String, session: Box<dyn Session>) {
         self.sessions.lock().insert(session_id, session);
     }

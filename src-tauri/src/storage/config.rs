@@ -1,13 +1,9 @@
-//! Gestion du fichier de configuration sessions.json
-//!
-//! Ce fichier contient uniquement les métadonnées des sessions (host, port, user, etc.)
-//! Les credentials sensibles sont stockés séparément via le module credentials.
+//! Session configuration storage (sessions.json)
 
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
-/// Type d'authentification pour une session SSH
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum AuthType {
@@ -15,7 +11,6 @@ pub enum AuthType {
     Key,
 }
 
-/// Session sauvegardée (sans données sensibles)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SavedSession {
     pub id: String,
@@ -24,26 +19,20 @@ pub struct SavedSession {
     pub port: u16,
     pub username: String,
     pub auth_type: AuthType,
-    /// Chemin vers la clé SSH (pas un secret, OK en JSON)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub key_path: Option<String>,
-    /// ID du dossier parent (None = racine)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub folder_id: Option<String>,
-    /// Tags associés à la session
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
-    /// Couleur personnalisée (format hex: #RRGGBB)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub color: Option<String>,
 }
 
-/// Récupère le chemin du fichier de configuration
 fn get_config_path() -> Result<PathBuf, String> {
     let home = dirs::home_dir().ok_or("Could not find home directory")?;
     let config_dir = home.join(".simplyterm");
 
-    // Créer le répertoire si nécessaire
     if !config_dir.exists() {
         fs::create_dir_all(&config_dir)
             .map_err(|e| format!("Failed to create config directory: {}", e))?;
@@ -52,7 +41,7 @@ fn get_config_path() -> Result<PathBuf, String> {
     Ok(config_dir.join("sessions.json"))
 }
 
-/// Charge toutes les sessions sauvegardées
+/// Loads all saved sessions
 pub fn load_sessions() -> Result<Vec<SavedSession>, String> {
     let path = get_config_path()?;
 

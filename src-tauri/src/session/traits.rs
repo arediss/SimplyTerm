@@ -14,8 +14,8 @@ pub trait Session: Send + Sync + Debug {
     #[allow(dead_code)]
     fn session_type(&self) -> &'static str;
 
-    /// Ferme proprement la session
+    /// Closes the session
     fn close(&self) -> Result<(), String> {
-        Ok(()) // Par défaut, ne fait rien
+        Ok(())
     }
 }

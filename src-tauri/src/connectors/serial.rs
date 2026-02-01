@@ -1,6 +1,4 @@
-//! Connecteur Serial/COM
-//!
-//! Permet la communication avec des périphériques série (Arduino, routeurs, etc.)
+//! Serial/COM connector
 
 use parking_lot::Mutex as SyncMutex;
 use serde::Serialize;
@@ -14,7 +12,7 @@ use tokio::sync::mpsc as tokio_mpsc;
 
 use crate::session::{OutputMessage, Session};
 
-/// Information sur un port série disponible
+/// Available serial port information
 #[derive(Debug, Clone, Serialize)]
 pub struct SerialPortInfo {
     pub port_name: String,
@@ -23,7 +21,7 @@ pub struct SerialPortInfo {
     pub product: Option<String>,
 }
 
-/// Configuration d'une connexion série
+/// Serial connection configuration
 #[derive(Debug, Clone)]
 pub struct SerialConfig {
     pub port: String,
@@ -34,7 +32,7 @@ pub struct SerialConfig {
     pub flow_control: String,
 }
 
-/// Commandes envoyées à la session Serial
+/// Commands sent to serial session
 #[derive(Debug)]
 enum SerialCommand {
     Data(Vec<u8>),
@@ -63,7 +61,6 @@ impl Session for SerialSession {
     }
 
     fn resize(&self, _cols: u32, _rows: u32) -> Result<(), String> {
-        // Serial n'a pas de concept de taille de fenêtre
         Ok(())
     }
 
@@ -77,7 +74,7 @@ impl Session for SerialSession {
     }
 }
 
-/// Énumère les ports série disponibles sur le système
+/// Lists available serial ports
 pub fn list_serial_ports() -> Result<Vec<SerialPortInfo>, String> {
     let ports = serialport::available_ports()
         .map_err(|e| format!("Failed to enumerate ports: {}", e))?;
@@ -106,7 +103,7 @@ pub fn list_serial_ports() -> Result<Vec<SerialPortInfo>, String> {
         .collect())
 }
 
-/// Convertit les paramètres de configuration
+/// Converts configuration parameters
 fn parse_data_bits(bits: u8) -> DataBits {
     match bits {
         5 => DataBits::Five,
@@ -158,7 +155,6 @@ pub fn connect_serial(
 
     let (cmd_tx, cmd_rx) = tokio_mpsc::unbounded_channel::<SerialCommand>();
 
-    // Créer un clone du port pour l'écriture
     let port = Arc::new(SyncMutex::new(port));
     let port_read = Arc::clone(&port);
     let port_write = Arc::clone(&port);

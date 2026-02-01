@@ -1,4 +1,4 @@
-//! Connecteur SSH
+//! SSH connector
 
 use async_trait::async_trait;
 use parking_lot::Mutex as SyncMutex;
@@ -12,7 +12,7 @@ use tokio::sync::mpsc as tokio_mpsc;
 use crate::session::{OutputMessage, Session};
 use super::known_hosts::{verify_host_key, HostKeyVerification, store_pending_key};
 
-/// Configuration d'un jump host (bastion)
+/// Jump host (bastion) configuration
 #[derive(Debug, Clone)]
 pub struct JumpHostConfig {
     pub host: String,
@@ -21,7 +21,7 @@ pub struct JumpHostConfig {
     pub auth: SshAuth,
 }
 
-/// Configuration SSH
+/// SSH configuration
 #[derive(Debug, Clone)]
 pub struct SshConfig {
     pub host: String,
@@ -31,7 +31,7 @@ pub struct SshConfig {
     pub jump_host: Option<JumpHostConfig>,
 }
 
-/// Méthode d'authentification SSH
+/// SSH authentication method
 #[derive(Debug, Clone)]
 pub enum SshAuth {
     Password(String),
@@ -173,7 +173,7 @@ pub async fn check_host_key_only(host: &str, port: u16) -> HostKeyCheckResult {
     }
 }
 
-/// Handler SSH (gestion des événements de connexion) - trusts known hosts only
+/// SSH handler - trusts known hosts only
 struct SshHandler {
     host: String,
     port: u16,
@@ -289,12 +289,10 @@ pub async fn connect_ssh(
 ) -> Result<SshSession, String> {
     let ssh_config = Arc::new(Config::default());
 
-    // Variable pour garder la session jump host en vie
     let _jump_session: Option<Handle<SshHandler>>;
 
-    // Établir la connexion (directe ou via jump host)
     let mut session = if let Some(ref jump) = config.jump_host {
-        // 1. Connexion au jump host (bastion)
+        // Connect via jump host
         let jump_handler = SshHandler {
             host: jump.host.clone(),
             port: jump.port,
@@ -305,20 +303,16 @@ pub async fn connect_ssh(
             .await
             .map_err(|e| format!("Jump host connection failed: {}", e))?;
 
-        // 2. Authentification sur le jump host
         authenticate_session(&mut jump_sess, &jump.username, &jump.auth).await
             .map_err(|e| format!("Jump host auth failed: {}", e))?;
 
-        // 3. Ouvrir un tunnel direct-tcpip vers la destination finale
         let channel = jump_sess
             .channel_open_direct_tcpip(&config.host, config.port as u32, "127.0.0.1", 0)
             .await
             .map_err(|e| format!("Failed to open tunnel through jump host: {}", e))?;
 
-        // 4. Convertir le channel en stream pour la connexion SSH finale
         let stream = channel.into_stream();
 
-        // 5. Établir la connexion SSH à travers le tunnel
         let dest_handler = SshHandler {
             host: config.host.clone(),
             port: config.port,
@@ -328,12 +322,11 @@ pub async fn connect_ssh(
             .await
             .map_err(|e| format!("Destination connection through jump host failed: {}", e))?;
 
-        // Garder la session jump en vie
         _jump_session = Some(jump_sess);
 
         dest_session
     } else {
-        // Connexion directe (sans jump host)
+        // Direct connection
         let handler = SshHandler {
             host: config.host.clone(),
             port: config.port,

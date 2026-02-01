@@ -1,26 +1,19 @@
-//! Gestion des dossiers pour organiser les sessions
-//!
-//! Les dossiers permettent d'organiser hiérarchiquement les sessions sauvegardées.
+//! Session folder storage
 
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
-/// Dossier pour organiser les sessions
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionFolder {
     pub id: String,
     pub name: String,
-    /// Couleur du dossier (format hex: #RRGGBB)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub color: Option<String>,
-    /// ID du dossier parent (None = racine)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_id: Option<String>,
-    /// Ordre d'affichage dans le dossier parent
     #[serde(default)]
     pub order: i32,
-    /// État ouvert/fermé du dossier dans l'UI
     #[serde(default = "default_expanded")]
     pub expanded: bool,
 }
@@ -29,7 +22,6 @@ fn default_expanded() -> bool {
     true
 }
 
-/// Récupère le chemin du fichier de configuration des dossiers
 fn get_folders_path() -> Result<PathBuf, String> {
     let home = dirs::home_dir().ok_or("Could not find home directory")?;
     let config_dir = home.join(".simplyterm");
@@ -42,7 +34,7 @@ fn get_folders_path() -> Result<PathBuf, String> {
     Ok(config_dir.join("folders.json"))
 }
 
-/// Charge tous les dossiers
+/// Loads all folders
 pub fn load_folders() -> Result<Vec<SessionFolder>, String> {
     let path = get_folders_path()?;
 

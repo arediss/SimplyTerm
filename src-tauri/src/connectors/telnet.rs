@@ -1,6 +1,4 @@
-//! Connecteur Telnet
-//!
-//! Implémente le protocole Telnet (RFC 854) avec support NAWS pour le redimensionnement.
+//! Telnet connector (RFC 854) with NAWS support for window resizing
 
 use parking_lot::Mutex as SyncMutex;
 use std::sync::mpsc as std_mpsc;
@@ -83,7 +81,7 @@ fn build_naws_response(cols: u16, rows: u16) -> Vec<u8> {
     ]
 }
 
-/// Traite les séquences IAC et retourne les données nettoyées + réponses à envoyer
+/// Process IAC sequences and return cleaned data + responses to send
 fn process_telnet_data(
     input: &[u8],
     naws_enabled: &mut bool,
@@ -108,38 +106,29 @@ fn process_telnet_data(
                     
                     match (cmd, opt) {
                         (iac::DO, iac::NAWS) => {
-                            // Serveur demande NAWS, on accepte
                             response.extend_from_slice(&[iac::IAC, iac::WILL, iac::NAWS]);
                             *naws_enabled = true;
-                            // Envoyer la taille actuelle
                             response.extend_from_slice(&build_naws_response(current_cols, current_rows));
                         }
                         (iac::DO, iac::TERMINAL_TYPE) => {
-                            // On supporte le type de terminal
                             response.extend_from_slice(&[iac::IAC, iac::WILL, iac::TERMINAL_TYPE]);
                         }
                         (iac::DO, iac::ECHO) => {
-                            // Ne pas echo (le terminal s'en charge)
                             response.extend_from_slice(&[iac::IAC, iac::WONT, iac::ECHO]);
                         }
                         (iac::DO, iac::SUPPRESS_GO_AHEAD) => {
-                            // Accepter suppress-go-ahead
                             response.extend_from_slice(&[iac::IAC, iac::WILL, iac::SUPPRESS_GO_AHEAD]);
                         }
                         (iac::DO, _) => {
-                            // Refuser les autres options DO
                             response.extend_from_slice(&[iac::IAC, iac::WONT, opt]);
                         }
                         (iac::WILL, iac::ECHO) => {
-                            // Serveur fait l'echo
                             response.extend_from_slice(&[iac::IAC, iac::DO, iac::ECHO]);
                         }
                         (iac::WILL, iac::SUPPRESS_GO_AHEAD) => {
-                            // Accepter
                             response.extend_from_slice(&[iac::IAC, iac::DO, iac::SUPPRESS_GO_AHEAD]);
                         }
                         (iac::WILL, _) => {
-                            // Refuser les autres WILL
                             response.extend_from_slice(&[iac::IAC, iac::DONT, opt]);
                         }
                         _ => {}
@@ -147,7 +136,6 @@ fn process_telnet_data(
                     i += 3;
                 }
                 iac::SB if i + 2 < input.len() => {
-                    // Subnégociation - chercher SE
                     let opt = input[i + 2];
                     let mut j = i + 3;
                     while j + 1 < input.len() {
@@ -211,10 +199,7 @@ pub async fn connect_telnet(
                 // Lecture depuis le serveur
                 result = reader.read(&mut buf) => {
                     match result {
-                        Ok(0) => {
-                            // Connexion fermée
-                            break;
-                        }
+                        Ok(0) => break,
                         Ok(n) => {
                             let (data, response) = process_telnet_data(
                                 &buf[..n],
@@ -222,15 +207,13 @@ pub async fn connect_telnet(
                                 current_cols,
                                 current_rows,
                             );
-                            
-                            // Envoyer les réponses IAC si nécessaire
+
                             if !response.is_empty() {
                                 if writer.write_all(&response).await.is_err() {
                                     break;
                                 }
                             }
-                            
-                            // Envoyer les données au terminal
+
                             if !data.is_empty() {
                                 let _ = output_tx.send(OutputMessage {
                                     session_id: session_id.clone(),
@@ -241,11 +224,10 @@ pub async fn connect_telnet(
                         Err(_) => break,
                     }
                 }
-                // Commandes depuis le frontend
                 Some(cmd) = cmd_rx.recv() => {
                     match cmd {
                         TelnetCommand::Data(data) => {
-                            // Échapper les IAC dans les données utilisateur
+                            // Escape IAC bytes
                             let mut escaped = Vec::with_capacity(data.len() * 2);
                             for byte in data {
                                 if byte == iac::IAC {

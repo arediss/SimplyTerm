@@ -1,4 +1,4 @@
-//! Connecteur PTY local
+//! Local PTY connector
 
 use parking_lot::Mutex;
 use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
@@ -10,7 +10,7 @@ use std::sync::mpsc;
 
 use crate::session::{OutputMessage, Session};
 
-/// Session PTY locale
+/// Local PTY session
 pub struct LocalSession {
     writer: Mutex<Box<dyn Write + Send>>,
     master: Arc<Mutex<Box<dyn MasterPty + Send>>>,
@@ -48,7 +48,7 @@ impl Session for LocalSession {
     }
 }
 
-/// Crée une nouvelle session PTY locale
+/// Creates a new local PTY session
 pub fn create_local_session(
     session_id: String,
     output_tx: mpsc::Sender<OutputMessage>,
@@ -88,14 +88,9 @@ pub fn create_local_session(
     let cmd = CommandBuilder::new(&shell);
 
     let mut child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
-
-    // Lecteur pour recevoir la sortie du PTY
     let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
-
-    // Writer pour envoyer des données au PTY
     let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
 
-    // Thread pour lire la sortie du PTY
     let session_id_clone = session_id.clone();
     thread::spawn(move || {
         let mut buf = [0u8; 4096];
@@ -113,7 +108,6 @@ pub fn create_local_session(
         }
     });
 
-    // Thread pour attendre la fin du processus
     thread::spawn(move || {
         let _ = child.wait();
         on_exit();

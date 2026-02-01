@@ -1,9 +1,4 @@
-//! Connecteurs disponibles (SSH, Local, Telnet, Serial, etc.)
-//!
-//! Pour ajouter un nouveau connecteur :
-//! 1. Créer un nouveau fichier (ex: serial.rs)
-//! 2. Implémenter le trait Session
-//! 3. Exposer via ce module
+//! Available connectors (SSH, Local, Telnet, Serial)
 
 pub mod local;
 pub mod ssh;

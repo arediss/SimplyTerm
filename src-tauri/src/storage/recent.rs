@@ -1,8 +1,4 @@
-//! Gestion des sessions récentes
-//!
-//! Stocke les 10 dernières connexions (métadonnées uniquement, pas de credentials)
-//! Les sessions récentes permettent de retrouver rapidement une connexion
-//! sans avoir à la sauvegarder explicitement.
+//! Recent sessions storage
 
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -10,7 +6,6 @@ use std::path::PathBuf;
 
 const MAX_RECENT_SESSIONS: usize = 10;
 
-/// Session récente (métadonnées uniquement)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecentSession {
     pub id: String,
@@ -19,14 +14,11 @@ pub struct RecentSession {
     pub port: u16,
     pub username: String,
     pub auth_type: String,
-    /// Chemin vers la clé SSH (pas un secret)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub key_path: Option<String>,
-    /// Timestamp de la dernière connexion
     pub last_used: u64,
 }
 
-/// Récupère le chemin du fichier des sessions récentes
 fn get_recent_path() -> Result<PathBuf, String> {
     let home = dirs::home_dir().ok_or("Could not find home directory")?;
     let config_dir = home.join(".simplyterm");
