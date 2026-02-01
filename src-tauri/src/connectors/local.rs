@@ -65,11 +65,27 @@ pub fn create_local_session(
         })
         .map_err(|e| e.to_string())?;
 
-    // Déterminer le shell par défaut
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    let shell = if cfg!(windows) {
+        std::env::var("COMSPEC").unwrap_or_else(|_| {
+            if std::path::Path::new("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe").exists() {
+                "powershell.exe".to_string()
+            } else {
+                "cmd.exe".to_string()
+            }
+        })
+    } else {
+        std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string())
+    };
 
-    let mut cmd = CommandBuilder::new(&shell);
-    cmd.env("TERM", "xterm-256color");
+    #[cfg(not(windows))]
+    let cmd = {
+        let mut c = CommandBuilder::new(&shell);
+        c.env("TERM", "xterm-256color");
+        c
+    };
+
+    #[cfg(windows)]
+    let cmd = CommandBuilder::new(&shell);
 
     let mut child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
 
