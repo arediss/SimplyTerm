@@ -747,7 +747,7 @@ export default {
     // New connection button
     newConnection: "New connection",
     // Keyboard shortcut hint
-    shortcutHint: "Press ⌘ + N to create a connection",
+    shortcutHint: "Press {{modifier}} + N to create a connection",
     // Terminal tab title
     terminalTab: "Terminal",
     // SFTP tab title prefix

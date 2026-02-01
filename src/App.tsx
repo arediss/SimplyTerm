@@ -31,7 +31,7 @@ import TunnelManager from "./components/TunnelManager";
 import TunnelSidebar from "./components/TunnelSidebar";
 import { useSessions, useAppSettings, useVaultFlow } from "./hooks";
 import { SavedSession, RecentSession, Tab } from "./types";
-import { generateSessionId, generateTabId, expandHomeDir } from "./utils";
+import { generateSessionId, generateTabId, expandHomeDir, isModifierPressed, modifierKey } from "./utils";
 import { applyTheme } from "./themes";
 
 function App() {
@@ -1127,28 +1127,30 @@ function App() {
       const target = e.target as HTMLElement;
       const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA";
 
+      const mod = isModifierPressed(e);
+
       // --- Tab management ---
-      // Ctrl+T: New local terminal
-      if (e.ctrlKey && !e.shiftKey && e.key === "t") {
+      // Mod+T: New local terminal
+      if (mod && !e.shiftKey && e.key === "t") {
         e.preventDefault();
         handleNewLocalTab();
         return;
       }
-      // Ctrl+N: New SSH connection
-      if (e.ctrlKey && !e.shiftKey && e.key === "n") {
+      // Mod+N: New SSH connection
+      if (mod && !e.shiftKey && e.key === "n") {
         if (isInput) return;
         e.preventDefault();
         handleOpenConnectionModal();
         return;
       }
-      // Ctrl+W: Close active tab
-      if (e.ctrlKey && !e.shiftKey && e.key === "w") {
+      // Mod+W: Close active tab
+      if (mod && !e.shiftKey && e.key === "w") {
         e.preventDefault();
         if (activeTabId) handleCloseTab(activeTabId);
         return;
       }
-      // Ctrl+ArrowLeft: Previous tab
-      if (e.ctrlKey && !e.shiftKey && e.key === "ArrowLeft") {
+      // Mod+ArrowLeft: Previous tab
+      if (mod && !e.shiftKey && e.key === "ArrowLeft") {
         e.preventDefault();
         if (tabs.length > 1) {
           const currentIndex = tabs.findIndex((t) => t.id === activeTabId);
@@ -1157,8 +1159,8 @@ function App() {
         }
         return;
       }
-      // Ctrl+ArrowRight: Next tab
-      if (e.ctrlKey && !e.shiftKey && e.key === "ArrowRight") {
+      // Mod+ArrowRight: Next tab
+      if (mod && !e.shiftKey && e.key === "ArrowRight") {
         e.preventDefault();
         if (tabs.length > 1) {
           const currentIndex = tabs.findIndex((t) => t.id === activeTabId);
@@ -1167,28 +1169,28 @@ function App() {
         }
         return;
       }
-      // Ctrl+,: Open settings
-      if (e.ctrlKey && !e.shiftKey && e.key === ",") {
+      // Mod+,: Open settings
+      if (mod && !e.shiftKey && e.key === ",") {
         e.preventDefault();
         setIsSettingsOpen(true);
         return;
       }
 
-      // --- Pane management (Ctrl+Shift) ---
-      // Ctrl+Shift+D: Split vertical
-      if (e.ctrlKey && e.shiftKey && e.key === "D") {
+      // --- Pane management (Mod+Shift) ---
+      // Mod+Shift+D: Split vertical
+      if (mod && e.shiftKey && e.key === "D") {
         e.preventDefault();
         handleSplitPane("vertical");
         return;
       }
-      // Ctrl+Shift+E: Split horizontal
-      if (e.ctrlKey && e.shiftKey && e.key === "E") {
+      // Mod+Shift+E: Split horizontal
+      if (mod && e.shiftKey && e.key === "E") {
         e.preventDefault();
         handleSplitPane("horizontal");
         return;
       }
-      // Ctrl+Shift+W: Close current pane
-      if (e.ctrlKey && e.shiftKey && e.key === "W") {
+      // Mod+Shift+W: Close current pane
+      if (mod && e.shiftKey && e.key === "W") {
         e.preventDefault();
         const tab = tabs.find((t) => t.id === activeTabId);
         if (tab?.focusedPaneId) {
@@ -1309,10 +1311,10 @@ function App() {
     context: commandContext,
   });
 
-  // Global keyboard shortcut for Command Palette (Ctrl+Shift+P)
+  // Global keyboard shortcut for Command Palette (Mod+Shift+P)
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.key === "P") {
+      if (isModifierPressed(e) && e.shiftKey && e.key === "P") {
         e.preventDefault();
         commandPalette.toggle();
       }
@@ -1708,7 +1710,7 @@ function EmptyState({ onNewConnection }: { onNewConnection: () => void }) {
 
         {/* Keyboard shortcut hint */}
         <p className="text-xs text-text-muted/60">
-          {t('app.shortcutHint')}
+          {t('app.shortcutHint', { modifier: modifierKey })}
         </p>
       </div>
     </div>

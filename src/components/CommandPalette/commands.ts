@@ -12,6 +12,7 @@ import {
   ChevronLeft,
 } from "lucide-react";
 import { Command, CommandHandlers, CommandContext } from "./types";
+import { modifierKey } from "../../utils";
 
 export function createCommands(
   handlers: CommandHandlers,
@@ -126,7 +127,7 @@ export function formatShortcut(shortcut: Command["shortcut"]): string {
   if (!shortcut) return "";
 
   const parts: string[] = [];
-  if (shortcut.ctrl) parts.push("Ctrl");
+  if (shortcut.ctrl) parts.push(modifierKey);
   if (shortcut.shift) parts.push("Shift");
   if (shortcut.alt) parts.push("Alt");
   parts.push(shortcut.key);

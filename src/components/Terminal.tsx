@@ -9,6 +9,7 @@ import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { X, ChevronUp, ChevronDown, CaseSensitive, Regex } from "lucide-react";
 import "@xterm/xterm/css/xterm.css";
 import { getTerminalTheme } from "../themes";
+import { isModifierPressed } from "../utils";
 
 interface TerminalSettings {
   fontSize: number;
@@ -307,10 +308,10 @@ function Terminal({ sessionId, type, onExit, isActive = true, appTheme = "dark",
     }
   }, [isSearchOpen]);
 
-  // Intercept Ctrl+F globally to prevent Tauri's native search
+  // Intercept Mod+F globally to prevent Tauri's native search
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === "f") {
+      if (isModifierPressed(e) && e.key === "f") {
         e.preventDefault();
         e.stopPropagation();
         setIsSearchOpen(true);
