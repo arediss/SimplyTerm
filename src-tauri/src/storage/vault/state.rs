@@ -518,6 +518,147 @@ impl VaultState {
         Ok(())
     }
 
+    // ========================================================================
+    // Bastion Profile Methods
+    // ========================================================================
+
+    /// List all bastion profiles (info only, no credentials)
+    pub fn list_bastions(&self) -> Result<Vec<super::types::BastionProfileInfo>, String> {
+        if !self.is_unlocked() {
+            return Err("Vault is locked".to_string());
+        }
+
+        let data = self.data.read();
+        let data = data.as_ref().ok_or("Vault data not loaded")?;
+
+        Ok(data.get_bastions().iter().map(|b| b.into()).collect())
+    }
+
+    /// Get a bastion profile info (without sensitive data)
+    pub fn get_bastion_info(&self, id: &str) -> Result<Option<super::types::BastionProfileInfo>, String> {
+        if !self.is_unlocked() {
+            return Err("Vault is locked".to_string());
+        }
+
+        let data = self.data.read();
+        let data = data.as_ref().ok_or("Vault data not loaded")?;
+
+        Ok(data.get_bastion(id).map(|b| b.into()))
+    }
+
+    /// Get a bastion profile with credentials (for actual connection use)
+    pub fn get_bastion_with_credentials(&self, id: &str) -> Result<Option<super::types::BastionProfile>, String> {
+        if !self.is_unlocked() {
+            return Err("Vault is locked".to_string());
+        }
+
+        let data = self.data.read();
+        let data = data.as_ref().ok_or("Vault data not loaded")?;
+
+        self.touch();
+        Ok(data.get_bastion(id).cloned())
+    }
+
+    /// Create a new bastion profile
+    pub fn create_bastion(
+        &self,
+        name: String,
+        host: String,
+        port: u16,
+        username: String,
+        auth_type: super::types::BastionAuthType,
+        password: Option<String>,
+        key_path: Option<String>,
+        key_passphrase: Option<String>,
+    ) -> Result<super::types::BastionProfileInfo, String> {
+        if !self.is_unlocked() {
+            return Err("Vault is locked".to_string());
+        }
+
+        let bastion = super::types::BastionProfile::new(
+            name,
+            host,
+            port,
+            username,
+            auth_type,
+            password,
+            key_path,
+            key_passphrase,
+        );
+        let info: super::types::BastionProfileInfo = (&bastion).into();
+
+        {
+            let mut data = self.data.write();
+            let data = data.as_mut().ok_or("Vault data not loaded")?;
+            data.store_bastion(bastion);
+        }
+
+        self.save_data()?;
+        self.touch();
+        Ok(info)
+    }
+
+    /// Update an existing bastion profile
+    pub fn update_bastion(
+        &self,
+        id: &str,
+        name: Option<String>,
+        host: Option<String>,
+        port: Option<u16>,
+        username: Option<String>,
+        auth_type: Option<super::types::BastionAuthType>,
+        password: Option<String>,
+        key_path: Option<String>,
+        key_passphrase: Option<String>,
+    ) -> Result<bool, String> {
+        if !self.is_unlocked() {
+            return Err("Vault is locked".to_string());
+        }
+
+        let updated = {
+            let mut data = self.data.write();
+            let data = data.as_mut().ok_or("Vault data not loaded")?;
+            data.update_bastion(
+                id,
+                super::types::BastionProfileUpdate {
+                    name,
+                    host,
+                    port,
+                    username,
+                    auth_type,
+                    password,
+                    key_path,
+                    key_passphrase,
+                },
+            )
+        };
+
+        if updated {
+            self.save_data()?;
+        }
+        self.touch();
+        Ok(updated)
+    }
+
+    /// Delete a bastion profile
+    pub fn delete_bastion(&self, id: &str) -> Result<bool, String> {
+        if !self.is_unlocked() {
+            return Err("Vault is locked".to_string());
+        }
+
+        let deleted = {
+            let mut data = self.data.write();
+            let data = data.as_mut().ok_or("Vault data not loaded")?;
+            data.delete_bastion(id)
+        };
+
+        if deleted {
+            self.save_data()?;
+        }
+        self.touch();
+        Ok(deleted)
+    }
+
     /// Update vault settings
     pub fn update_settings(&self, auto_lock_timeout: u32) -> Result<(), String> {
         if !self.is_unlocked() {

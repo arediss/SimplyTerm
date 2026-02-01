@@ -1212,6 +1212,13 @@ pub fn run() {
             storage::vault::setup_vault_security_key,
             storage::vault::unlock_vault_with_security_key,
             storage::vault::remove_vault_security_key,
+            // Bastion Profiles
+            storage::vault::list_bastions,
+            storage::vault::get_bastion,
+            storage::vault::get_bastion_credentials,
+            storage::vault::create_bastion,
+            storage::vault::update_bastion,
+            storage::vault::delete_bastion,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -36,6 +36,36 @@ export interface SerialPortInfo {
   product: string | null;
 }
 
+// Bastion/Jump Host profile stored in vault
+export interface BastionProfile {
+  id: string;
+  name: string;
+  host: string;
+  port: number;
+  username: string;
+  authType: "password" | "key";
+  password?: string;
+  keyPath?: string;
+  keyPassphrase?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+// Bastion profile info (without sensitive data)
+export interface BastionProfileInfo {
+  id: string;
+  name: string;
+  host: string;
+  port: number;
+  username: string;
+  authType: "password" | "key";
+  hasPassword: boolean;
+  keyPath?: string;
+  hasKeyPassphrase: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface SavedSession {
   id: string;
   name: string;

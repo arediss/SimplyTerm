@@ -166,6 +166,31 @@ export default {
       deleteWarning: "Click again to confirm. This action is irreversible.",
     },
 
+    // --- Bastions section ---
+    bastions: {
+      // Section title
+      title: "Jump Hosts (Bastions)",
+      // Section description
+      description: "Configure SSH jump hosts for tunneled connections",
+      // No bastions message
+      noBastions: "No jump hosts configured",
+      // Count message
+      count_one: "{{count}} jump host configured",
+      count_other: "{{count}} jump hosts configured",
+      // Add button
+      add: "Add",
+      // Create form title
+      create: "New jump host",
+      // Edit form title
+      edit: "Edit jump host",
+      // Name field
+      name: "Name",
+      // Leave empty to keep current value
+      leaveEmptyToKeep: "leave empty to keep",
+      // Vault locked warning
+      vaultLocked: "Unlock the vault to manage jump hosts",
+    },
+
     // --- Security section ---
     security: {
       // Vault not configured group title
@@ -566,12 +591,18 @@ export default {
       port: "Port",
       username: "Username",
       sameAsDestination: "Same as destination",
+      sameAuth: "Use same authentication as destination",
+      none: "None (direct connection)",
+      configureInSettings: "Configure jump hosts in Settings",
     },
     // Connection type labels
     types: {
       ssh: "SSH",
+      sshDesc: "Secure Shell",
       telnet: "Telnet",
+      telnetDesc: "Unencrypted",
       serial: "Serial",
+      serialDesc: "COM / TTY",
       newTelnet: "New Telnet Connection",
       newSerial: "New Serial Connection",
     },

@@ -7,7 +7,7 @@ use tauri::State;
 
 use super::fido2::{self, SecurityKeyInfo};
 use super::state::VaultState;
-use super::types::{VaultCredentialType, VaultStatus};
+use super::types::{BastionAuthType, BastionProfile, BastionProfileInfo, VaultCredentialType, VaultStatus};
 
 /// Store the vault state in Tauri's managed state
 pub type VaultStateHandle = Arc<VaultState>;
@@ -225,4 +225,76 @@ pub fn unlock_vault_with_security_key(
 #[tauri::command]
 pub fn remove_vault_security_key(vault: State<VaultStateHandle>) -> Result<(), String> {
     vault.remove_security_key()
+}
+
+// ============================================================================
+// Bastion Profile Commands
+// ============================================================================
+
+/// List all bastion profiles (without sensitive data)
+#[tauri::command]
+pub fn list_bastions(vault: State<VaultStateHandle>) -> Result<Vec<BastionProfileInfo>, String> {
+    vault.list_bastions()
+}
+
+/// Get a bastion profile by ID (without sensitive data)
+#[tauri::command]
+pub fn get_bastion(vault: State<VaultStateHandle>, id: String) -> Result<Option<BastionProfileInfo>, String> {
+    vault.get_bastion_info(&id)
+}
+
+/// Get full bastion profile including credentials (for connection use)
+#[tauri::command]
+pub fn get_bastion_credentials(vault: State<VaultStateHandle>, id: String) -> Result<Option<BastionProfile>, String> {
+    vault.get_bastion_with_credentials(&id)
+}
+
+/// Create a new bastion profile
+#[tauri::command]
+pub fn create_bastion(
+    vault: State<VaultStateHandle>,
+    name: String,
+    host: String,
+    port: u16,
+    username: String,
+    auth_type: String,
+    password: Option<String>,
+    key_path: Option<String>,
+    key_passphrase: Option<String>,
+) -> Result<BastionProfileInfo, String> {
+    let auth = match auth_type.as_str() {
+        "password" => BastionAuthType::Password,
+        "key" => BastionAuthType::Key,
+        _ => return Err(format!("Invalid auth type: {}", auth_type)),
+    };
+
+    vault.create_bastion(name, host, port, username, auth, password, key_path, key_passphrase)
+}
+
+/// Update a bastion profile
+#[tauri::command]
+pub fn update_bastion(
+    vault: State<VaultStateHandle>,
+    id: String,
+    name: Option<String>,
+    host: Option<String>,
+    port: Option<u16>,
+    username: Option<String>,
+    auth_type: Option<String>,
+    password: Option<String>,
+    key_path: Option<String>,
+    key_passphrase: Option<String>,
+) -> Result<bool, String> {
+    let auth = auth_type.map(|t| match t.as_str() {
+        "password" => BastionAuthType::Password,
+        _ => BastionAuthType::Key,
+    });
+
+    vault.update_bastion(&id, name, host, port, username, auth, password, key_path, key_passphrase)
+}
+
+/// Delete a bastion profile
+#[tauri::command]
+pub fn delete_bastion(vault: State<VaultStateHandle>, id: String) -> Result<bool, String> {
+    vault.delete_bastion(&id)
 }

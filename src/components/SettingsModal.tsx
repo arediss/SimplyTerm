@@ -31,6 +31,7 @@ import {
 import { usePlugins, type PluginManifest } from "../plugins";
 import { useVault } from "../hooks/useVault";
 import { getThemes } from "../themes";
+import BastionManager from "./BastionManager";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -410,6 +411,7 @@ function ConnectionsSettings({
 }) {
   const { t } = useTranslation();
   const [confirmClear, setConfirmClear] = useState(false);
+  const vault = useVault();
 
   const handleClearAll = () => {
     if (confirmClear) {
@@ -423,6 +425,30 @@ function ConnectionsSettings({
 
   return (
     <div className="space-y-6">
+      {/* Bastions / Jump Hosts */}
+      {vault.status?.isUnlocked && (
+        <SettingGroup
+          title={t("settings.bastions.title")}
+          description={t("settings.bastions.description")}
+        >
+          <BastionManager />
+        </SettingGroup>
+      )}
+
+      {!vault.status?.isUnlocked && (
+        <SettingGroup
+          title={t("settings.bastions.title")}
+          description={t("settings.bastions.description")}
+        >
+          <div className="flex items-center gap-3 p-4 bg-warning/10 border border-warning/20 rounded-lg">
+            <Lock size={20} className="text-warning shrink-0" />
+            <p className="text-sm text-warning">
+              {t("settings.bastions.vaultLocked")}
+            </p>
+          </div>
+        </SettingGroup>
+      )}
+
       <SettingGroup
         title={t("settings.connections.savedTitle")}
         description={t("settings.connections.savedDesc")}

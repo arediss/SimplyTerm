@@ -166,6 +166,31 @@ export default {
       deleteWarning: "Cliquez à nouveau pour confirmer. Cette action est irréversible.",
     },
 
+    // --- Section Bastions ---
+    bastions: {
+      // Titre de la section
+      title: "Jump Hosts (Bastions)",
+      // Description de la section
+      description: "Configurer les serveurs de rebond SSH",
+      // Message aucun bastion
+      noBastions: "Aucun serveur de rebond configuré",
+      // Message de comptage
+      count_one: "{{count}} serveur de rebond configuré",
+      count_other: "{{count}} serveurs de rebond configurés",
+      // Bouton ajouter
+      add: "Ajouter",
+      // Titre formulaire création
+      create: "Nouveau serveur de rebond",
+      // Titre formulaire édition
+      edit: "Modifier le serveur de rebond",
+      // Champ nom
+      name: "Nom",
+      // Laisser vide pour garder la valeur actuelle
+      leaveEmptyToKeep: "laisser vide pour garder",
+      // Avertissement vault verrouillé
+      vaultLocked: "Déverrouillez le vault pour gérer les serveurs de rebond",
+    },
+
     // --- Section Sécurité ---
     security: {
       // Titre du groupe vault non configuré
@@ -566,12 +591,18 @@ export default {
       port: "Port",
       username: "Utilisateur",
       sameAsDestination: "Identique à la destination",
+      sameAuth: "Même authentification que la destination",
+      none: "Aucun (connexion directe)",
+      configureInSettings: "Configurer les jump hosts dans les Paramètres",
     },
     // Labels des types de connexion
     types: {
       ssh: "SSH",
+      sshDesc: "Secure Shell",
       telnet: "Telnet",
+      telnetDesc: "Non chiffré",
       serial: "Série",
+      serialDesc: "COM / TTY",
       newTelnet: "Nouvelle connexion Telnet",
       newSerial: "Nouvelle connexion série",
     },
