@@ -602,8 +602,11 @@ function SecuritySettings() {
 
     if (available) {
       // Detect security keys
-      const keys = await vault.detectSecurityKeys();
+      const { keys, error } = await vault.detectSecurityKeys();
       setDetectedSecurityKeys(keys);
+      if (error) {
+        setSecurityKeyError(error);
+      }
     }
 
     setSecurityKeyLoading(false);
@@ -611,8 +614,12 @@ function SecuritySettings() {
 
   const handleRefreshSecurityKeys = async () => {
     setSecurityKeyLoading(true);
-    const keys = await vault.detectSecurityKeys();
+    setSecurityKeyError(null);
+    const { keys, error } = await vault.detectSecurityKeys();
     setDetectedSecurityKeys(keys);
+    if (error) {
+      setSecurityKeyError(error);
+    }
     setSecurityKeyLoading(false);
   };
 
@@ -1028,19 +1035,32 @@ function SecuritySettings() {
               </div>
             ) : detectedSecurityKeys.length === 0 ? (
               <div className="p-4 bg-surface-0/30 rounded-lg">
-                <p className="text-sm text-text-muted text-center">
-                  {t("settings.security.noKeyDetected")}
-                </p>
-                <p className="text-xs text-text-muted/70 text-center mt-1">
-                  {t("settings.security.insertKeyPrompt")}
-                </p>
-                <button
-                  onClick={handleRefreshSecurityKeys}
-                  className="mt-3 w-full py-2 bg-surface-0/50 text-text-muted text-xs rounded-lg hover:bg-surface-0 transition-colors flex items-center justify-center gap-2"
-                >
-                  <RefreshCw size={14} />
-                  {t("common.refresh")}
-                </button>
+                {navigator.platform.includes('Win') ? (
+                  <>
+                    <p className="text-sm text-text text-center">
+                      {t("settings.security.windowsWebAuthnReady")}
+                    </p>
+                    <p className="text-xs text-text-muted/70 text-center mt-1">
+                      {t("settings.security.windowsWebAuthnHint")}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-text-muted text-center">
+                      {t("settings.security.noKeyDetected")}
+                    </p>
+                    <p className="text-xs text-text-muted/70 text-center mt-1">
+                      {t("settings.security.insertKeyPrompt")}
+                    </p>
+                    <button
+                      onClick={handleRefreshSecurityKeys}
+                      className="mt-3 w-full py-2 bg-surface-0/50 text-text-muted text-xs rounded-lg hover:bg-surface-0 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <RefreshCw size={14} />
+                      {t("common.refresh")}
+                    </button>
+                  </>
+                )}
               </div>
             ) : (
               <>
@@ -1092,7 +1112,7 @@ function SecuritySettings() {
               </button>
               <button
                 onClick={handleSetupSecurityKey}
-                disabled={securityKeyLoading || detectedSecurityKeys.length === 0}
+                disabled={securityKeyLoading || (detectedSecurityKeys.length === 0 && !navigator.platform.includes('Win'))}
                 className="flex-1 py-2 bg-accent text-crust text-sm font-medium rounded-lg hover:bg-accent-hover transition-colors disabled:opacity-50"
               >
                 {securityKeyLoading ? t("settings.security.touchKey") : t("common.configure")}

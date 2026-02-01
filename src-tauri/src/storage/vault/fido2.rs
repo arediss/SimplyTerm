@@ -1,18 +1,23 @@
 //! FIDO2 security key support for vault unlock
 //!
-//! Uses ctap-hid-fido2 for direct HID access to FIDO2 authenticators.
-//!
-//! Note: On Windows, this requires running as Administrator for HID access.
-//! A future update may add native Windows WebAuthn API support.
+//! Platform-specific backends:
+//! - Windows: Uses native WebAuthn API (no admin required)
+//! - macOS/Linux: Uses ctap-hid-fido2 for direct HID access
 
-use ctap_hid_fido2::{
-    fidokey::{GetAssertionArgsBuilder, MakeCredentialArgsBuilder},
-    verifier, Cfg, FidoKeyHidFactory,
-};
 use serde::{Deserialize, Serialize};
+#[cfg(not(windows))]
 use sha2::{Digest, Sha256};
+#[cfg(windows)]
+use sha2::Sha256;
+
+// Import Windows-specific backend
+#[cfg(windows)]
+mod windows_backend {
+    pub use super::super::fido2_windows::*;
+}
 
 /// Relying Party ID for SimplyTerm vault
+#[cfg(not(windows))]
 const RP_ID: &str = "simplyterm.local";
 
 /// Information about a detected FIDO2 security key
@@ -46,54 +51,51 @@ pub struct Fido2Config {
     pub nonce: String,
 }
 
-/// Check if running with elevated privileges (Windows only)
-#[cfg(windows)]
-fn is_elevated() -> bool {
-    use std::process::Command;
+// =============================================================================
+// Windows implementation using native WebAuthn API
+// =============================================================================
 
-    // Try to run a command that requires admin privileges
-    Command::new("net")
-        .args(["session"])
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
+#[cfg(windows)]
+pub fn is_fido2_available() -> bool {
+    windows_backend::is_available()
 }
+
+#[cfg(windows)]
+pub fn detect_security_keys() -> Result<Vec<SecurityKeyInfo>, String> {
+    windows_backend::detect_security_keys()
+}
+
+#[cfg(windows)]
+pub fn register_security_key(pin: Option<&str>) -> Result<(Vec<u8>, Vec<u8>), String> {
+    windows_backend::register_security_key(pin)
+}
+
+#[cfg(windows)]
+pub fn authenticate_with_security_key(
+    credential_id: &[u8],
+    pin: Option<&str>,
+) -> Result<Vec<u8>, String> {
+    windows_backend::authenticate_with_security_key(credential_id, pin)
+}
+
+// =============================================================================
+// macOS/Linux implementation using ctap-hid-fido2
+// =============================================================================
 
 #[cfg(not(windows))]
-fn is_elevated() -> bool {
-    true // Not needed on other platforms
-}
+use ctap_hid_fido2::{
+    fidokey::{GetAssertionArgsBuilder, MakeCredentialArgsBuilder},
+    verifier, Cfg, FidoKeyHidFactory,
+};
 
-/// Check if FIDO2 security keys are available
+#[cfg(not(windows))]
 pub fn is_fido2_available() -> bool {
-    // On Windows, check if we have admin privileges
-    #[cfg(windows)]
-    {
-        if !is_elevated() {
-            // Can't access HID without admin on Windows
-            // Return true anyway so user sees the option, but setup will explain
-            return true;
-        }
-    }
-
     // Try to create a device connection
     FidoKeyHidFactory::create(&Cfg::init()).is_ok()
 }
 
-/// Detect connected FIDO2 security keys
+#[cfg(not(windows))]
 pub fn detect_security_keys() -> Result<Vec<SecurityKeyInfo>, String> {
-    // On Windows, check privileges first
-    #[cfg(windows)]
-    {
-        if !is_elevated() {
-            return Err(
-                "Sur Windows, l'accès aux clés FIDO2 nécessite les droits administrateur.\n\
-                 Relancez SimplyTerm en tant qu'administrateur pour configurer votre clé."
-                    .to_string(),
-            );
-        }
-    }
-
     let devices = ctap_hid_fido2::get_fidokey_devices();
 
     if devices.is_empty() {
@@ -116,22 +118,8 @@ pub fn detect_security_keys() -> Result<Vec<SecurityKeyInfo>, String> {
     Ok(keys)
 }
 
-/// Create a FIDO2 credential for vault unlock
-///
-/// Returns (credential_id, assertion_data_for_key_derivation)
+#[cfg(not(windows))]
 pub fn register_security_key(pin: Option<&str>) -> Result<(Vec<u8>, Vec<u8>), String> {
-    // On Windows, check privileges first
-    #[cfg(windows)]
-    {
-        if !is_elevated() {
-            return Err(
-                "Sur Windows, la configuration FIDO2 nécessite les droits administrateur.\n\
-                 Relancez SimplyTerm en tant qu'administrateur."
-                    .to_string(),
-            );
-        }
-    }
-
     let device = FidoKeyHidFactory::create(&Cfg::init())
         .map_err(|e| format!("Impossible d'ouvrir la clé de sécurité: {:?}", e))?;
 
@@ -179,25 +167,11 @@ pub fn register_security_key(pin: Option<&str>) -> Result<(Vec<u8>, Vec<u8>), St
     Ok((credential_id, assertions[0].signature.clone()))
 }
 
-/// Authenticate with a FIDO2 security key
-///
-/// Returns data that can be used to derive the vault encryption key
+#[cfg(not(windows))]
 pub fn authenticate_with_security_key(
     credential_id: &[u8],
     pin: Option<&str>,
 ) -> Result<Vec<u8>, String> {
-    // On Windows, check privileges first
-    #[cfg(windows)]
-    {
-        if !is_elevated() {
-            return Err(
-                "Sur Windows, l'authentification FIDO2 nécessite les droits administrateur.\n\
-                 Relancez SimplyTerm en tant qu'administrateur."
-                    .to_string(),
-            );
-        }
-    }
-
     let device = FidoKeyHidFactory::create(&Cfg::init())
         .map_err(|e| format!("Impossible d'ouvrir la clé de sécurité: {:?}", e))?;
 
@@ -223,7 +197,12 @@ pub fn authenticate_with_security_key(
     Ok(assertions[0].signature.clone())
 }
 
+// =============================================================================
+// Common functions (all platforms)
+// =============================================================================
+
 /// Derive a deterministic challenge from the credential ID
+#[cfg(not(windows))]
 fn derive_challenge_from_credential(credential_id: &[u8]) -> Vec<u8> {
     let mut hasher = Sha256::new();
     hasher.update(b"simplyterm-vault-challenge-v1");
@@ -248,6 +227,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(not(windows))]
     fn test_challenge_derivation_is_deterministic() {
         let cred_id = b"test-credential-id";
         let challenge1 = derive_challenge_from_credential(cred_id);

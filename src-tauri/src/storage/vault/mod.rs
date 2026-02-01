@@ -9,12 +9,14 @@
 //! - `crypto.rs`: AES-256-GCM encryption and Argon2id key derivation
 //! - `state.rs`: In-memory vault state management
 //! - `commands.rs`: Tauri commands for frontend integration
-//! - `fido2.rs`: FIDO2 security key support (WebAuthn/CTAP2)
-//! - `webauthn_win.rs`: Windows WebAuthn API (no admin privileges needed)
+//! - `fido2.rs`: FIDO2 security key support (cross-platform dispatcher)
+//! - `fido2_windows.rs`: Windows WebAuthn API backend (no admin required)
 
 mod commands;
 mod crypto;
 pub mod fido2;
+#[cfg(windows)]
+pub mod fido2_windows;
 mod state;
 mod types;
 

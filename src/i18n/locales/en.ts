@@ -274,6 +274,10 @@ export default {
       noKeyDetected: "No security key detected",
       // Insert key prompt
       insertKeyPrompt: "Insert a FIDO2 key (YubiKey, SoloKey, Google Titan, etc.)",
+      // Windows WebAuthn ready message
+      windowsWebAuthnReady: "Ready to configure",
+      // Windows WebAuthn hint
+      windowsWebAuthnHint: "Click Configure to use Windows Hello or plug in your USB security key",
       // Key detected - singular
       keyDetected_one: "{{count}} key detected",
       // Keys detected - plural

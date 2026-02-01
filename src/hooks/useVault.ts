@@ -195,12 +195,13 @@ export function useVault() {
   }, []);
 
   // Detect connected FIDO2 security keys
-  const detectSecurityKeys = useCallback(async () => {
+  const detectSecurityKeys = useCallback(async (): Promise<{ keys: SecurityKeyInfo[], error: string | null }> => {
     try {
-      return await invoke<SecurityKeyInfo[]>('detect_security_keys');
+      const keys = await invoke<SecurityKeyInfo[]>('detect_security_keys');
+      return { keys, error: null };
     } catch (err) {
       console.error('Failed to detect security keys:', err);
-      return [];
+      return { keys: [], error: String(err) };
     }
   }, []);
 
