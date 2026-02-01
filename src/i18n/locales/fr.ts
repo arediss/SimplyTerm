@@ -557,6 +557,32 @@ export default {
     enterPassword: "Entrez votre mot de passe pour vous connecter",
     // Invitation à entrer le mot de passe pour SFTP
     enterPasswordSftp: "Entrez votre mot de passe pour ouvrir SFTP",
+    // Avertissement Telnet connexion non chiffrée
+    telnetWarning: "Les connexions Telnet ne sont pas chiffrées. Utilisez SSH autant que possible pour la sécurité.",
+    // Labels des types de connexion
+    types: {
+      ssh: "SSH",
+      telnet: "Telnet",
+      serial: "Série",
+      newTelnet: "Nouvelle connexion Telnet",
+      newSerial: "Nouvelle connexion série",
+    },
+    // Champs de connexion série
+    serial: {
+      port: "Port",
+      baudRate: "Débit",
+      dataBits: "Bits de données",
+      stopBits: "Bits d'arrêt",
+      parity: "Parité",
+      parityNone: "Aucune",
+      parityOdd: "Impaire",
+      parityEven: "Paire",
+      flowControl: "Contrôle de flux",
+      flowNone: "Aucun",
+      flowHardware: "Matériel (RTS/CTS)",
+      flowSoftware: "Logiciel (XON/XOFF)",
+      noPorts: "Aucun port disponible",
+    },
   },
 
   // ============================================

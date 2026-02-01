@@ -6,7 +6,8 @@ import FloatingTabs from "./components/FloatingTabs";
 import TerminalPane from "./components/TerminalPane";
 import Modal from "./components/Modal";
 import HostKeyModal, { HostKeyCheckResult } from "./components/HostKeyModal";
-import ConnectionForm, { SshConnectionConfig } from "./components/ConnectionForm";
+import { SshConnectionConfig } from "./components/ConnectionForm";
+import NewConnectionModal from "./components/NewConnectionModal";
 import SettingsModal from "./components/SettingsModal";
 import { CommandPalette, useCommandPalette, CommandHandlers, CommandContext } from "./components/CommandPalette";
 import { StatusBar } from "./components/StatusBar";
@@ -30,7 +31,8 @@ import { VaultSetupModal, VaultUnlockModal } from "./components/vault";
 import TunnelManager from "./components/TunnelManager";
 import TunnelSidebar from "./components/TunnelSidebar";
 import { useSessions, useAppSettings, useVaultFlow } from "./hooks";
-import { SavedSession, RecentSession, Tab } from "./types";
+import { SavedSession, RecentSession, Tab, TelnetConnectionConfig, SerialConnectionConfig } from "./types";
+import { ConnectionType } from "./components/ConnectionTypeSelector";
 import { generateSessionId, generateTabId, expandHomeDir, isModifierPressed, modifierKey } from "./utils";
 import { applyTheme } from "./themes";
 
@@ -89,6 +91,9 @@ function App() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState<string | undefined>();
   const [initialConnectionConfig, setInitialConnectionConfig] = useState<Partial<SshConnectionConfig> | null>(null);
+  const [initialTelnetConfig, setInitialTelnetConfig] = useState<Partial<TelnetConnectionConfig> | null>(null);
+  const [initialSerialConfig, setInitialSerialConfig] = useState<Partial<SerialConnectionConfig> | null>(null);
+  const [connectionType, setConnectionType] = useState<ConnectionType>("ssh");
 
   // Save session modal state
   const [pendingSaveConfig, setPendingSaveConfig] = useState<SshConnectionConfig | null>(null);
@@ -521,6 +526,98 @@ function App() {
 
     // Check host key before connecting
     await checkHostKeyBeforeConnect(config.host, config.port, performSshConnection);
+  };
+
+  // Handler Telnet connection
+  const handleTelnetConnect = async (config: TelnetConnectionConfig) => {
+    setIsConnecting(true);
+    setConnectionError(undefined);
+
+    const ptySessionId = generateSessionId("telnet");
+
+    try {
+      await invoke("create_telnet_session", {
+        sessionId: ptySessionId,
+        host: config.host,
+        port: config.port,
+      });
+
+      const paneTree = createTerminalNode(ptySessionId);
+      const newTab: Tab = {
+        id: generateTabId(),
+        sessionId: `telnet-${config.host}`,
+        paneTree,
+        title: config.name,
+        type: "telnet",
+        telnetConfig: config,
+        focusedPaneId: paneTree.id,
+      };
+
+      setTabs((prev) => [...prev, newTab]);
+      setActiveTabId(newTab.id);
+      setIsConnectionModalOpen(false);
+      setOpenSidebar("none");
+      setIsConnecting(false);
+
+      pluginManager.notifySessionConnect({
+        id: ptySessionId,
+        type: "ssh", // Plugins treat it as SSH-like
+        host: config.host,
+        port: config.port,
+        status: "connected",
+      });
+    } catch (error) {
+      console.error("Telnet connection failed:", error);
+      setConnectionError(String(error));
+      setIsConnecting(false);
+    }
+  };
+
+  // Handler Serial connection
+  const handleSerialConnect = async (config: SerialConnectionConfig) => {
+    setIsConnecting(true);
+    setConnectionError(undefined);
+
+    const ptySessionId = generateSessionId("serial");
+
+    try {
+      await invoke("create_serial_session", {
+        sessionId: ptySessionId,
+        port: config.port,
+        baudRate: config.baudRate,
+        dataBits: config.dataBits,
+        stopBits: config.stopBits,
+        parity: config.parity,
+        flowControl: config.flowControl,
+      });
+
+      const paneTree = createTerminalNode(ptySessionId);
+      const newTab: Tab = {
+        id: generateTabId(),
+        sessionId: `serial-${config.port}`,
+        paneTree,
+        title: config.name,
+        type: "serial",
+        serialConfig: config,
+        focusedPaneId: paneTree.id,
+      };
+
+      setTabs((prev) => [...prev, newTab]);
+      setActiveTabId(newTab.id);
+      setIsConnectionModalOpen(false);
+      setOpenSidebar("none");
+      setIsConnecting(false);
+
+      pluginManager.notifySessionConnect({
+        id: ptySessionId,
+        type: "local", // Serial is like a local connection
+        status: "connected",
+      });
+    } catch (error) {
+      console.error("Serial connection failed:", error);
+      setConnectionError(String(error));
+      setIsConnecting(false);
+    }
   };
 
   // Sauvegarder une session
@@ -1207,6 +1304,9 @@ function App() {
   const handleOpenConnectionModal = () => {
     setConnectionError(undefined);
     setInitialConnectionConfig(null);
+    setInitialTelnetConfig(null);
+    setInitialSerialConfig(null);
+    setConnectionType("ssh");
     setEditingSessionId(null);
     setIsConnectionModalOpen(true);
     setOpenSidebar("none");
@@ -1493,32 +1593,29 @@ function App() {
       />
 
       {/* Connection Modal */}
-      <Modal
+      <NewConnectionModal
         isOpen={isConnectionModalOpen}
         onClose={() => {
           setIsConnectionModalOpen(false);
           setInitialConnectionConfig(null);
+          setInitialTelnetConfig(null);
+          setInitialSerialConfig(null);
           setConnectionError(undefined);
           setEditingSessionId(null);
           setPendingSftpSession(null);
+          setConnectionType("ssh");
         }}
-        title={editingSessionId ? t('app.editConnection') : (pendingSftpSession ? t('app.sftpConnection') : (initialConnectionConfig ? t('app.reconnectSsh') : t('app.newSshConnection')))}
-        width="md"
-      >
-        <ConnectionForm
-          onConnect={handleSshConnect}
-          onCancel={() => {
-            setIsConnectionModalOpen(false);
-            setInitialConnectionConfig(null);
-            setConnectionError(undefined);
-            setEditingSessionId(null);
-            setPendingSftpSession(null);
-          }}
-          isConnecting={isConnecting}
-          error={connectionError}
-          initialConfig={initialConnectionConfig}
-        />
-      </Modal>
+        onSshConnect={handleSshConnect}
+        onTelnetConnect={handleTelnetConnect}
+        onSerialConnect={handleSerialConnect}
+        isConnecting={isConnecting}
+        error={connectionError}
+        initialSshConfig={initialConnectionConfig}
+        initialTelnetConfig={initialTelnetConfig}
+        initialSerialConfig={initialSerialConfig}
+        initialConnectionType={connectionType}
+        title={editingSessionId ? t('app.editConnection') : (pendingSftpSession ? t('app.sftpConnection') : undefined)}
+      />
 
       {/* Save Session Modal */}
       <Modal

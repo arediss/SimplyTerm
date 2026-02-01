@@ -17,6 +17,7 @@ mod tunnels;
 use connectors::{
     connect_ssh, create_local_session, ssh_exec::ssh_exec, SshAuth, SshConfig, FileEntry, sftp_read_file,
     check_host_key_only, HostKeyCheckResult, accept_pending_key, accept_and_update_pending_key, remove_pending_key,
+    connect_telnet, connect_serial, list_serial_ports, SerialConfig, SerialPortInfo,
 };
 use plugins::{PluginManager, PluginState};
 use session::SessionManager;
@@ -109,6 +110,73 @@ async fn create_ssh_session(
         let _ = app_clone.emit(&format!("pty-exit-{}", session_id_clone), ());
     })
     .await?;
+
+    state
+        .session_manager
+        .register(session_id, Box::new(session));
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn create_telnet_session(
+    app: AppHandle,
+    session_id: String,
+    host: String,
+    port: u16,
+) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let output_tx = state.session_manager.output_sender();
+
+    let app_clone = app.clone();
+    let session_id_clone = session_id.clone();
+
+    let session = connect_telnet(host, port, session_id.clone(), output_tx, move || {
+        let _ = app_clone.emit(&format!("pty-exit-{}", session_id_clone), ());
+    })
+    .await?;
+
+    state
+        .session_manager
+        .register(session_id, Box::new(session));
+
+    Ok(())
+}
+
+#[tauri::command]
+fn get_serial_ports() -> Result<Vec<SerialPortInfo>, String> {
+    list_serial_ports()
+}
+
+#[tauri::command]
+async fn create_serial_session(
+    app: AppHandle,
+    session_id: String,
+    port: String,
+    baud_rate: u32,
+    data_bits: u8,
+    stop_bits: u8,
+    parity: String,
+    flow_control: String,
+) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let output_tx = state.session_manager.output_sender();
+
+    let config = SerialConfig {
+        port,
+        baud_rate,
+        data_bits,
+        stop_bits,
+        parity,
+        flow_control,
+    };
+
+    let app_clone = app.clone();
+    let session_id_clone = session_id.clone();
+
+    let session = connect_serial(config, session_id.clone(), output_tx, move || {
+        let _ = app_clone.emit(&format!("pty-exit-{}", session_id_clone), ());
+    })?;
 
     state
         .session_manager
@@ -1023,6 +1091,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             create_pty_session,
             create_ssh_session,
+            // Telnet & Serial
+            create_telnet_session,
+            get_serial_ports,
+            create_serial_session,
             // Host key verification
             check_host_key,
             trust_host_key,

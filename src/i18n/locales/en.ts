@@ -557,6 +557,32 @@ export default {
     enterPassword: "Enter your password to connect",
     // Enter password prompt for SFTP
     enterPasswordSftp: "Enter your password to open SFTP",
+    // Telnet warning about unencrypted connection
+    telnetWarning: "Telnet connections are not encrypted. Use SSH whenever possible for security.",
+    // Connection type labels
+    types: {
+      ssh: "SSH",
+      telnet: "Telnet",
+      serial: "Serial",
+      newTelnet: "New Telnet Connection",
+      newSerial: "New Serial Connection",
+    },
+    // Serial connection fields
+    serial: {
+      port: "Port",
+      baudRate: "Baud Rate",
+      dataBits: "Data Bits",
+      stopBits: "Stop Bits",
+      parity: "Parity",
+      parityNone: "None",
+      parityOdd: "Odd",
+      parityEven: "Even",
+      flowControl: "Flow Control",
+      flowNone: "None",
+      flowHardware: "Hardware (RTS/CTS)",
+      flowSoftware: "Software (XON/XOFF)",
+      noPorts: "No ports available",
+    },
   },
 
   // ============================================

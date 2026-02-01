@@ -64,3 +64,6 @@ windows = { version = "0.58", features = [
 # External file editing
 notify = "6"
 open = "5"
+
+# Serial port communication
+serialport = "4.3"

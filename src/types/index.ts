@@ -4,10 +4,36 @@ import { PaneNode } from "../components/SplitPane";
 export interface Session {
   id: string;
   name: string;
-  type: "ssh" | "local" | "sftp";
+  type: "ssh" | "local" | "sftp" | "telnet" | "serial";
   host?: string;
   user?: string;
   status: "connected" | "disconnected" | "connecting";
+}
+
+// Telnet connection configuration
+export interface TelnetConnectionConfig {
+  name: string;
+  host: string;
+  port: number;
+}
+
+// Serial/COM connection configuration
+export interface SerialConnectionConfig {
+  name: string;
+  port: string;
+  baudRate: number;
+  dataBits: 5 | 6 | 7 | 8;
+  stopBits: 1 | 2;
+  parity: "none" | "odd" | "even";
+  flowControl: "none" | "hardware" | "software";
+}
+
+// Serial port information from backend
+export interface SerialPortInfo {
+  port_name: string;
+  port_type: string;
+  manufacturer: string | null;
+  product: string | null;
 }
 
 export interface SavedSession {
@@ -48,8 +74,10 @@ export interface Tab {
   sessionId: string;
   paneTree: PaneNode;
   title: string;
-  type: "local" | "ssh" | "sftp" | "tunnel";
+  type: "local" | "ssh" | "sftp" | "tunnel" | "telnet" | "serial";
   sshConfig?: SshConnectionConfig;
+  telnetConfig?: TelnetConnectionConfig;
+  serialConfig?: SerialConnectionConfig;
   focusedPaneId: string | null;
 }
 
