@@ -1412,6 +1412,7 @@ function App() {
                       type={tab.type as "local" | "ssh"}
                       isActive={tab.id === activeTabId && isFocused}
                       appTheme={appSettings.appearance?.theme ?? "dark"}
+                      terminalSettings={appSettings.terminal}
                     />
                   )}
                   renderSftp={(_paneId, sessionId, initialPath) => (

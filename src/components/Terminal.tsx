@@ -10,17 +10,35 @@ import { X, ChevronUp, ChevronDown, CaseSensitive, Regex } from "lucide-react";
 import "@xterm/xterm/css/xterm.css";
 import { getTerminalTheme } from "../themes";
 
+interface TerminalSettings {
+  fontSize: number;
+  fontFamily: string;
+  cursorStyle: "block" | "bar" | "underline";
+  cursorBlink: boolean;
+  scrollback: number;
+}
+
 interface TerminalProps {
   sessionId: string;
   type: "local" | "ssh";
   onExit?: () => void;
   isActive?: boolean;
   appTheme?: string;
+  settings?: TerminalSettings;
 }
+
+const defaultTerminalSettings: TerminalSettings = {
+  fontSize: 13,
+  fontFamily: "JetBrains Mono",
+  cursorStyle: "bar",
+  cursorBlink: true,
+  scrollback: 10000,
+};
 
 const RESIZE_DEBOUNCE_MS = 100;
 
-function Terminal({ sessionId, type, onExit, isActive = true, appTheme = "dark" }: TerminalProps) {
+function Terminal({ sessionId, type, onExit, isActive = true, appTheme = "dark", settings }: TerminalProps) {
+  const terminalSettings = settings ?? defaultTerminalSettings;
   const { t } = useTranslation();
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
@@ -54,14 +72,14 @@ function Terminal({ sessionId, type, onExit, isActive = true, appTheme = "dark" 
     if (!terminalRef.current) return;
 
     const xterm = new XTerm({
-      cursorBlink: true,
-      cursorStyle: "bar",
-      fontSize: 13,
-      fontFamily: '"JetBrains Mono", "SF Mono", Menlo, Consolas, monospace',
+      cursorBlink: terminalSettings.cursorBlink,
+      cursorStyle: terminalSettings.cursorStyle,
+      fontSize: terminalSettings.fontSize,
+      fontFamily: `"${terminalSettings.fontFamily}", "SF Mono", Menlo, Consolas, monospace`,
       fontWeight: "400",
       lineHeight: 1.25,
       letterSpacing: 0,
-      scrollback: 10000,
+      scrollback: terminalSettings.scrollback,
       allowProposedApi: true,
       theme: getTerminalTheme(appTheme),
     });
@@ -211,6 +229,23 @@ function Terminal({ sessionId, type, onExit, isActive = true, appTheme = "dark" 
       xtermRef.current.options.theme = getTerminalTheme(appTheme);
     }
   }, [appTheme]);
+
+  // Update terminal settings when they change
+  useEffect(() => {
+    if (xtermRef.current) {
+      const xterm = xtermRef.current;
+      xterm.options.fontSize = terminalSettings.fontSize;
+      xterm.options.fontFamily = `"${terminalSettings.fontFamily}", "SF Mono", Menlo, Consolas, monospace`;
+      xterm.options.cursorStyle = terminalSettings.cursorStyle;
+      xterm.options.cursorBlink = terminalSettings.cursorBlink;
+      xterm.options.scrollback = terminalSettings.scrollback;
+
+      // Refit after font changes
+      if (fitAddonRef.current) {
+        fitAddonRef.current.fit();
+      }
+    }
+  }, [terminalSettings.fontSize, terminalSettings.fontFamily, terminalSettings.cursorStyle, terminalSettings.cursorBlink, terminalSettings.scrollback]);
 
   // Refocus and refit when terminal becomes active
   useEffect(() => {
