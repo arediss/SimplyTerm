@@ -135,6 +135,12 @@ pub enum Permission {
     KnownHostsRead,
     /// Manage known hosts
     KnownHostsWrite,
+
+    // Vault sync (encrypted blob transport)
+    /// Export the encrypted vault bundle (vault.meta + vault.enc)
+    VaultExportEncrypted,
+    /// Import and overwrite the encrypted vault bundle
+    VaultImportEncrypted,
 }
 
 impl Permission {
@@ -178,6 +184,8 @@ impl Permission {
             Permission::BastionsWrite => "Create, modify, and delete bastion profiles",
             Permission::KnownHostsRead => "Read SSH known hosts entries",
             Permission::KnownHostsWrite => "Manage SSH known hosts entries",
+            Permission::VaultExportEncrypted => "Export the encrypted vault bundle for sync/backup",
+            Permission::VaultImportEncrypted => "Import and overwrite the encrypted vault bundle",
         }
     }
 
@@ -218,7 +226,9 @@ impl Permission {
             | Permission::ClipboardRead
             | Permission::ClipboardWrite
             | Permission::BastionsWrite
-            | Permission::KnownHostsWrite => PermissionRisk::Medium,
+            | Permission::KnownHostsWrite
+            | Permission::VaultExportEncrypted
+            | Permission::VaultImportEncrypted => PermissionRisk::Medium,
 
             // High risk - sensitive data or system access
             Permission::SessionsConnect

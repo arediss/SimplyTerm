@@ -1346,6 +1346,49 @@ fn plugin_api_vault_delete(
 }
 
 // ============================================================================
+// Plugin API v1 - Vault Sync (Encrypted Export/Import)
+// ============================================================================
+
+#[tauri::command]
+fn plugin_api_vault_export_encrypted(
+    app: AppHandle,
+    plugin_id: String,
+) -> Result<storage::vault::VaultExportResult, String> {
+    use plugins::manifest::Permission;
+
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .map_err(|e| e.message)?
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    if !plugin.granted_permissions.has(Permission::VaultExportEncrypted) {
+        return Err("Permission denied: vault_export_encrypted required".to_string());
+    }
+
+    state.vault.export_encrypted()
+}
+
+#[tauri::command]
+fn plugin_api_vault_import_encrypted(
+    app: AppHandle,
+    plugin_id: String,
+    bundle: storage::vault::VaultBundle,
+) -> Result<storage::vault::SyncMeta, String> {
+    use plugins::manifest::Permission;
+
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .map_err(|e| e.message)?
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    if !plugin.granted_permissions.has(Permission::VaultImportEncrypted) {
+        return Err("Permission denied: vault_import_encrypted required".to_string());
+    }
+
+    state.vault.import_encrypted(bundle)
+}
+
+// ============================================================================
 // Plugin API v1 - Server Stats
 // ============================================================================
 
@@ -1497,6 +1540,9 @@ pub fn run() {
             plugin_api_vault_store,
             plugin_api_vault_read,
             plugin_api_vault_delete,
+            // Plugin API v1 - Vault Sync
+            plugin_api_vault_export_encrypted,
+            plugin_api_vault_import_encrypted,
             // Plugin API v1 - Server Stats
             plugin_api_get_server_stats,
             // Vault
@@ -1518,6 +1564,9 @@ pub fn run() {
             storage::vault::check_vault_auto_lock,
             storage::vault::set_vault_require_unlock_on_connect,
             storage::vault::get_vault_require_unlock_on_connect,
+            // Vault Sync
+            storage::vault::vault_export_encrypted,
+            storage::vault::vault_import_encrypted,
             // FIDO2 Security Keys
             storage::vault::is_security_key_available,
             storage::vault::detect_security_keys,

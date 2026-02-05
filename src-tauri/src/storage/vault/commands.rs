@@ -7,7 +7,10 @@ use tauri::State;
 
 use super::fido2::{self, SecurityKeyInfo};
 use super::state::VaultState;
-use super::types::{BastionAuthType, BastionProfile, BastionProfileInfo, VaultCredentialType, VaultStatus};
+use super::types::{
+    BastionAuthType, BastionProfile, BastionProfileInfo, VaultBundle, VaultCredentialType,
+    VaultExportResult, VaultStatus, SyncMeta,
+};
 
 /// Store the vault state in Tauri's managed state
 pub type VaultStateHandle = Arc<VaultState>;
@@ -183,6 +186,29 @@ pub fn set_vault_require_unlock_on_connect(
 #[tauri::command]
 pub fn get_vault_require_unlock_on_connect(vault: State<VaultStateHandle>) -> bool {
     vault.requires_unlock_on_connect()
+}
+
+// ============================================================================
+// Vault Sync / Export / Import Commands
+// ============================================================================
+
+/// Export the encrypted vault bundle for sync or backup.
+/// Does NOT require the vault to be unlocked — reads raw encrypted files.
+#[tauri::command]
+pub fn vault_export_encrypted(
+    vault: State<VaultStateHandle>,
+) -> Result<VaultExportResult, String> {
+    vault.export_encrypted()
+}
+
+/// Import an encrypted vault bundle, replacing the current vault.
+/// After import, the vault is locked and the user must re-unlock.
+#[tauri::command]
+pub fn vault_import_encrypted(
+    vault: State<VaultStateHandle>,
+    bundle: VaultBundle,
+) -> Result<SyncMeta, String> {
+    vault.import_encrypted(bundle)
 }
 
 // ============================================================================

@@ -80,7 +80,10 @@ export type Permission =
   | 'bastions_write'
   // Known Hosts
   | 'known_hosts_read'
-  | 'known_hosts_write';
+  | 'known_hosts_write'
+  // Vault Sync
+  | 'vault_export_encrypted'
+  | 'vault_import_encrypted';
 
 // ============================================================================
 // Session Types

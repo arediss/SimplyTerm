@@ -439,6 +439,40 @@ impl VaultData {
     }
 }
 
+/// Encrypted vault bundle for sync/backup (no plaintext)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultBundle {
+    /// Raw vault.meta JSON content
+    pub vault_meta: String,
+    /// Base64-encoded vault.enc content
+    pub vault_enc_b64: String,
+}
+
+/// Sync metadata for conflict detection and diagnostics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncMeta {
+    /// Version of this sync meta schema
+    pub format_version: u32,
+    /// Vault format version (from VaultMeta.version)
+    pub vault_format: u32,
+    /// SHA-256 hash of the bundle (vault_meta + vault_enc concatenated)
+    pub blob_sha256: String,
+    /// Unix timestamp of the export
+    pub updated_at: u64,
+    /// UUID of the device that produced this export
+    pub device_id: String,
+}
+
+/// Combined export result: bundle + sync metadata
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultExportResult {
+    pub bundle: VaultBundle,
+    pub sync_meta: SyncMeta,
+}
+
 /// Vault status for frontend
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

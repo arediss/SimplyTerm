@@ -223,6 +223,18 @@ export const permissionInfoMap: Record<string, PermissionInfo> = {
     description: 'Manage SSH known hosts entries',
     risk: 'medium',
   },
+
+  // Vault Sync
+  vault_export_encrypted: {
+    label: 'Vault Export',
+    description: 'Export the encrypted vault bundle for sync or backup',
+    risk: 'medium',
+  },
+  vault_import_encrypted: {
+    label: 'Vault Import',
+    description: 'Import and overwrite the encrypted vault bundle',
+    risk: 'medium',
+  },
 };
 
 const RISK_ORDER: Record<RiskLevel, number> = { high: 0, medium: 1, low: 2 };

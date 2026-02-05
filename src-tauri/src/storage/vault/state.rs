@@ -11,8 +11,8 @@ use std::time::{Duration, Instant};
 use super::crypto::{self, generate_nonce, generate_salt};
 use super::fido2;
 use super::types::{
-    Fido2Config, MasterKey, PinConfig, UnlockMethod, VaultCredentialType, VaultData, VaultMeta,
-    VaultStatus, VAULT_VERSION,
+    Fido2Config, MasterKey, PinConfig, SyncMeta, UnlockMethod, VaultBundle, VaultCredentialType,
+    VaultData, VaultExportResult, VaultMeta, VaultStatus, VAULT_VERSION,
 };
 
 /// Detect available biometric type for this platform
@@ -516,6 +516,174 @@ impl VaultState {
         self.save_data()?;
         self.touch();
         Ok(())
+    }
+
+    // ========================================================================
+    // Encrypted Export/Import (for sync & backup)
+    // ========================================================================
+
+    /// Get or create a persistent device ID (UUID v4) stored in ~/.simplyterm/device_id
+    fn get_or_create_device_id(&self) -> Result<String, String> {
+        let path = self.config_dir.join("device_id");
+        if path.exists() {
+            let id = fs::read_to_string(&path)
+                .map_err(|e| format!("Failed to read device_id: {}", e))?;
+            let id = id.trim().to_string();
+            if !id.is_empty() {
+                return Ok(id);
+            }
+        }
+
+        let id = uuid::Uuid::new_v4().to_string();
+        fs::write(&path, &id)
+            .map_err(|e| format!("Failed to write device_id: {}", e))?;
+        Ok(id)
+    }
+
+    /// Export the encrypted vault as a bundle (vault.meta + vault.enc) with sync metadata.
+    ///
+    /// Does NOT require the vault to be unlocked — reads raw files from disk.
+    /// The bundle contains only encrypted data, no plaintext is ever exposed.
+    pub fn export_encrypted(&self) -> Result<VaultExportResult, String> {
+        if !self.exists() {
+            return Err("Vault does not exist".to_string());
+        }
+
+        // Read raw files
+        let meta_json = fs::read_to_string(self.meta_path())
+            .map_err(|e| format!("Failed to read vault.meta: {}", e))?;
+
+        let enc_bytes = fs::read(self.data_path())
+            .map_err(|e| format!("Failed to read vault.enc: {}", e))?;
+
+        // Parse meta to get vault format version
+        let meta: VaultMeta = serde_json::from_str(&meta_json)
+            .map_err(|e| format!("Failed to parse vault.meta: {}", e))?;
+
+        // Base64-encode the encrypted blob for JSON transport
+        use base64::Engine;
+        let enc_b64 = base64::engine::general_purpose::STANDARD.encode(&enc_bytes);
+
+        // Compute SHA-256 over the concatenation of meta + enc (raw bytes)
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(meta_json.as_bytes());
+        hasher.update(&enc_bytes);
+        let hash = hasher.finalize();
+        let blob_sha256 = hex::encode(hash);
+
+        // Timestamp
+        let updated_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        // Device ID
+        let device_id = self.get_or_create_device_id()?;
+
+        Ok(VaultExportResult {
+            bundle: VaultBundle {
+                vault_meta: meta_json,
+                vault_enc_b64: enc_b64,
+            },
+            sync_meta: SyncMeta {
+                format_version: 1,
+                vault_format: meta.version,
+                blob_sha256,
+                updated_at,
+                device_id,
+            },
+        })
+    }
+
+    /// Import an encrypted vault bundle, replacing the current vault files.
+    ///
+    /// Uses atomic write (temp file + rename) to prevent corruption.
+    /// After import, the vault is locked and the user must re-unlock with their master password.
+    /// Does NOT require the vault to be unlocked.
+    pub fn import_encrypted(&self, bundle: VaultBundle) -> Result<SyncMeta, String> {
+        // Validate the meta JSON is parseable
+        let meta: VaultMeta = serde_json::from_str(&bundle.vault_meta)
+            .map_err(|e| format!("Invalid vault metadata in bundle: {}", e))?;
+
+        // Version check
+        if meta.version > VAULT_VERSION {
+            return Err(format!(
+                "Vault version {} is not supported (max: {}). Update SimplyTerm first.",
+                meta.version, VAULT_VERSION
+            ));
+        }
+
+        // Decode the encrypted data
+        use base64::Engine;
+        let enc_bytes = base64::engine::general_purpose::STANDARD
+            .decode(&bundle.vault_enc_b64)
+            .map_err(|e| format!("Invalid base64 in vault bundle: {}", e))?;
+
+        // Validate that enc_bytes is not empty
+        if enc_bytes.is_empty() {
+            return Err("Vault encrypted data is empty".to_string());
+        }
+
+        // Ensure config directory exists
+        if !self.config_dir.exists() {
+            fs::create_dir_all(&self.config_dir)
+                .map_err(|e| format!("Failed to create config directory: {}", e))?;
+        }
+
+        // Compute SHA-256 for the sync meta response
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(bundle.vault_meta.as_bytes());
+        hasher.update(&enc_bytes);
+        let hash = hasher.finalize();
+        let blob_sha256 = hex::encode(hash);
+
+        // Atomic write: write to temp files, then rename
+        let meta_tmp = self.config_dir.join("vault.meta.tmp");
+        let enc_tmp = self.config_dir.join("vault.enc.tmp");
+
+        // Write temp files
+        fs::write(&meta_tmp, &bundle.vault_meta)
+            .map_err(|e| format!("Failed to write temp vault.meta: {}", e))?;
+        fs::write(&enc_tmp, &enc_bytes)
+            .map_err(|e| {
+                let _ = fs::remove_file(&meta_tmp); // Cleanup on failure
+                format!("Failed to write temp vault.enc: {}", e)
+            })?;
+
+        // Rename atomically (on most filesystems)
+        fs::rename(&meta_tmp, self.meta_path())
+            .map_err(|e| {
+                let _ = fs::remove_file(&meta_tmp);
+                let _ = fs::remove_file(&enc_tmp);
+                format!("Failed to replace vault.meta: {}", e)
+            })?;
+        fs::rename(&enc_tmp, self.data_path())
+            .map_err(|e| {
+                let _ = fs::remove_file(&enc_tmp);
+                format!("Failed to replace vault.enc: {}", e)
+            })?;
+
+        // Lock vault: clear all in-memory state
+        *self.data.write() = None;
+        *self.master_key.write() = None;
+        *self.meta.write() = None;
+
+        let updated_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        let device_id = self.get_or_create_device_id()?;
+
+        Ok(SyncMeta {
+            format_version: 1,
+            vault_format: meta.version,
+            blob_sha256,
+            updated_at,
+            device_id,
+        })
     }
 
     // ========================================================================
