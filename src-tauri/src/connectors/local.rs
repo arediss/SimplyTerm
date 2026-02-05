@@ -48,6 +48,44 @@ impl Session for LocalSession {
     }
 }
 
+/// Detect the user's default shell for the current platform.
+///
+/// - **Windows**: prefers PowerShell 7+ (`pwsh`) if found in PATH,
+///   then Windows PowerShell (`powershell`), then `COMSPEC` (cmd.exe).
+/// - **Unix/macOS**: uses `SHELL` env var, falls back to `/bin/sh`.
+fn detect_default_shell() -> String {
+    #[cfg(windows)]
+    {
+        // Check for PowerShell 7+ (pwsh) in PATH
+        if which_exists("pwsh") {
+            return "pwsh.exe".to_string();
+        }
+        // Check for Windows PowerShell in PATH
+        if which_exists("powershell") {
+            return "powershell.exe".to_string();
+        }
+        // Fall back to COMSPEC (cmd.exe)
+        std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string())
+    }
+
+    #[cfg(not(windows))]
+    {
+        std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string())
+    }
+}
+
+/// Check if a command exists in PATH
+#[cfg(windows)]
+fn which_exists(cmd: &str) -> bool {
+    std::process::Command::new("where")
+        .arg(cmd)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
 /// Creates a new local PTY session
 pub fn create_local_session(
     session_id: String,
@@ -65,17 +103,7 @@ pub fn create_local_session(
         })
         .map_err(|e| e.to_string())?;
 
-    let shell = if cfg!(windows) {
-        std::env::var("COMSPEC").unwrap_or_else(|_| {
-            if std::path::Path::new("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe").exists() {
-                "powershell.exe".to_string()
-            } else {
-                "cmd.exe".to_string()
-            }
-        })
-    } else {
-        std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string())
-    };
+    let shell = detect_default_shell();
 
     #[cfg(not(windows))]
     let cmd = {
