@@ -1418,6 +1418,89 @@ async fn plugin_api_get_server_stats(
 }
 
 // ============================================================================
+// Plugin API v1 - HTTP Proxy (bypasses CORS)
+// ============================================================================
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PluginHttpRequest {
+    method: String,
+    url: String,
+    headers: Option<std::collections::HashMap<String, String>>,
+    body: Option<String>,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PluginHttpResponse {
+    status: u16,
+    status_text: String,
+    headers: std::collections::HashMap<String, String>,
+    body: String,
+}
+
+#[tauri::command]
+async fn plugin_api_http_request(
+    app: AppHandle,
+    plugin_id: String,
+    request: PluginHttpRequest,
+) -> Result<PluginHttpResponse, String> {
+    use plugins::manifest::Permission;
+
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .map_err(|e| e.message)?
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    if !plugin.granted_permissions.has(Permission::NetworkHttp) {
+        return Err("Permission denied: network_http required".to_string());
+    }
+
+    let client = reqwest::Client::new();
+
+    let method = request.method.to_uppercase();
+    let mut req = match method.as_str() {
+        "GET" => client.get(&request.url),
+        "PUT" => client.put(&request.url),
+        "POST" => client.post(&request.url),
+        "DELETE" => client.delete(&request.url),
+        "PROPFIND" => client.request(reqwest::Method::from_bytes(b"PROPFIND").unwrap(), &request.url),
+        "MKCOL" => client.request(reqwest::Method::from_bytes(b"MKCOL").unwrap(), &request.url),
+        "OPTIONS" => client.request(reqwest::Method::OPTIONS, &request.url),
+        _ => return Err(format!("Unsupported HTTP method: {}", method)),
+    };
+
+    if let Some(headers) = request.headers {
+        for (key, value) in headers {
+            req = req.header(&key, &value);
+        }
+    }
+
+    if let Some(body) = request.body {
+        req = req.body(body);
+    }
+
+    let resp = req.send().await.map_err(|e| format!("HTTP request failed: {}", e))?;
+
+    let status = resp.status().as_u16();
+    let status_text = resp.status().canonical_reason().unwrap_or("").to_string();
+    let mut headers = std::collections::HashMap::new();
+    for (key, value) in resp.headers() {
+        if let Ok(v) = value.to_str() {
+            headers.insert(key.to_string(), v.to_string());
+        }
+    }
+    let body = resp.text().await.map_err(|e| format!("Failed to read response: {}", e))?;
+
+    Ok(PluginHttpResponse {
+        status,
+        status_text,
+        headers,
+        body,
+    })
+}
+
+// ============================================================================
 // Point d'entrée
 // ============================================================================
 
@@ -1545,6 +1628,8 @@ pub fn run() {
             plugin_api_vault_import_encrypted,
             // Plugin API v1 - Server Stats
             plugin_api_get_server_stats,
+            // Plugin API v1 - HTTP Proxy
+            plugin_api_http_request,
             // Vault
             storage::vault::get_vault_status,
             storage::vault::create_vault,

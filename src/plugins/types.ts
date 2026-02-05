@@ -4,10 +4,10 @@
  * API v1 - Unified types for backend and frontend plugin system
  */
 
-import type { SidebarSectionRegistration, SidebarViewRegistration, SettingsPanelRegistration, ContextMenuItemConfig, StatusBarItemConfig, StatusBarItemHandle } from './extensionTypes';
+import type { SidebarSectionRegistration, SidebarViewRegistration, SettingsPanelRegistration, ContextMenuItemConfig, StatusBarItemConfig, StatusBarItemHandle, HeaderActionConfig, HeaderActionHandle } from './extensionTypes';
 
 // Re-export extension types
-export type { SidebarSectionRegistration, SidebarViewRegistration, SettingsPanelRegistration, ContextMenuItemConfig, StatusBarItemConfig, StatusBarItemHandle } from './extensionTypes';
+export type { SidebarSectionRegistration, SidebarViewRegistration, SettingsPanelRegistration, ContextMenuItemConfig, StatusBarItemConfig, StatusBarItemHandle, HeaderActionConfig, HeaderActionHandle } from './extensionTypes';
 export type { ContextMenuContext } from './extensionTypes';
 
 // ============================================================================
@@ -235,6 +235,9 @@ export interface SimplyTermPluginAPI {
   // Status bar (requires ui_notifications)
   addStatusBarItem(config: StatusBarItemConfig): StatusBarItemHandle;
 
+  // Header actions (requires ui_notifications)
+  addHeaderAction(config: HeaderActionConfig): HeaderActionHandle;
+
   // UI utilities (requires ui_notifications/ui_modals)
   showNotification(message: string, type?: NotificationType): void;
   showModal(config: ModalConfig): Promise<unknown>;
@@ -309,7 +312,8 @@ export type PluginEvent =
   | { type: 'settings:unregister'; pluginId: string; panelId: string }
   | { type: 'context-menu:register'; pluginId: string; itemId: string }
   | { type: 'context-menu:unregister'; pluginId: string; itemId: string }
-  | { type: 'statusbar:changed' };
+  | { type: 'statusbar:changed' }
+  | { type: 'headeractions:changed' };
 
 export type PluginEventHandler = (event: PluginEvent) => void;
 

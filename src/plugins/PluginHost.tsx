@@ -10,6 +10,7 @@ import { PluginPanel } from './PluginPanel';
 import { PluginWidget } from './PluginWidget';
 import type { PluginManifest, PanelRegistration, SessionInfo, ModalConfig, NotificationType, PromptConfig } from './types';
 import type { StatusBarItem } from '../components/StatusBar';
+import type { HeaderActionItem } from './PluginManager';
 
 interface PanelEntry {
   pluginId: string;
@@ -25,6 +26,7 @@ interface PluginHostProps {
   getSessions: () => SessionInfo[];
   getActiveSession: () => SessionInfo | null;
   onStatusBarItemsChanged: (items: StatusBarItem[]) => void;
+  onHeaderActionsChanged: (items: HeaderActionItem[]) => void;
 }
 
 export function PluginHost({
@@ -34,6 +36,7 @@ export function PluginHost({
   getSessions,
   getActiveSession,
   onStatusBarItemsChanged,
+  onHeaderActionsChanged,
 }: PluginHostProps) {
   const [panels, setPanels] = useState<Map<string, PanelEntry>>(new Map());
   const [visiblePanels, setVisiblePanels] = useState<Set<string>>(new Set());
@@ -46,7 +49,8 @@ export function PluginHost({
     pluginManager.getSessions = getSessions;
     pluginManager.getActiveSession = getActiveSession;
     pluginManager.onStatusBarItemsChanged = onStatusBarItemsChanged;
-  }, [onShowNotification, onShowModal, onShowPrompt, getSessions, getActiveSession, onStatusBarItemsChanged]);
+    pluginManager.onHeaderActionsChanged = onHeaderActionsChanged;
+  }, [onShowNotification, onShowModal, onShowPrompt, getSessions, getActiveSession, onStatusBarItemsChanged, onHeaderActionsChanged]);
 
   // Subscribe to plugin events
   useEffect(() => {

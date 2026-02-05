@@ -25,8 +25,21 @@ import type {
   PromptConfig,
   StatusBarItemConfig,
   StatusBarItemHandle,
+  HeaderActionConfig,
+  HeaderActionHandle,
 } from './types';
 import type { StatusBarItem } from '../components/StatusBar';
+
+/** Header action item exposed to the UI */
+export interface HeaderActionItem {
+  id: string;
+  pluginId: string;
+  icon: string;
+  tooltip?: string;
+  position: "left" | "right";
+  order: number;
+  onClick: (position: { x: number; y: number; right: number }) => void;
+}
 
 // Declare the global window property for plugins
 declare global {
@@ -57,6 +70,10 @@ export class PluginManager {
   // Status bar items
   public registeredStatusBarItems: Map<string, { pluginId: string; config: StatusBarItemConfig; visible: boolean }> = new Map();
   public onStatusBarItemsChanged: (items: StatusBarItem[]) => void = () => {};
+
+  // Header action items
+  public registeredHeaderActions: Map<string, { pluginId: string; config: HeaderActionConfig; visible: boolean }> = new Map();
+  public onHeaderActionsChanged: (items: HeaderActionItem[]) => void = () => {};
 
   /**
    * Subscribe to plugin events
@@ -158,6 +175,7 @@ export class PluginManager {
         onContextMenuItemRegister: this.handleContextMenuItemRegister.bind(this),
         onContextMenuItemUnregister: this.handleContextMenuItemUnregister.bind(this),
         onAddStatusBarItem: this.handleAddStatusBarItem.bind(this),
+        onAddHeaderAction: this.handleAddHeaderAction.bind(this),
         getSessions: this.getSessions.bind(this),
         getActiveSession: this.getActiveSession.bind(this),
       });
@@ -329,6 +347,18 @@ export class PluginManager {
     }
     if (statusBarChanged) {
       this.notifyStatusBarChanged();
+    }
+
+    // Remove registered header actions for this plugin
+    let headerActionsChanged = false;
+    for (const [itemId, entry] of this.registeredHeaderActions) {
+      if (entry.pluginId === id) {
+        this.registeredHeaderActions.delete(itemId);
+        headerActionsChanged = true;
+      }
+    }
+    if (headerActionsChanged) {
+      this.notifyHeaderActionsChanged();
     }
 
     // Remove from loaded plugins
@@ -540,6 +570,61 @@ export class PluginManager {
       });
     }
     this.onStatusBarItemsChanged(items);
+  }
+
+  // Header action handler
+  handleAddHeaderAction(pluginId: string, config: HeaderActionConfig): HeaderActionHandle {
+    const itemId = `${pluginId}:${config.id}`;
+    this.registeredHeaderActions.set(itemId, { pluginId, config, visible: true });
+    this.notifyHeaderActionsChanged();
+    this.emit({ type: 'headeractions:changed' });
+
+    return {
+      setIcon: (icon: string) => {
+        const entry = this.registeredHeaderActions.get(itemId);
+        if (entry) {
+          entry.config = { ...entry.config, icon };
+          this.notifyHeaderActionsChanged();
+        }
+      },
+      setTooltip: (tooltip: string) => {
+        const entry = this.registeredHeaderActions.get(itemId);
+        if (entry) {
+          entry.config = { ...entry.config, tooltip };
+          this.notifyHeaderActionsChanged();
+        }
+      },
+      setVisible: (visible: boolean) => {
+        const entry = this.registeredHeaderActions.get(itemId);
+        if (entry) {
+          entry.visible = visible;
+          this.notifyHeaderActionsChanged();
+        }
+      },
+      dispose: () => {
+        this.registeredHeaderActions.delete(itemId);
+        this.notifyHeaderActionsChanged();
+        this.emit({ type: 'headeractions:changed' });
+      },
+    };
+  }
+
+  private notifyHeaderActionsChanged() {
+    const items: HeaderActionItem[] = [];
+    for (const [itemId, entry] of this.registeredHeaderActions) {
+      if (!entry.visible) continue;
+      items.push({
+        id: itemId,
+        pluginId: entry.pluginId,
+        icon: entry.config.icon,
+        tooltip: entry.config.tooltip,
+        position: entry.config.position || 'right',
+        order: entry.config.order ?? 50,
+        onClick: entry.config.onClick,
+      });
+    }
+    items.sort((a, b) => a.order - b.order);
+    this.onHeaderActionsChanged(items);
   }
 
   /**

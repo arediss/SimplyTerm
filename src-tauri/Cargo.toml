@@ -65,5 +65,8 @@ windows = { version = "0.58", features = [
 notify = "6"
 open = "5"
 
+# HTTP client (for plugin network requests, bypasses CORS)
+reqwest = { version = "0.12", features = ["json"] }
+
 # Serial port communication
 serialport = "4.3"

@@ -1,9 +1,11 @@
-import { useState, useEffect, useRef, forwardRef } from "react";
+import { useState, useEffect, useRef, forwardRef, createElement } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Menu, Plus, X, Minus, Square, Copy, ChevronDown, Terminal, ArrowLeftRight } from "lucide-react";
+import * as LucideIcons from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Tab } from "../types";
+import type { HeaderActionItem } from "../plugins/PluginManager";
 
 interface FloatingTabsProps {
   tabs: Tab[];
@@ -17,6 +19,7 @@ interface FloatingTabsProps {
   onToggleTunnelSidebar: () => void;
   isTunnelSidebarOpen: boolean;
   activeTunnelCount: number;
+  headerActions?: HeaderActionItem[];
 }
 
 function FloatingTabs({
@@ -31,6 +34,7 @@ function FloatingTabs({
   onToggleTunnelSidebar,
   isTunnelSidebarOpen,
   activeTunnelCount,
+  headerActions = [],
 }: FloatingTabsProps) {
   const { t } = useTranslation();
   const [isMaximized, setIsMaximized] = useState(false);
@@ -77,6 +81,34 @@ function FloatingTabs({
     }
   }, [isDropdownOpen]);
 
+  const leftActions = headerActions.filter(a => a.position === 'left');
+  const rightActions = headerActions.filter(a => a.position === 'right');
+
+  const renderHeaderActions = (actions: HeaderActionItem[]) =>
+    actions.map((action) => {
+      const pascalName = action.icon
+        .split('-')
+        .map((s: string) => s.charAt(0).toUpperCase() + s.slice(1))
+        .join('');
+      const IconComp = (LucideIcons as Record<string, unknown>)[pascalName];
+      return (
+        <button
+          key={action.id}
+          onClick={(e) => {
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+            action.onClick({ x: rect.left, y: rect.bottom + 4, right: rect.right });
+          }}
+          className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-text-muted hover:text-text hover:bg-surface-0/50 transition-colors"
+          title={action.tooltip}
+        >
+          {IconComp
+            ? createElement(IconComp as React.ComponentType<{ size?: number }>, { size: 14 })
+            : <span className="text-xs">?</span>
+          }
+        </button>
+      );
+    });
+
   return (
     <div className="absolute top-0 left-0 right-0 z-20 h-10 bg-mantle/80 backdrop-blur-sm border-b border-surface-0/30">
       {/* Drag region - toute la barre sauf les contrôles */}
@@ -86,7 +118,7 @@ function FloatingTabs({
       <div className="relative h-full flex items-center justify-between px-2">
         {/* Partie gauche */}
         <div className="flex items-center gap-1.5 no-drag">
-          {/* === Section App (Menu, Vault) === */}
+          {/* === Section App (Menu) === */}
           <button
             onClick={onToggleSidebar}
             className={`
@@ -98,6 +130,9 @@ function FloatingTabs({
           >
             <Menu size={14} />
           </button>
+
+          {/* Plugin header actions — left */}
+          {leftActions.length > 0 && renderHeaderActions(leftActions)}
 
           {/* Séparateur */}
           <div className="w-px h-5 bg-surface-0/40 mx-1" />
@@ -152,8 +187,16 @@ function FloatingTabs({
           </div>
         </div>
 
-        {/* Partie droite - Window controls */}
+        {/* Partie droite - Plugin header actions (right) + Window controls */}
         <div className="flex items-center no-drag">
+          {/* Plugin header actions — right */}
+          {rightActions.length > 0 && (
+            <>
+              {renderHeaderActions(rightActions)}
+              <div className="w-px h-5 bg-surface-0/40 mx-0.5" />
+            </>
+          )}
+
           {/* Minimize */}
           <button
             onClick={handleMinimize}

@@ -232,6 +232,43 @@ export interface UIEvents {
 export type ExtensionEvent = SessionEvents & UIEvents;
 
 // ============================================================================
+// Header Action Extension Types
+// ============================================================================
+
+/**
+ * Configuration for a header action button registered by a plugin.
+ * Rendered as an icon button in the header bar (before window controls).
+ */
+export interface HeaderActionConfig {
+  /** Unique action identifier */
+  id: string;
+  /** Icon name (from lucide-react) */
+  icon: string;
+  /** Tooltip text */
+  tooltip?: string;
+  /** Position in header: 'left' (after menu) or 'right' (before window controls). Default: 'right' */
+  position?: "left" | "right";
+  /** Sort order (lower = more to the left/first) */
+  order?: number;
+  /** Handler when the button is clicked. Receives the position of the button for anchoring dropdowns. */
+  onClick: (position: { x: number; y: number; right: number }) => void;
+}
+
+/**
+ * Handle for updating a header action after registration
+ */
+export interface HeaderActionHandle {
+  /** Update the icon */
+  setIcon(icon: string): void;
+  /** Update the tooltip */
+  setTooltip(tooltip: string): void;
+  /** Show or hide the action */
+  setVisible(visible: boolean): void;
+  /** Remove the action */
+  dispose(): void;
+}
+
+// ============================================================================
 // Toolbar Extension Types
 // ============================================================================
 

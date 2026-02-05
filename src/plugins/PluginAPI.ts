@@ -22,6 +22,8 @@ import type {
   PromptConfig,
   StatusBarItemConfig,
   StatusBarItemHandle,
+  HeaderActionConfig,
+  HeaderActionHandle,
 } from './types';
 import type { SidebarViewRegistration, SidebarSectionRegistration, SettingsPanelRegistration, ContextMenuItemConfig } from './extensionTypes';
 
@@ -55,6 +57,7 @@ export function createPluginAPI(
     onContextMenuItemRegister: (pluginId: string, item: ContextMenuItemConfig) => void;
     onContextMenuItemUnregister: (pluginId: string, itemId: string) => void;
     onAddStatusBarItem: (pluginId: string, config: StatusBarItemConfig) => StatusBarItemHandle;
+    onAddHeaderAction: (pluginId: string, config: HeaderActionConfig) => HeaderActionHandle;
     getSessions: () => SessionInfo[];
     getActiveSession: () => SessionInfo | null;
   }
@@ -385,6 +388,20 @@ export function createPluginAPI(
         };
       }
       return callbacks.onAddStatusBarItem(pluginId, config);
+    },
+
+    // Header actions
+    addHeaderAction(config: HeaderActionConfig): HeaderActionHandle {
+      if (!hasPermission(permissions, 'ui_notifications')) {
+        console.warn(`[Plugin ${pluginId}] Missing permission: ui_notifications`);
+        return {
+          setIcon: () => {},
+          setTooltip: () => {},
+          setVisible: () => {},
+          dispose: () => {},
+        };
+      }
+      return callbacks.onAddHeaderAction(pluginId, config);
     },
 
     // UI utilities

@@ -12,6 +12,7 @@ import SettingsModal from "./components/SettingsModal";
 import { CommandPalette, useCommandPalette, CommandHandlers, CommandContext } from "./components/CommandPalette";
 import { StatusBar, type StatusBarItem } from "./components/StatusBar";
 import { PluginHost, pluginManager, type SessionInfo, type ModalConfig, type NotificationType, type PromptConfig } from "./plugins";
+import type { HeaderActionItem } from "./plugins/PluginManager";
 import PromptModal from "./components/PromptModal";
 import PluginModal from "./components/PluginModal";
 import {
@@ -1463,6 +1464,12 @@ function App() {
   }, []);
   const statusBarVisible = (appSettings.ui?.statusBarVisible ?? false) || statusBarItems.length > 0;
 
+  // Header actions (from plugins)
+  const [headerActions, setHeaderActions] = useState<HeaderActionItem[]>([]);
+  const handleHeaderActionsChanged = useCallback((items: HeaderActionItem[]) => {
+    setHeaderActions(items);
+  }, []);
+
   return (
     <div className="relative h-screen bg-terminal overflow-hidden">
       {/* Terminal area - sous la titlebar, au dessus de la status bar */}
@@ -1552,6 +1559,7 @@ function App() {
         onToggleTunnelSidebar={() => setOpenSidebar(openSidebar === "tunnel" ? "none" : "tunnel")}
         isTunnelSidebarOpen={isTunnelSidebarOpen}
         activeTunnelCount={activeTunnelCount}
+        headerActions={headerActions}
       />
 
       {/* Sidebar drawer */}
@@ -1705,6 +1713,7 @@ function App() {
         getSessions={getSessions}
         getActiveSession={getActiveSessionInfo}
         onStatusBarItemsChanged={handleStatusBarItemsChanged}
+        onHeaderActionsChanged={handleHeaderActionsChanged}
       />
 
       {/* Plugin Notification Toast */}
