@@ -1,327 +1,395 @@
-//! Plugin discovery, loading, and lifecycle management
+//! Plugin lifecycle management
 
-use super::manifest::{PluginManifest, PluginState, PluginStatus};
-use parking_lot::RwLock;
+use super::error::{PluginError, PluginResult};
+use super::manifest::{GrantedPermissions, Permission, PluginManifest, is_api_compatible, API_VERSION};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fs;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
-/// Plugin manager handles discovery, loading, and lifecycle of plugins
-pub struct PluginManager {
-    /// Discovered plugins (id -> state)
-    plugins: RwLock<HashMap<String, PluginState>>,
-    /// Path to plugins directory
-    plugins_dir: PathBuf,
-    /// Path to plugin settings file
-    settings_path: PathBuf,
+/// Plugin state
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PluginState {
+    /// Plugin is installed but not enabled
+    Disabled,
+    /// Plugin is enabled and running
+    Enabled,
+    /// Plugin encountered an error
+    Error,
 }
 
-/// Persistent plugin settings
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-struct PluginSettings {
-    /// Enabled plugin IDs
-    enabled: Vec<String>,
+/// Installed plugin information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InstalledPlugin {
+    pub manifest: PluginManifest,
+    pub state: PluginState,
+    pub granted_permissions: GrantedPermissions,
+    pub install_path: PathBuf,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_message: Option<String>,
+}
+
+/// Plugin registry persisted to disk
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct PluginRegistry {
+    plugins: HashMap<String, InstalledPlugin>,
+}
+
+/// Plugin manager handles installation, activation, and lifecycle
+pub struct PluginManager {
+    plugins: Arc<RwLock<HashMap<String, InstalledPlugin>>>,
+    plugins_dir: PathBuf,
+    registry_path: PathBuf,
 }
 
 impl PluginManager {
-    /// Create a new plugin manager
-    pub fn new() -> Result<Self, String> {
-        let plugins_dir = Self::get_plugins_dir()?;
-        let settings_path = Self::get_settings_path()?;
+    /// Creates a new plugin manager using the application data directory
+    /// This is the preferred method - plugins are stored with the app
+    pub fn with_app_dir(app_data_dir: PathBuf) -> PluginResult<Self> {
+        let plugins_dir = app_data_dir.join("plugins");
+        let registry_path = app_data_dir.join("plugin-registry.json");
 
-        // Ensure plugins directory exists
+        // Ensure directories exist
         if !plugins_dir.exists() {
-            std::fs::create_dir_all(&plugins_dir)
-                .map_err(|e| format!("Failed to create plugins directory: {}", e))?;
+            fs::create_dir_all(&plugins_dir)
+                .map_err(|e| PluginError::storage_error(format!("Failed to create plugins directory: {}", e)))?;
         }
 
         let manager = Self {
-            plugins: RwLock::new(HashMap::new()),
+            plugins: Arc::new(RwLock::new(HashMap::new())),
             plugins_dir,
-            settings_path,
+            registry_path,
         };
 
-        // Discover plugins on startup
-        manager.discover_plugins()?;
-
-        // Load settings and enable previously enabled plugins
-        manager.load_settings()?;
+        // Load existing registry
+        manager.load_registry()?;
 
         Ok(manager)
     }
 
-    /// Get plugins directory path (~/.simplyterm/plugins/)
-    fn get_plugins_dir() -> Result<PathBuf, String> {
-        let home = dirs::home_dir().ok_or("Could not determine home directory")?;
-        Ok(home.join(".simplyterm").join("plugins"))
+    /// Creates a new plugin manager (fallback to user directory)
+    /// Prefer using `with_app_dir` when app handle is available
+    pub fn new() -> PluginResult<Self> {
+        let home = dirs::home_dir()
+            .ok_or_else(|| PluginError::internal("Could not find home directory"))?;
+
+        // Fallback to user directory (for testing or when app dir not available)
+        let app_data_dir = home.join(".simplyterm").join("app_data");
+        Self::with_app_dir(app_data_dir)
     }
 
-    /// Get settings file path (~/.simplyterm/plugin-settings.json)
-    fn get_settings_path() -> Result<PathBuf, String> {
-        let home = dirs::home_dir().ok_or("Could not determine home directory")?;
-        let config_dir = home.join(".simplyterm");
-        if !config_dir.exists() {
-            std::fs::create_dir_all(&config_dir)
-                .map_err(|e| format!("Failed to create config directory: {}", e))?;
+    /// Loads the plugin registry from disk
+    fn load_registry(&self) -> PluginResult<()> {
+        if !self.registry_path.exists() {
+            return Ok(());
         }
-        Ok(config_dir.join("plugin-settings.json"))
+
+        let content = fs::read_to_string(&self.registry_path)
+            .map_err(|e| PluginError::storage_error(format!("Failed to read plugin registry: {}", e)))?;
+
+        if content.trim().is_empty() {
+            return Ok(());
+        }
+
+        let registry: PluginRegistry = serde_json::from_str(&content)
+            .map_err(|e| PluginError::storage_error(format!("Failed to parse plugin registry: {}", e)))?;
+
+        let mut plugins = self.plugins.write()
+            .map_err(|_| PluginError::internal("Failed to acquire lock"))?;
+        *plugins = registry.plugins;
+
+        Ok(())
     }
 
-    /// Discover all plugins in the plugins directory
-    pub fn discover_plugins(&self) -> Result<(), String> {
-        let mut plugins = self.plugins.write();
-        plugins.clear();
+    /// Saves the plugin registry to disk
+    fn save_registry(&self) -> PluginResult<()> {
+        let plugins = self.plugins.read()
+            .map_err(|_| PluginError::internal("Failed to acquire lock"))?;
 
-        if !self.plugins_dir.exists() {
-            return Ok(()); // No plugins directory yet
-        }
+        let registry = PluginRegistry {
+            plugins: plugins.clone(),
+        };
 
-        let entries = std::fs::read_dir(&self.plugins_dir)
-            .map_err(|e| format!("Failed to read plugins directory: {}", e))?;
+        let content = serde_json::to_string_pretty(&registry)
+            .map_err(|e| PluginError::storage_error(format!("Failed to serialize plugin registry: {}", e)))?;
 
-        for entry in entries.flatten() {
+        fs::write(&self.registry_path, content)
+            .map_err(|e| PluginError::storage_error(format!("Failed to write plugin registry: {}", e)))?;
+
+        Ok(())
+    }
+
+    /// Returns the plugin directory path
+    pub fn plugins_dir(&self) -> &PathBuf {
+        &self.plugins_dir
+    }
+
+    /// Scans the plugins directory for new plugins and adds them to the registry
+    pub fn scan_plugins(&self) -> PluginResult<Vec<InstalledPlugin>> {
+        let mut discovered = Vec::new();
+
+        println!("[PluginManager] Scanning plugins directory: {:?}", self.plugins_dir);
+
+        // Read all subdirectories in plugins_dir
+        let entries = fs::read_dir(&self.plugins_dir)
+            .map_err(|e| PluginError::storage_error(format!("Failed to read plugins directory {:?}: {}", self.plugins_dir, e)))?;
+
+        for entry in entries {
+            let entry = match entry {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
+
             let path = entry.path();
             if !path.is_dir() {
                 continue;
             }
 
+            // Look for manifest.json
             let manifest_path = path.join("manifest.json");
             if !manifest_path.exists() {
                 continue;
             }
 
-            match PluginManifest::from_file(&manifest_path) {
-                Ok(manifest) => {
-                    let id = manifest.id.clone();
-                    let state = PluginState::new(manifest, path);
-                    plugins.insert(id, state);
-                }
+            // Read and parse manifest
+            let manifest_content = match fs::read_to_string(&manifest_path) {
+                Ok(c) => c,
                 Err(e) => {
-                    // Log error but continue with other plugins
-                    eprintln!(
-                        "Failed to load plugin manifest from {:?}: {}",
-                        manifest_path, e
-                    );
+                    eprintln!("Failed to read manifest at {:?}: {}", manifest_path, e);
+                    continue;
+                }
+            };
+
+            let manifest: PluginManifest = match serde_json::from_str::<PluginManifest>(&manifest_content) {
+                Ok(m) => m,
+                Err(e) => {
+                    eprintln!("[PluginManager] Failed to parse manifest at {:?}: {}", manifest_path, e);
+                    continue;
+                }
+            };
+            println!("[PluginManager] Found plugin: {} ({})", manifest.name, manifest.id);
+
+            // Check if already in registry
+            {
+                let plugins = self.plugins.read()
+                    .map_err(|_| PluginError::internal("Failed to acquire lock"))?;
+                if plugins.contains_key(&manifest.id) {
+                    // Already registered, skip
+                    continue;
+                }
+            }
+
+            // Install the discovered plugin
+            match self.install_plugin(manifest, path.clone()) {
+                Ok(plugin) => discovered.push(plugin),
+                Err(e) => {
+                    eprintln!("Failed to install plugin from {:?}: {}", path, e);
                 }
             }
         }
 
+        Ok(discovered)
+    }
+
+    /// Lists all installed plugins
+    pub fn list_plugins(&self) -> PluginResult<Vec<InstalledPlugin>> {
+        let plugins = self.plugins.read()
+            .map_err(|_| PluginError::internal("Failed to acquire lock"))?;
+        Ok(plugins.values().cloned().collect())
+    }
+
+    /// Gets a specific plugin by ID
+    pub fn get_plugin(&self, id: &str) -> PluginResult<Option<InstalledPlugin>> {
+        let plugins = self.plugins.read()
+            .map_err(|_| PluginError::internal("Failed to acquire lock"))?;
+        Ok(plugins.get(id).cloned())
+    }
+
+    /// Installs a plugin from a manifest
+    pub fn install_plugin(&self, manifest: PluginManifest, install_path: PathBuf) -> PluginResult<InstalledPlugin> {
+        // Validate API version compatibility
+        if !is_api_compatible(&manifest.api_version) {
+            return Err(PluginError::invalid_input(format!(
+                "Plugin requires API version {} but current version is {}",
+                manifest.api_version, API_VERSION
+            )));
+        }
+
+        let plugin = InstalledPlugin {
+            manifest: manifest.clone(),
+            state: PluginState::Disabled,
+            granted_permissions: GrantedPermissions::new(),
+            install_path,
+            error_message: None,
+        };
+
+        let mut plugins = self.plugins.write()
+            .map_err(|_| PluginError::internal("Failed to acquire lock"))?;
+
+        plugins.insert(manifest.id.clone(), plugin.clone());
+        drop(plugins);
+
+        self.save_registry()?;
+
+        Ok(plugin)
+    }
+
+    /// Uninstalls a plugin
+    pub fn uninstall_plugin(&self, id: &str) -> PluginResult<()> {
+        let mut plugins = self.plugins.write()
+            .map_err(|_| PluginError::internal("Failed to acquire lock"))?;
+
+        let plugin = plugins.remove(id)
+            .ok_or_else(|| PluginError::not_found(format!("Plugin not found: {}", id)))?;
+
+        // Remove plugin directory
+        if plugin.install_path.exists() {
+            fs::remove_dir_all(&plugin.install_path)
+                .map_err(|e| PluginError::storage_error(format!("Failed to remove plugin directory: {}", e)))?;
+        }
+
+        drop(plugins);
+        self.save_registry()?;
+
         Ok(())
     }
 
-    /// Load and apply plugin settings
-    fn load_settings(&self) -> Result<(), String> {
-        if !self.settings_path.exists() {
-            return Ok(());
-        }
+    /// Enables a plugin
+    pub fn enable_plugin(&self, id: &str) -> PluginResult<()> {
+        let mut plugins = self.plugins.write()
+            .map_err(|_| PluginError::internal("Failed to acquire lock"))?;
 
-        let content = std::fs::read_to_string(&self.settings_path)
-            .map_err(|e| format!("Failed to read plugin settings: {}", e))?;
+        let plugin = plugins.get_mut(id)
+            .ok_or_else(|| PluginError::not_found(format!("Plugin not found: {}", id)))?;
 
-        let settings: PluginSettings = serde_json::from_str(&content)
-            .map_err(|e| format!("Failed to parse plugin settings: {}", e))?;
+        plugin.state = PluginState::Enabled;
+        plugin.error_message = None;
 
-        // Enable previously enabled plugins
-        let mut plugins = self.plugins.write();
-        for id in settings.enabled {
-            if let Some(plugin) = plugins.get_mut(&id) {
-                plugin.status = PluginStatus::Enabled;
-            }
-        }
+        drop(plugins);
+        self.save_registry()?;
 
         Ok(())
     }
 
-    /// Save current plugin settings
-    fn save_settings(&self) -> Result<(), String> {
-        let plugins = self.plugins.read();
-        let enabled: Vec<String> = plugins
-            .iter()
-            .filter(|(_, state)| state.status == PluginStatus::Enabled)
-            .map(|(id, _)| id.clone())
-            .collect();
+    /// Disables a plugin
+    pub fn disable_plugin(&self, id: &str) -> PluginResult<()> {
+        let mut plugins = self.plugins.write()
+            .map_err(|_| PluginError::internal("Failed to acquire lock"))?;
 
-        let settings = PluginSettings { enabled };
-        let content = serde_json::to_string_pretty(&settings)
-            .map_err(|e| format!("Failed to serialize settings: {}", e))?;
+        let plugin = plugins.get_mut(id)
+            .ok_or_else(|| PluginError::not_found(format!("Plugin not found: {}", id)))?;
 
-        std::fs::write(&self.settings_path, content)
-            .map_err(|e| format!("Failed to write settings: {}", e))?;
+        plugin.state = PluginState::Disabled;
+
+        drop(plugins);
+        self.save_registry()?;
 
         Ok(())
     }
 
-    /// Get all discovered plugins
-    pub fn list_plugins(&self) -> Vec<PluginState> {
-        self.plugins.read().values().cloned().collect()
-    }
+    /// Grants a permission to a plugin
+    pub fn grant_permission(&self, id: &str, permission: Permission) -> PluginResult<()> {
+        let mut plugins = self.plugins.write()
+            .map_err(|_| PluginError::internal("Failed to acquire lock"))?;
 
-    /// Get a specific plugin by ID
-    pub fn get_plugin(&self, id: &str) -> Option<PluginState> {
-        self.plugins.read().get(id).cloned()
-    }
+        let plugin = plugins.get_mut(id)
+            .ok_or_else(|| PluginError::not_found(format!("Plugin not found: {}", id)))?;
 
-    /// Get plugin manifest by ID
-    #[allow(dead_code)]
-    pub fn get_manifest(&self, id: &str) -> Option<PluginManifest> {
-        self.plugins.read().get(id).map(|s| s.manifest.clone())
-    }
-
-    /// Enable a plugin
-    pub fn enable_plugin(&self, id: &str) -> Result<(), String> {
-        {
-            let mut plugins = self.plugins.write();
-            let plugin = plugins
-                .get_mut(id)
-                .ok_or_else(|| format!("Plugin not found: {}", id))?;
-
-            // Validate plugin can be enabled
-            let main_path = plugin.path.join(&plugin.manifest.main);
-            if !main_path.exists() {
-                return Err(format!(
-                    "Plugin main file not found: {}",
-                    plugin.manifest.main
-                ));
-            }
-
-            plugin.status = PluginStatus::Enabled;
-            plugin.error = None;
+        // Check if permission is in manifest
+        if !plugin.manifest.permissions.contains(&permission) {
+            return Err(PluginError::invalid_input(format!(
+                "Permission {:?} is not declared in plugin manifest",
+                permission
+            )));
         }
 
-        self.save_settings()?;
+        plugin.granted_permissions.grant(permission);
+
+        drop(plugins);
+        self.save_registry()?;
+
         Ok(())
     }
 
-    /// Disable a plugin
-    pub fn disable_plugin(&self, id: &str) -> Result<(), String> {
-        {
-            let mut plugins = self.plugins.write();
-            let plugin = plugins
-                .get_mut(id)
-                .ok_or_else(|| format!("Plugin not found: {}", id))?;
+    /// Grants all requested permissions to a plugin
+    pub fn grant_all_permissions(&self, id: &str) -> PluginResult<()> {
+        let mut plugins = self.plugins.write()
+            .map_err(|_| PluginError::internal("Failed to acquire lock"))?;
 
-            plugin.status = PluginStatus::Disabled;
+        let plugin = plugins.get_mut(id)
+            .ok_or_else(|| PluginError::not_found(format!("Plugin not found: {}", id)))?;
+
+        for permission in &plugin.manifest.permissions {
+            plugin.granted_permissions.grant(*permission);
         }
 
-        self.save_settings()?;
+        drop(plugins);
+        self.save_registry()?;
+
         Ok(())
     }
 
-    /// Get a file from a plugin directory
-    pub fn get_plugin_file(&self, plugin_id: &str, file_path: &str) -> Result<String, String> {
-        let plugins = self.plugins.read();
-        let plugin = plugins
-            .get(plugin_id)
-            .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+    /// Revokes a permission from a plugin
+    pub fn revoke_permission(&self, id: &str, permission: Permission) -> PluginResult<()> {
+        let mut plugins = self.plugins.write()
+            .map_err(|_| PluginError::internal("Failed to acquire lock"))?;
 
-        // Security: prevent path traversal
-        let normalized_path = PathBuf::from(file_path);
-        if normalized_path
-            .components()
-            .any(|c| matches!(c, std::path::Component::ParentDir))
-        {
-            return Err("Path traversal not allowed".to_string());
-        }
+        let plugin = plugins.get_mut(id)
+            .ok_or_else(|| PluginError::not_found(format!("Plugin not found: {}", id)))?;
 
-        let full_path = plugin.path.join(file_path);
+        plugin.granted_permissions.revoke(permission);
 
-        // Ensure file is within plugin directory
-        if !full_path.starts_with(&plugin.path) {
-            return Err("File path outside plugin directory".to_string());
-        }
-
-        std::fs::read_to_string(&full_path)
-            .map_err(|e| format!("Failed to read file {}: {}", file_path, e))
-    }
-
-    /// Get all enabled plugins
-    #[allow(dead_code)]
-    pub fn get_enabled_plugins(&self) -> Vec<PluginState> {
-        self.plugins
-            .read()
-            .values()
-            .filter(|s| s.status == PluginStatus::Enabled)
-            .cloned()
-            .collect()
-    }
-
-    /// Re-scan plugins directory for new/removed plugins
-    pub fn refresh(&self) -> Result<(), String> {
-        // Remember which plugins were enabled
-        let enabled_ids: Vec<String> = self
-            .plugins
-            .read()
-            .iter()
-            .filter(|(_, s)| s.status == PluginStatus::Enabled)
-            .map(|(id, _)| id.clone())
-            .collect();
-
-        // Rediscover plugins
-        self.discover_plugins()?;
-
-        // Re-enable previously enabled plugins
-        for id in enabled_ids {
-            if self.plugins.read().contains_key(&id) {
-                let _ = self.enable_plugin(&id);
-            }
-        }
+        drop(plugins);
+        self.save_registry()?;
 
         Ok(())
+    }
+
+    /// Gets the granted permissions for a plugin
+    pub fn get_permissions(&self, id: &str) -> PluginResult<GrantedPermissions> {
+        let plugins = self.plugins.read()
+            .map_err(|_| PluginError::internal("Failed to acquire lock"))?;
+
+        let plugin = plugins.get(id)
+            .ok_or_else(|| PluginError::not_found(format!("Plugin not found: {}", id)))?;
+
+        Ok(plugin.granted_permissions.clone())
+    }
+
+    /// Sets an error state for a plugin
+    pub fn set_plugin_error(&self, id: &str, message: String) -> PluginResult<()> {
+        let mut plugins = self.plugins.write()
+            .map_err(|_| PluginError::internal("Failed to acquire lock"))?;
+
+        let plugin = plugins.get_mut(id)
+            .ok_or_else(|| PluginError::not_found(format!("Plugin not found: {}", id)))?;
+
+        plugin.state = PluginState::Error;
+        plugin.error_message = Some(message);
+
+        drop(plugins);
+        self.save_registry()?;
+
+        Ok(())
+    }
+
+    /// Gets the data directory for a plugin (for sandboxed file access)
+    pub fn get_plugin_data_dir(&self, id: &str) -> PluginResult<PathBuf> {
+        let data_dir = self.plugins_dir.join("data").join(id);
+
+        if !data_dir.exists() {
+            fs::create_dir_all(&data_dir)
+                .map_err(|e| PluginError::storage_error(format!("Failed to create plugin data directory: {}", e)))?;
+        }
+
+        Ok(data_dir)
     }
 }
 
 impl Default for PluginManager {
     fn default() -> Self {
-        Self::new().unwrap_or_else(|e| {
-            eprintln!("Failed to initialize plugin manager: {}", e);
-            Self {
-                plugins: RwLock::new(HashMap::new()),
-                plugins_dir: PathBuf::new(),
-                settings_path: PathBuf::new(),
-            }
-        })
-    }
-}
-
-/// Thread-safe wrapper for use in Tauri state
-#[allow(dead_code)]
-pub type SharedPluginManager = Arc<PluginManager>;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::io::Write;
-    use tempfile::TempDir;
-
-    fn create_test_plugin(dir: &TempDir, id: &str) -> PathBuf {
-        let plugin_dir = dir.path().join(id);
-        std::fs::create_dir_all(&plugin_dir).unwrap();
-
-        let manifest = format!(
-            r#"{{
-            "id": "{}",
-            "name": "Test Plugin",
-            "version": "1.0.0",
-            "permissions": ["terminal:read"]
-        }}"#,
-            id
-        );
-
-        let manifest_path = plugin_dir.join("manifest.json");
-        let mut file = std::fs::File::create(&manifest_path).unwrap();
-        file.write_all(manifest.as_bytes()).unwrap();
-
-        // Create index.js
-        let main_path = plugin_dir.join("index.js");
-        std::fs::write(&main_path, "export default function(api) {}").unwrap();
-
-        plugin_dir
-    }
-
-    #[test]
-    fn test_plugin_discovery() {
-        // This test would need a mock filesystem setup
-        // For now, we just verify the basic structure compiles
+        Self::new().expect("Failed to create plugin manager")
     }
 }

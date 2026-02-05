@@ -1,632 +1,720 @@
-# SimplyTerm Plugin API Reference
+# SimplyTerm Plugin API v1 Reference
 
-> Complete technical reference for the Plugin API
+> Complete technical reference for Plugin API v1
 
 ---
 
 ## Table of Contents
 
-- [TypeScript Types](#typescript-types)
-- [API Methods](#api-methods)
-- [Events](#events)
+- [Overview](#overview)
 - [Manifest Schema](#manifest-schema)
+- [Permissions](#permissions)
+- [API Modules](#api-modules)
+  - [Sessions API](#sessions-api)
+  - [Folders API](#folders-api)
+  - [Vault API](#vault-api)
+  - [Settings API](#settings-api)
+  - [Events API](#events-api)
+  - [Storage API](#storage-api)
+  - [Shell API](#shell-api)
+- [TypeScript Types](#typescript-types)
+- [Error Handling](#error-handling)
 
 ---
 
-## TypeScript Types
+## Overview
 
-### SessionInfo
+SimplyTerm plugins are frontend-only (JavaScript/TypeScript) with access to backend APIs via Tauri commands. The API is versioned for stability and backward compatibility.
 
-```typescript
-interface SessionInfo {
-  id: string;                                    // Unique session identifier
-  type: 'local' | 'ssh' | 'sftp';               // Connection type
-  host?: string;                                 // Host (SSH only)
-  port?: number;                                 // Port (SSH only)
-  username?: string;                             // User (SSH only)
-  status: 'connected' | 'disconnected' | 'connecting';
-}
-```
+### Key Concepts
 
-### PanelRegistration
+- **Permission-based access**: Plugins must declare required permissions in their manifest
+- **Sandboxed storage**: Each plugin has its own isolated data directory
+- **Versioned API**: Current version is `1.0.0`
 
-```typescript
-interface PanelRegistration {
-  id: string;                                    // Unique panel ID
-  render: (container: HTMLElement) => void | (() => void);
-  // render receives a DOM element and can return a cleanup function
-}
-```
+### Plugin Location
 
-### CommandRegistration
+Plugins are stored in the application data directory (removed when app is uninstalled):
 
-```typescript
-interface CommandRegistration {
-  id: string;                                    // Unique command ID
-  handler: () => void | Promise<void>;          // Function to execute
-}
-```
-
-### NotificationType
-
-```typescript
-type NotificationType = 'info' | 'success' | 'error' | 'warning';
-```
-
-### ModalConfig
-
-```typescript
-interface ModalConfig {
-  title: string;
-  content: string | HTMLElement;
-  buttons?: ModalButton[];
-}
-
-interface ModalButton {
-  label: string;
-  variant?: 'primary' | 'secondary' | 'danger';
-  onClick?: () => void | Promise<void>;
-}
-```
-
----
-
-## API Methods
-
-### Lifecycle
-
-#### `onLoad(callback)`
-
-Registers a function called when the plugin is activated.
-
-```typescript
-onLoad(callback: () => void): void
-```
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `callback` | `() => void` | Function called on load |
-
-**Example:**
-```javascript
-api.onLoad(() => {
-  console.log('Plugin ready!');
-});
-```
-
----
-
-#### `onUnload(callback)`
-
-Registers a function called when the plugin is deactivated.
-
-```typescript
-onUnload(callback: () => void): void
-```
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `callback` | `() => void` | Cleanup function |
-
-**Example:**
-```javascript
-api.onUnload(() => {
-  clearInterval(myInterval);
-});
-```
-
----
-
-### Panels
-
-#### `registerPanel(config)`
-
-Registers a new panel in the interface.
-
-```typescript
-registerPanel(config: PanelRegistration): void
-```
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `config.id` | `string` | Unique panel identifier |
-| `config.render` | `(container: HTMLElement) => void \| (() => void)` | Render function |
-
-**Required permission:** `panel:register`
-
-**Example:**
-```javascript
-api.registerPanel({
-  id: 'my-panel',
-  render: (container) => {
-    container.innerHTML = '<h1>Hello</h1>';
-
-    // Optional: return a cleanup function
-    return () => {
-      console.log('Panel closed');
-    };
-  }
-});
-```
-
----
-
-#### `showPanel(panelId)`
-
-Shows a panel.
-
-```typescript
-showPanel(panelId: string): void
-```
-
----
-
-#### `hidePanel(panelId)`
-
-Hides a panel.
-
-```typescript
-hidePanel(panelId: string): void
-```
-
----
-
-### Commands
-
-#### `registerCommand(config)`
-
-Registers a custom command.
-
-```typescript
-registerCommand(config: CommandRegistration): void
-```
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `config.id` | `string` | Unique identifier |
-| `config.handler` | `() => void \| Promise<void>` | Function to execute |
-
-**Required permission:** `command:register`
-
----
-
-#### `executeCommand(commandId)`
-
-Executes a registered command.
-
-```typescript
-executeCommand(commandId: string): void
-```
-
----
-
-### Terminal
-
-#### `onTerminalOutput(sessionId, callback)`
-
-Listens to terminal output.
-
-```typescript
-onTerminalOutput(
-  sessionId: string,
-  callback: (data: string) => void
-): Unsubscribe
-```
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `sessionId` | `string` | Session ID to listen to |
-| `callback` | `(data: string) => void` | Called on each output |
-
-**Returns:** `() => void` - Function to stop listening
-
-**Required permission:** `terminal:read`
-
-**Example:**
-```javascript
-const unsubscribe = api.onTerminalOutput(session.id, (data) => {
-  if (data.includes('error')) {
-    api.showNotification('Error detected', 'error');
-  }
-});
-
-// Later...
-unsubscribe();
-```
-
----
-
-#### `onTerminalInput(sessionId, callback)`
-
-Listens to user input in the terminal.
-
-```typescript
-onTerminalInput(
-  sessionId: string,
-  callback: (data: string) => void
-): Unsubscribe
-```
-
-**Required permission:** `terminal:read`
-
----
-
-#### `writeToTerminal(sessionId, data)`
-
-Writes to the terminal.
-
-```typescript
-writeToTerminal(sessionId: string, data: string): Promise<void>
-```
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `sessionId` | `string` | Target session ID |
-| `data` | `string` | Text to send (include `\n` to execute) |
-
-**Required permission:** `terminal:write`
-
-**Example:**
-```javascript
-// Execute a command
-await api.writeToTerminal(session.id, 'ls -la\n');
-
-// Send text without executing
-await api.writeToTerminal(session.id, 'echo "hello"');
-```
-
----
-
-#### `execCommand(sessionId, command)`
-
-Executes a command in the background without displaying it in the terminal. Returns the command output.
-
-```typescript
-execCommand(sessionId: string, command: string): Promise<string>
-```
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `sessionId` | `string` | Target session ID |
-| `command` | `string` | Command to execute |
-
-**Returns:** `Promise<string>` - The command output
-
-**Required permission:** `backend:exec`
-
-**Example:**
-```javascript
-// Execute silently and get result
-const output = await api.execCommand(session.id, 'hostname');
-console.log('Server:', output.trim());
-```
-
----
-
-### Sessions
-
-#### `getActiveSession()`
-
-Returns the currently active session.
-
-```typescript
-getActiveSession(): SessionInfo | null
-```
-
-**Required permission:** `session:info`
-
-**Example:**
-```javascript
-const session = api.getActiveSession();
-if (session && session.type === 'ssh') {
-  console.log(`Connected to ${session.username}@${session.host}`);
-}
-```
-
----
-
-#### `getAllSessions()`
-
-Returns all open sessions.
-
-```typescript
-getAllSessions(): SessionInfo[]
-```
-
-**Required permission:** `session:info`
-
----
-
-#### `onSessionConnect(callback)`
-
-Listens for new connections.
-
-```typescript
-onSessionConnect(callback: (session: SessionInfo) => void): Unsubscribe
-```
-
-**Required permission:** `session:info`
-
----
-
-#### `onSessionDisconnect(callback)`
-
-Listens for disconnections.
-
-```typescript
-onSessionDisconnect(callback: (sessionId: string) => void): Unsubscribe
-```
-
-**Required permission:** `session:info`
-
----
-
-### Storage
-
-The storage API allows you to persist JSON data. Data is isolated per plugin.
-
-#### `storage.get(key)`
-
-Retrieves a value.
-
-```typescript
-storage.get<T>(key: string): Promise<T | null>
-```
-
-**Required permission:** `storage:read`
-
----
-
-#### `storage.set(key, value)`
-
-Saves a value.
-
-```typescript
-storage.set<T>(key: string, value: T): Promise<void>
-```
-
-**Required permission:** `storage:write`
-
----
-
-#### `storage.delete(key)`
-
-Deletes a value.
-
-```typescript
-storage.delete(key: string): Promise<void>
-```
-
-**Required permission:** `storage:write`
-
-**Examples:**
-```javascript
-// Store data
-await api.storage.set('settings', { theme: 'dark' });
-await api.storage.set('counter', 42);
-await api.storage.set('items', ['a', 'b', 'c']);
-
-// Retrieve
-const settings = await api.storage.get('settings'); // { theme: 'dark' }
-const counter = await api.storage.get('counter');   // 42
-const missing = await api.storage.get('unknown');   // null
-
-// Delete
-await api.storage.delete('counter');
-```
-
----
-
-### UI
-
-#### `showNotification(message, type?)`
-
-Displays a toast notification.
-
-```typescript
-showNotification(message: string, type?: NotificationType): void
-```
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `message` | `string` | - | Text to display |
-| `type` | `NotificationType` | `'info'` | Notification style |
-
-**No permission required**
-
-**Example:**
-```javascript
-api.showNotification('Operation successful', 'success');
-api.showNotification('Warning!', 'warning');
-api.showNotification('Critical error', 'error');
-api.showNotification('Information', 'info');
-```
-
----
-
-#### `showModal(config)`
-
-Displays a custom modal dialog.
-
-```typescript
-showModal(config: ModalConfig): Promise<unknown>
-```
-
----
-
-### Backend
-
-#### `invokeBackend(command, args?)`
-
-Calls a Rust backend function.
-
-```typescript
-invokeBackend<T>(command: string, args?: Record<string, unknown>): Promise<T>
-```
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `command` | `string` | Backend command name |
-| `args` | `object` | Optional arguments |
-
-**Required permission:** `backend:exec`
-
-**Available commands:**
-
-| Command | Arguments | Description |
-|---------|-----------|-------------|
-| `get_session_info` | `{ session_id: string }` | Session info |
-
----
-
-## Events
-
-### Event List
-
-| Event | Payload | Description |
-|-------|---------|-------------|
-| `session-connect` | `SessionInfo` | New session connected |
-| `session-disconnect` | `string` (sessionId) | Session closed |
-| `pty-output-{sessionId}` | `string` | Terminal output |
-| `pty-input-{sessionId}` | `string` | User input |
-| `pty-exit-{sessionId}` | `void` | Terminal closed |
+| OS | Path |
+|---|---|
+| Windows | `%APPDATA%\com.simplyterm.app\plugins\` |
+| macOS | `~/Library/Application Support/com.simplyterm.app/plugins/` |
+| Linux | `~/.local/share/com.simplyterm.app/plugins/` |
 
 ---
 
 ## Manifest Schema
 
-### JSON Schema
+Every plugin requires a `manifest.json` file.
+
+### Required Fields
 
 ```json
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "required": ["id", "name", "version"],
-  "properties": {
-    "id": {
-      "type": "string",
-      "pattern": "^[a-z0-9-]+$",
-      "description": "Unique plugin identifier (kebab-case)"
-    },
-    "name": {
-      "type": "string",
-      "description": "Display name"
-    },
-    "version": {
-      "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$",
-      "description": "Semantic version"
-    },
-    "author": {
-      "type": "string",
-      "description": "Author name"
-    },
-    "description": {
-      "type": "string",
-      "description": "Short description"
-    },
-    "main": {
-      "type": "string",
-      "default": "index.js",
-      "description": "Entry point file"
-    },
-    "permissions": {
-      "type": "array",
-      "items": {
-        "enum": [
-          "terminal:read",
-          "terminal:write",
-          "panel:register",
-          "command:register",
-          "backend:exec",
-          "storage:read",
-          "storage:write",
-          "session:info"
-        ]
-      }
-    },
-    "panels": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["id", "title"],
-        "properties": {
-          "id": { "type": "string" },
-          "title": { "type": "string" },
-          "icon": { "type": "string" },
-          "position": { "enum": ["left", "right", "bottom"], "default": "right" }
-        }
-      }
-    },
-    "commands": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["id", "title"],
-        "properties": {
-          "id": { "type": "string" },
-          "title": { "type": "string" },
-          "shortcut": { "type": "string" }
-        }
-      }
-    }
+  "id": "com.example.my-plugin",
+  "name": "My Plugin",
+  "version": "1.0.0",
+  "api_version": "1.0.0",
+  "description": "A short description",
+  "author": "Developer Name",
+  "permissions": ["sessions_read", "vault_status"],
+  "main": "index.js"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique identifier (reverse domain recommended) |
+| `name` | string | Display name |
+| `version` | string | Plugin version (semver) |
+| `api_version` | string | Required API version (must be `1.x.x`) |
+| `description` | string | Short description |
+| `author` | string | Author name or organization |
+| `permissions` | string[] | Required permissions |
+| `main` | string | Entry point file |
+
+### Optional Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `homepage` | string | Plugin homepage or repository URL |
+| `icon` | string | Relative path to plugin icon |
+
+---
+
+## Permissions
+
+Permissions control what APIs a plugin can access. Users must approve permissions before a plugin can use them.
+
+### Session Permissions
+
+| Permission | Risk | Description |
+|------------|------|-------------|
+| `sessions_read` | Low | Read saved sessions and their configuration |
+| `sessions_write` | Medium | Create, modify, and delete saved sessions |
+| `sessions_connect` | High | Initiate connections to remote hosts |
+
+### Folder Permissions
+
+| Permission | Risk | Description |
+|------------|------|-------------|
+| `folders_read` | Low | Read folder organization structure |
+| `folders_write` | Medium | Create, modify, and delete folders |
+
+### Vault Permissions
+
+| Permission | Risk | Description |
+|------------|------|-------------|
+| `vault_status` | Low | Check if the secure vault is locked or unlocked |
+| `vault_read` | High | Read encrypted data from the secure vault |
+| `vault_write` | High | Store encrypted data in the secure vault |
+
+### Settings Permissions
+
+| Permission | Risk | Description |
+|------------|------|-------------|
+| `settings_read` | Low | Read application settings and preferences |
+| `settings_write` | Medium | Modify application settings and preferences |
+
+### Recent Sessions Permissions
+
+| Permission | Risk | Description |
+|------------|------|-------------|
+| `recent_read` | Low | Read recently used sessions history |
+| `recent_write` | Medium | Modify recently used sessions history |
+
+### Event Permissions
+
+| Permission | Risk | Description |
+|------------|------|-------------|
+| `events_subscribe` | Low | Listen to application events |
+| `events_emit` | Medium | Send custom events to other plugins |
+
+### Shell Permissions
+
+| Permission | Risk | Description |
+|------------|------|-------------|
+| `shell_execute` | High | Execute shell commands on the local system |
+
+### Network Permissions
+
+| Permission | Risk | Description |
+|------------|------|-------------|
+| `network_http` | Medium | Make HTTP/HTTPS requests to remote servers |
+| `network_websocket` | Medium | Establish WebSocket connections |
+
+### File System Permissions
+
+| Permission | Risk | Description |
+|------------|------|-------------|
+| `fs_read` | Low | Read files from plugin data directory |
+| `fs_write` | Medium | Write files to plugin data directory |
+
+### UI Permissions
+
+| Permission | Risk | Description |
+|------------|------|-------------|
+| `ui_menu` | Medium | Add items to application menus |
+| `ui_notifications` | Medium | Display system notifications |
+| `ui_settings` | Medium | Add a settings panel in preferences |
+| `ui_panels` | Medium | Register custom panels in the interface |
+| `ui_commands` | Medium | Register commands in the command palette |
+| `ui_modals` | Medium | Display modal dialogs |
+
+### Terminal Permissions
+
+| Permission | Risk | Description |
+|------------|------|-------------|
+| `terminal_read` | Medium | Read terminal output |
+| `terminal_write` | High | Write data to terminal sessions |
+| `ui_settings` | Medium | Add a settings panel in preferences |
+
+### Clipboard Permissions
+
+| Permission | Risk | Description |
+|------------|------|-------------|
+| `clipboard_read` | Medium | Read content from system clipboard |
+| `clipboard_write` | Medium | Write content to system clipboard |
+
+### Bastion Permissions
+
+| Permission | Risk | Description |
+|------------|------|-------------|
+| `bastions_read` | Low | Read bastion/jump host profiles |
+| `bastions_write` | Medium | Create, modify, and delete bastion profiles |
+
+### Known Hosts Permissions
+
+| Permission | Risk | Description |
+|------------|------|-------------|
+| `known_hosts_read` | Low | Read SSH known hosts entries |
+| `known_hosts_write` | Medium | Manage SSH known hosts entries |
+
+---
+
+## API Modules
+
+### Sessions API
+
+Requires: `sessions_read`, `sessions_write`
+
+#### List Sessions
+
+```typescript
+invoke('plugin_api_list_sessions', { pluginId: string }): Promise<Session[]>
+```
+
+#### Get Session
+
+```typescript
+invoke('plugin_api_get_session', { pluginId: string, id: string }): Promise<Session | null>
+```
+
+#### Create Session
+
+```typescript
+invoke('plugin_api_create_session', {
+  pluginId: string,
+  name: string,
+  host: string,
+  port: number,
+  username: string,
+  authType: 'password' | 'key',
+  keyPath?: string,
+  folderId?: string,
+  color?: string
+}): Promise<Session>
+```
+
+#### Update Session
+
+```typescript
+invoke('plugin_api_update_session', {
+  pluginId: string,
+  id: string,
+  name?: string,
+  host?: string,
+  port?: number,
+  username?: string,
+  authType?: string,
+  keyPath?: string | null,
+  folderId?: string | null,
+  color?: string | null
+}): Promise<Session>
+```
+
+#### Delete Session
+
+```typescript
+invoke('plugin_api_delete_session', { pluginId: string, id: string }): Promise<void>
+```
+
+---
+
+### Folders API
+
+Requires: `folders_read`, `folders_write`
+
+#### List Folders
+
+```typescript
+invoke('plugin_api_list_folders', { pluginId: string }): Promise<Folder[]>
+```
+
+#### Create Folder
+
+```typescript
+invoke('plugin_api_create_folder', {
+  pluginId: string,
+  name: string,
+  color?: string,
+  parentId?: string
+}): Promise<Folder>
+```
+
+#### Update Folder
+
+```typescript
+invoke('plugin_api_update_folder', {
+  pluginId: string,
+  id: string,
+  name?: string,
+  color?: string,
+  parentId?: string | null,
+  expanded?: boolean
+}): Promise<Folder>
+```
+
+#### Delete Folder
+
+```typescript
+invoke('plugin_api_delete_folder', { pluginId: string, id: string }): Promise<void>
+```
+
+---
+
+### Vault API
+
+Requires: `vault_status`, `vault_read`, `vault_write`
+
+#### Get Vault Status
+
+```typescript
+invoke('plugin_api_vault_status', { pluginId: string }): Promise<VaultStatus>
+
+interface VaultStatus {
+  exists: boolean;
+  isUnlocked: boolean;
+}
+```
+
+#### Store Blob
+
+Store encrypted data in the vault (plugin-namespaced).
+
+```typescript
+invoke('plugin_api_vault_store', {
+  pluginId: string,
+  key: string,
+  value: string
+}): Promise<void>
+```
+
+#### Read Blob
+
+```typescript
+invoke('plugin_api_vault_read', {
+  pluginId: string,
+  key: string
+}): Promise<string | null>
+```
+
+#### Delete Blob
+
+```typescript
+invoke('plugin_api_vault_delete', {
+  pluginId: string,
+  key: string
+}): Promise<boolean>
+```
+
+---
+
+### Settings API
+
+Requires: `settings_read`, `settings_write`
+
+#### Get Settings
+
+```typescript
+invoke('plugin_api_get_settings', { pluginId: string }): Promise<Settings>
+
+interface Settings {
+  terminal: TerminalSettings;
+  appearance: AppearanceSettings;
+  ui: UiSettings;
+}
+```
+
+#### Update Terminal Settings
+
+```typescript
+invoke('plugin_api_update_terminal_settings', {
+  pluginId: string,
+  fontSize?: number,
+  fontFamily?: string,
+  cursorStyle?: string,
+  cursorBlink?: boolean,
+  scrollback?: number
+}): Promise<TerminalSettings>
+```
+
+#### Update Appearance Settings
+
+```typescript
+invoke('plugin_api_update_appearance_settings', {
+  pluginId: string,
+  theme?: string,
+  accentColor?: string
+}): Promise<AppearanceSettings>
+```
+
+---
+
+### Events API
+
+Requires: `events_subscribe`, `events_emit`
+
+#### Available Events
+
+| Event | Description |
+|-------|-------------|
+| `session_connected` | Session connected |
+| `session_disconnected` | Session disconnected |
+| `vault_locked` | Vault locked |
+| `vault_unlocked` | Vault unlocked |
+| `settings_changed` | Settings changed |
+| `theme_changed` | Theme changed |
+| `session_created` | Session created |
+| `session_updated` | Session updated |
+| `session_deleted` | Session deleted |
+| `folder_created` | Folder created |
+| `folder_updated` | Folder updated |
+| `folder_deleted` | Folder deleted |
+| `tab_opened` | Tab opened |
+| `tab_closed` | Tab closed |
+| `tab_switched` | Tab switched |
+
+#### Subscribe to Events
+
+```typescript
+invoke('plugin_api_subscribe_events', {
+  pluginId: string,
+  events: string[]
+}): Promise<void>
+```
+
+#### Emit Custom Event
+
+```typescript
+invoke('plugin_api_emit_event', {
+  pluginId: string,
+  eventName: string,
+  data: any
+}): Promise<void>
+```
+
+#### Get Pending Events
+
+```typescript
+invoke('plugin_api_get_events', { pluginId: string }): Promise<EventPayload[]>
+
+interface EventPayload {
+  event: string;
+  source: string;
+  timestamp: number;
+  data: any;
+}
+```
+
+---
+
+### Storage API
+
+Requires: `fs_read`, `fs_write`
+
+Sandboxed file storage for each plugin.
+
+#### Read File
+
+```typescript
+invoke('plugin_storage_read', {
+  pluginId: string,
+  path: string
+}): Promise<string>
+```
+
+#### Write File
+
+```typescript
+invoke('plugin_storage_write', {
+  pluginId: string,
+  path: string,
+  content: string
+}): Promise<void>
+```
+
+#### Delete File
+
+```typescript
+invoke('plugin_storage_delete', {
+  pluginId: string,
+  path: string
+}): Promise<void>
+```
+
+#### List Directory
+
+```typescript
+invoke('plugin_storage_list', {
+  pluginId: string,
+  path: string
+}): Promise<FileEntry[]>
+
+interface FileEntry {
+  name: string;
+  isDirectory: boolean;
+  size: number;
+  modified: number;
+}
+```
+
+---
+
+### Terminal API
+
+Requires: `terminal_read`, `terminal_write`
+
+Interact with terminal sessions.
+
+#### Write to Terminal
+
+```typescript
+invoke('plugin_api_write_to_terminal', {
+  pluginId: string,
+  sessionId: string,
+  data: string
+}): Promise<void>
+```
+
+#### Listen to Terminal Output
+
+Use Tauri events to listen to terminal output:
+
+```typescript
+import { listen } from '@tauri-apps/api/event';
+
+// Listen to output from a specific session
+const unlisten = await listen(`pty-output-${sessionId}`, (event) => {
+  console.log('Terminal output:', event.payload);
+});
+
+// Clean up when done
+unlisten();
+```
+
+#### Listen to Terminal Input
+
+```typescript
+import { listen } from '@tauri-apps/api/event';
+
+// Listen to input sent to a specific session
+const unlisten = await listen(`pty-input-${sessionId}`, (event) => {
+  console.log('Terminal input:', event.payload);
+});
+```
+
+---
+
+### UI API
+
+Requires: `ui_panels`, `ui_commands`, `ui_notifications`, `ui_modals`
+
+Register UI components and interact with the interface.
+
+#### Register a Panel
+
+```typescript
+// In your plugin's init function
+api.registerPanel({
+  id: 'my-panel',
+  render: (container) => {
+    container.innerHTML = '<div>My Panel Content</div>';
+  }
+});
+```
+
+#### Register a Command
+
+```typescript
+api.registerCommand({
+  id: 'my-command',
+  title: 'My Command',
+  shortcut: 'Ctrl+Shift+M',
+  handler: () => {
+    console.log('Command executed!');
+  }
+});
+```
+
+#### Show Notification
+
+```typescript
+api.showNotification('Hello from my plugin!', 'success');
+// Types: 'info' | 'success' | 'warning' | 'error'
+```
+
+#### Show Modal
+
+```typescript
+const result = await api.showModal({
+  title: 'Confirm Action',
+  content: 'Are you sure?',
+  buttons: [
+    { label: 'Cancel', variant: 'secondary' },
+    { label: 'Confirm', variant: 'primary' }
+  ]
+});
+```
+
+---
+
+### Shell API
+
+Requires: `shell_execute`
+
+Execute whitelisted shell commands.
+
+#### Allowed Commands
+
+- Network: `ping`, `curl`, `wget`, `nslookup`, `dig`, `host`, `traceroute`, `tracert`
+- File utilities: `cat`, `head`, `tail`, `less`, `more`, `wc`
+- System info: `date`, `uptime`, `whoami`, `hostname`, `uname`
+- Git: `git` (read-only operations)
+- SSH: `ssh-keygen`, `ssh-keyscan`
+
+#### Execute Command
+
+```typescript
+invoke('plugin_api_shell_execute', {
+  pluginId: string,
+  command: string,
+  args: string[],
+  workingDir?: string
+}): Promise<CommandResult>
+
+interface CommandResult {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+  success: boolean;
+  truncated: boolean;
+}
+```
+
+---
+
+## TypeScript Types
+
+### Session
+
+```typescript
+interface Session {
+  id: string;
+  name: string;
+  host: string;
+  port: number;
+  username: string;
+  authType: 'password' | 'key';
+  keyPath?: string;
+  folderId?: string;
+  color?: string;
+}
+```
+
+### Folder
+
+```typescript
+interface Folder {
+  id: string;
+  name: string;
+  color?: string;
+  parentId?: string;
+  order: number;
+  expanded: boolean;
+}
+```
+
+### Settings
+
+```typescript
+interface Settings {
+  terminal: {
+    fontSize: number;
+    fontFamily: string;
+    cursorStyle: string;
+    cursorBlink: boolean;
+    scrollback: number;
+  };
+  appearance: {
+    theme: string;
+    accentColor: string;
+  };
+  ui: {
+    statusBarVisible: boolean;
+  };
+}
+```
+
+---
+
+## Error Handling
+
+All API calls return errors with a consistent structure:
+
+```typescript
+interface PluginError {
+  code: 'permission_denied' | 'not_found' | 'invalid_input' | 'storage_error' | 'vault_locked' | 'internal_error';
+  message: string;
+}
+```
+
+### Error Codes
+
+| Code | Description |
+|------|-------------|
+| `permission_denied` | Plugin doesn't have required permission |
+| `not_found` | Requested resource doesn't exist |
+| `invalid_input` | Invalid parameters provided |
+| `storage_error` | File system or storage error |
+| `vault_locked` | Vault must be unlocked for this operation |
+| `internal_error` | Unexpected internal error |
+
+### Example Error Handling
+
+```typescript
+try {
+  const sessions = await invoke('plugin_api_list_sessions', { pluginId: 'my-plugin' });
+} catch (error) {
+  if (error.code === 'permission_denied') {
+    console.error('Missing sessions_read permission');
+  } else {
+    console.error('Error:', error.message);
   }
 }
 ```
 
-### Complete Example
-
-```json
-{
-  "id": "server-monitor",
-  "name": "Server Monitor",
-  "version": "2.1.0",
-  "author": "Dev Team",
-  "description": "Real-time server monitoring for SSH sessions",
-  "main": "index.js",
-  "permissions": [
-    "terminal:read",
-    "terminal:write",
-    "panel:register",
-    "command:register",
-    "session:info",
-    "storage:read",
-    "storage:write"
-  ],
-  "panels": [
-    {
-      "id": "monitor-panel",
-      "title": "Monitor",
-      "icon": "chart.svg",
-      "position": "right"
-    }
-  ],
-  "commands": [
-    {
-      "id": "refresh-stats",
-      "title": "Refresh Statistics",
-      "shortcut": "Ctrl+Shift+R"
-    },
-    {
-      "id": "export-report",
-      "title": "Export Report"
-    }
-  ]
-}
-```
-
 ---
 
-## File Paths
-
-| Path | Description |
-|------|-------------|
-| `~/.simplyterm/plugins/` | Plugins directory |
-| `~/.simplyterm/plugins/<id>/manifest.json` | Plugin manifest |
-| `~/.simplyterm/plugins/<id>/index.js` | Plugin code |
-| `~/.simplyterm/plugin-data/<id>/` | Plugin persistent data |
-| `~/.simplyterm/plugin-settings.json` | Enabled/disabled plugins |
-
----
-
-**SimplyTerm Plugin API v1.0**
+**SimplyTerm Plugin API v1.0.0**

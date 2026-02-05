@@ -11,6 +11,8 @@ pub enum AuthType {
     Key,
 }
 
+/// Core session data (connection info only)
+/// Plugin-specific metadata (folders, tags, colors) is stored separately via session_metadata API
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SavedSession {
     pub id: String,
@@ -21,12 +23,6 @@ pub struct SavedSession {
     pub auth_type: AuthType,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub key_path: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub folder_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub tags: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub color: Option<String>,
 }
 
 fn get_config_path() -> Result<PathBuf, String> {
@@ -89,5 +85,9 @@ mod tests {
 
         let json = serde_json::to_string(&session).unwrap();
         assert!(json.contains("\"auth_type\":\"password\""));
+        // Ensure no plugin-managed fields in core session
+        assert!(!json.contains("folder_id"));
+        assert!(!json.contains("tags"));
+        assert!(!json.contains("color"));
     }
 }

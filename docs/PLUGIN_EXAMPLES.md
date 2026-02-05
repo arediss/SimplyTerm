@@ -1,929 +1,861 @@
 # SimplyTerm Plugin Examples
 
-> Ready-to-use plugin examples
+> Ready-to-use plugin examples for API v1
 
-Copy these examples to `~/.simplyterm/plugins/<name>/` to test them.
+Copy these examples to your plugins directory to test them.
+
+| OS | Path |
+|---|---|
+| Windows | `%APPDATA%\com.simplyterm.app\plugins\<name>\` |
+| macOS | `~/Library/Application Support/com.simplyterm.app/plugins/<name>/` |
+| Linux | `~/.local/share/com.simplyterm.app/plugins/<name>/` |
 
 ---
 
 ## Table of Contents
 
 1. [Hello World](#1-hello-world) - Minimal plugin
-2. [Session Logger](#2-session-logger) - Connection logging
-3. [Quick Commands](#3-quick-commands) - Quick command buttons
-4. [Server Monitor](#4-server-monitor) - CPU/RAM monitoring
-5. [Command History](#5-command-history) - Command history
-6. [SSH Bookmarks](#6-ssh-bookmarks) - Commands per server
-7. [Color Theme](#7-color-theme) - Visual customization
+2. [Session Counter](#2-session-counter) - Count sessions
+3. [Config Backup](#3-config-backup) - Backup sessions and settings
+4. [Connection Logger](#4-connection-logger) - Log connection events
+5. [Vault Secrets Manager](#5-vault-secrets-manager) - Store encrypted secrets
+6. [Auto Organizer](#6-auto-organizer) - Organize sessions into folders
 
 ---
 
 ## 1. Hello World
 
-The simplest possible plugin.
+The simplest possible plugin using API v1.
 
 ### manifest.json
 ```json
 {
-  "id": "hello-world",
+  "id": "com.example.hello-world",
   "name": "Hello World",
   "version": "1.0.0",
+  "api_version": "1.0.0",
+  "author": "Developer",
   "description": "A minimal plugin to get started",
-  "permissions": ["panel:register"]
+  "main": "index.js",
+  "permissions": ["sessions_read"]
 }
 ```
 
 ### index.js
 ```javascript
-function init(api) {
-  api.onLoad(() => {
-    api.showNotification('Hello World plugin loaded!', 'success');
-  });
+const { invoke } = window.__TAURI__.core;
 
-  api.registerPanel({
-    id: 'hello-panel',
-    render: (container) => {
-      container.innerHTML = `
-        <div style="padding: 20px; text-align: center;">
-          <h1 style="font-size: 24px; color: #7da6e8;">Hello!</h1>
-          <p style="color: #888; margin-top: 8px;">
-            Welcome to SimplyTerm plugins
-          </p>
-        </div>
-      `;
+async function init(pluginId) {
+  console.log('[HelloWorld] Initializing with plugin ID:', pluginId);
+
+  try {
+    // Read sessions (requires sessions_read permission)
+    const sessions = await invoke('plugin_api_list_sessions', { pluginId });
+    console.log('[HelloWorld] Found', sessions.length, 'sessions');
+
+    // Log each session
+    for (const session of sessions) {
+      console.log('[HelloWorld] Session:', session.name, '->', session.host);
     }
-  });
+
+    console.log('[HelloWorld] Ready!');
+  } catch (error) {
+    console.error('[HelloWorld] Error:', error);
+  }
 }
 
-module.exports.default = init;
+// Export the init function
+window.SimplyTermPlugins = window.SimplyTermPlugins || {};
+window.SimplyTermPlugins['com.example.hello-world'] = { init };
 ```
 
 ---
 
-## 2. Session Logger
+## 2. Session Counter
 
-Logs all connections with timestamps.
+Counts total sessions and displays statistics.
 
 ### manifest.json
 ```json
 {
-  "id": "session-logger",
-  "name": "Session Logger",
+  "id": "com.example.session-counter",
+  "name": "Session Counter",
   "version": "1.0.0",
-  "description": "Log all SSH connections",
-  "permissions": ["panel:register", "session:info", "storage:read", "storage:write"]
+  "api_version": "1.0.0",
+  "author": "Developer",
+  "description": "Count and analyze your sessions",
+  "main": "index.js",
+  "permissions": ["sessions_read", "folders_read", "fs_read", "fs_write"]
 }
 ```
 
 ### index.js
 ```javascript
-function init(api) {
-  let logs = [];
+const { invoke } = window.__TAURI__.core;
 
-  api.onLoad(async () => {
-    const saved = await api.storage.get('logs');
-    if (saved) logs = saved;
-  });
+async function init(pluginId) {
+  console.log('[SessionCounter] Starting...');
 
-  api.onSessionConnect(async (session) => {
-    if (session.type === 'ssh') {
-      const entry = {
-        host: session.host,
-        user: session.username,
-        time: new Date().toISOString(),
-        type: 'connect'
-      };
-      logs.unshift(entry);
-      logs = logs.slice(0, 50); // Keep last 50
-      await api.storage.set('logs', logs);
-      updatePanel();
-    }
-  });
+  try {
+    // Get all sessions
+    const sessions = await invoke('plugin_api_list_sessions', { pluginId });
 
-  api.onSessionDisconnect(async (sessionId) => {
-    const entry = {
-      sessionId,
-      time: new Date().toISOString(),
-      type: 'disconnect'
-    };
-    logs.unshift(entry);
-    logs = logs.slice(0, 50);
-    await api.storage.set('logs', logs);
-    updatePanel();
-  });
+    // Get all folders
+    const folders = await invoke('plugin_api_list_folders', { pluginId });
 
-  api.registerPanel({
-    id: 'logger-panel',
-    render: (container) => {
-      window._loggerContainer = container;
-      updatePanel();
-    }
-  });
-
-  function updatePanel() {
-    const container = window._loggerContainer;
-    if (!container) return;
-
-    container.innerHTML = `
-      <div style="padding: 12px; font-family: system-ui;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-          <h3 style="margin: 0; color: #fff; font-size: 14px;">Session Logs</h3>
-          <button id="clear-logs" style="
-            padding: 4px 8px;
-            background: rgba(255,255,255,0.1);
-            border: none;
-            border-radius: 4px;
-            color: #888;
-            cursor: pointer;
-            font-size: 11px;
-          ">Clear</button>
-        </div>
-        <div style="max-height: 300px; overflow-y: auto;">
-          ${logs.length === 0
-            ? '<p style="color: #666; text-align: center; padding: 20px;">No logs yet</p>'
-            : logs.map(log => `
-              <div style="
-                padding: 8px;
-                margin-bottom: 4px;
-                background: rgba(255,255,255,0.05);
-                border-radius: 4px;
-                font-size: 11px;
-              ">
-                <span style="color: ${log.type === 'connect' ? '#9cd68d' : '#e88b8b'};">
-                  ${log.type === 'connect' ? '→' : '←'}
-                </span>
-                <span style="color: #aaa; margin-left: 8px;">
-                  ${log.host ? `${log.user}@${log.host}` : log.sessionId?.slice(0, 20)}
-                </span>
-                <span style="color: #666; float: right;">
-                  ${new Date(log.time).toLocaleTimeString()}
-                </span>
-              </div>
-            `).join('')}
-        </div>
-      </div>
-    `;
-
-    container.querySelector('#clear-logs')?.addEventListener('click', async () => {
-      logs = [];
-      await api.storage.set('logs', logs);
-      updatePanel();
-    });
-  }
-}
-
-module.exports.default = init;
-```
-
----
-
-## 3. Quick Commands
-
-Buttons to execute frequent commands.
-
-### manifest.json
-```json
-{
-  "id": "quick-commands",
-  "name": "Quick Commands",
-  "version": "1.0.0",
-  "description": "Execute commands with one click",
-  "permissions": ["panel:register", "terminal:write", "session:info", "storage:read", "storage:write"]
-}
-```
-
-### index.js
-```javascript
-function init(api) {
-  let commands = [
-    { name: 'Disk Usage', cmd: 'df -h', icon: 'disk' },
-    { name: 'Memory', cmd: 'free -m', icon: 'mem' },
-    { name: 'Top Processes', cmd: 'ps aux --sort=-%mem | head -10', icon: 'proc' },
-    { name: 'Network', cmd: 'netstat -tuln | head -20', icon: 'net' },
-    { name: 'Uptime', cmd: 'uptime', icon: 'time' },
-  ];
-
-  api.onLoad(async () => {
-    const saved = await api.storage.get('commands');
-    if (saved) commands = saved;
-  });
-
-  api.registerPanel({
-    id: 'quick-panel',
-    render: (container) => {
-      container.innerHTML = `
-        <div style="padding: 12px; font-family: system-ui;">
-          <h3 style="margin: 0 0 12px 0; color: #fff; font-size: 14px;">
-            Quick Commands
-          </h3>
-          <div id="cmd-list">
-            ${commands.map((c, i) => `
-              <button data-index="${i}" class="cmd-btn" style="
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                width: 100%;
-                padding: 10px 12px;
-                margin-bottom: 6px;
-                background: linear-gradient(135deg, rgba(125,166,232,0.15), rgba(125,166,232,0.05));
-                border: 1px solid rgba(125,166,232,0.2);
-                border-radius: 8px;
-                color: #ddd;
-                cursor: pointer;
-                font-size: 13px;
-                text-align: left;
-                transition: all 0.2s;
-              ">
-                <span>${c.name}</span>
-              </button>
-            `).join('')}
-          </div>
-          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.1);">
-            <input id="new-cmd-name" placeholder="Name" style="
-              width: 45%;
-              padding: 6px 8px;
-              background: rgba(255,255,255,0.1);
-              border: none;
-              border-radius: 4px;
-              color: #fff;
-              font-size: 11px;
-              margin-right: 4%;
-            "/>
-            <input id="new-cmd" placeholder="Command" style="
-              width: 45%;
-              padding: 6px 8px;
-              background: rgba(255,255,255,0.1);
-              border: none;
-              border-radius: 4px;
-              color: #fff;
-              font-size: 11px;
-            "/>
-            <button id="add-cmd" style="
-              width: 100%;
-              margin-top: 8px;
-              padding: 8px;
-              background: rgba(125,166,232,0.3);
-              border: none;
-              border-radius: 6px;
-              color: #7da6e8;
-              cursor: pointer;
-              font-size: 12px;
-            ">+ Add Command</button>
-          </div>
-        </div>
-      `;
-
-      // Hover effect
-      container.querySelectorAll('.cmd-btn').forEach(btn => {
-        btn.addEventListener('mouseenter', () => {
-          btn.style.background = 'linear-gradient(135deg, rgba(125,166,232,0.25), rgba(125,166,232,0.1))';
-          btn.style.borderColor = 'rgba(125,166,232,0.4)';
-        });
-        btn.addEventListener('mouseleave', () => {
-          btn.style.background = 'linear-gradient(135deg, rgba(125,166,232,0.15), rgba(125,166,232,0.05))';
-          btn.style.borderColor = 'rgba(125,166,232,0.2)';
-        });
-      });
-
-      // Execute command
-      container.querySelectorAll('.cmd-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const session = api.getActiveSession();
-          if (!session) {
-            api.showNotification('No active session', 'warning');
-            return;
-          }
-          const cmd = commands[btn.dataset.index].cmd;
-          await api.writeToTerminal(session.id, cmd + '\n');
-        });
-      });
-
-      // Add new command
-      container.querySelector('#add-cmd').addEventListener('click', async () => {
-        const name = container.querySelector('#new-cmd-name').value.trim();
-        const cmd = container.querySelector('#new-cmd').value.trim();
-        if (name && cmd) {
-          commands.push({ name, cmd, icon: 'custom' });
-          await api.storage.set('commands', commands);
-          api.showNotification('Command added!', 'success');
-          // Re-render
-          api.hidePanel('quick-panel');
-          api.showPanel('quick-panel');
-        }
-      });
-    }
-  });
-}
-
-module.exports.default = init;
-```
-
----
-
-## 4. Server Monitor
-
-Displays CPU, RAM, Disk in real-time.
-
-### manifest.json
-```json
-{
-  "id": "server-monitor",
-  "name": "Server Monitor",
-  "version": "1.0.0",
-  "description": "Real-time system monitoring",
-  "permissions": ["panel:register", "terminal:read", "terminal:write", "session:info"]
-}
-```
-
-### index.js
-```javascript
-function init(api) {
-  let stats = { cpu: 0, mem: 0, disk: 0 };
-  let interval = null;
-  let unsubscribe = null;
-
-  api.onLoad(() => {
-    const session = api.getActiveSession();
-    if (session?.type === 'ssh') {
-      startMonitoring(session.id);
-    }
-  });
-
-  api.onUnload(() => {
-    if (interval) clearInterval(interval);
-    if (unsubscribe) unsubscribe();
-  });
-
-  api.onSessionConnect((session) => {
-    if (session.type === 'ssh') {
-      startMonitoring(session.id);
-    }
-  });
-
-  api.onSessionDisconnect(() => {
-    if (interval) clearInterval(interval);
-    if (unsubscribe) unsubscribe();
-    stats = { cpu: 0, mem: 0, disk: 0 };
-    updateUI();
-  });
-
-  function startMonitoring(sessionId) {
-    // Listen to terminal output
-    let buffer = '';
-    unsubscribe = api.onTerminalOutput(sessionId, (data) => {
-      buffer += data;
-      if (buffer.includes('__MONITOR_END__')) {
-        parseStats(buffer);
-        buffer = '';
-      }
-    });
-
-    // Poll every 3 seconds
-    fetchStats(sessionId);
-    interval = setInterval(() => fetchStats(sessionId), 3000);
-  }
-
-  async function fetchStats(sessionId) {
-    const cmd = `echo "__MONITOR_START__" && ` +
-      `echo "CPU:$(top -bn1 | grep 'Cpu(s)' | awk '{print $2}')" && ` +
-      `echo "MEM:$(free | awk 'NR==2{printf \"%.0f\", $3*100/$2}')" && ` +
-      `echo "DISK:$(df / | awk 'NR==2{print $5}' | tr -d '%')" && ` +
-      `echo "__MONITOR_END__"\n`;
-
-    try {
-      await api.writeToTerminal(sessionId, cmd);
-    } catch (e) {
-      console.error('[Monitor]', e);
-    }
-  }
-
-  function parseStats(output) {
-    const lines = output.split('\n');
-    for (const line of lines) {
-      if (line.startsWith('CPU:')) stats.cpu = parseFloat(line.slice(4)) || 0;
-      if (line.startsWith('MEM:')) stats.mem = parseFloat(line.slice(4)) || 0;
-      if (line.startsWith('DISK:')) stats.disk = parseFloat(line.slice(5)) || 0;
-    }
-    updateUI();
-  }
-
-  api.registerPanel({
-    id: 'monitor-panel',
-    render: (container) => {
-      window._monitorContainer = container;
-      updateUI();
-    }
-  });
-
-  function updateUI() {
-    const container = window._monitorContainer;
-    if (!container) return;
-
-    const getColor = (value) => {
-      if (value > 80) return '#e88b8b';
-      if (value > 60) return '#e8c878';
-      return '#9cd68d';
+    // Calculate statistics
+    const stats = {
+      totalSessions: sessions.length,
+      totalFolders: folders.length,
+      byAuthType: {
+        password: sessions.filter(s => s.authType === 'password').length,
+        key: sessions.filter(s => s.authType === 'key').length
+      },
+      uniqueHosts: [...new Set(sessions.map(s => s.host))].length,
+      timestamp: new Date().toISOString()
     };
 
-    container.innerHTML = `
-      <div style="padding: 12px; font-family: system-ui;">
-        <h3 style="margin: 0 0 16px 0; color: #fff; font-size: 14px;">
-          Server Monitor
-        </h3>
+    console.log('[SessionCounter] Statistics:', stats);
 
-        ${['CPU', 'MEM', 'DISK'].map(key => {
-          const value = stats[key.toLowerCase()];
-          const color = getColor(value);
-          return `
-            <div style="margin-bottom: 16px;">
-              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                <span style="color: #888; font-size: 12px;">${key}</span>
-                <span style="color: ${color}; font-size: 14px; font-weight: 600;">${value}%</span>
-              </div>
-              <div style="
-                height: 8px;
-                background: rgba(255,255,255,0.1);
-                border-radius: 4px;
-                overflow: hidden;
-              ">
-                <div style="
-                  height: 100%;
-                  width: ${value}%;
-                  background: ${color};
-                  border-radius: 4px;
-                  transition: width 0.5s, background 0.5s;
-                "></div>
-              </div>
-            </div>
-          `;
-        }).join('')}
+    // Save stats to plugin storage
+    await invoke('plugin_storage_write', {
+      pluginId,
+      path: 'stats.json',
+      content: JSON.stringify(stats, null, 2)
+    });
 
-        <p style="color: #666; font-size: 10px; text-align: center; margin-top: 16px;">
-          Updated every 3s
-        </p>
-      </div>
-    `;
+    console.log('[SessionCounter] Stats saved to storage');
+
+  } catch (error) {
+    console.error('[SessionCounter] Error:', error);
   }
 }
 
-module.exports.default = init;
+async function getStats(pluginId) {
+  try {
+    const content = await invoke('plugin_storage_read', {
+      pluginId,
+      path: 'stats.json'
+    });
+    return JSON.parse(content);
+  } catch {
+    return null;
+  }
+}
+
+window.SimplyTermPlugins = window.SimplyTermPlugins || {};
+window.SimplyTermPlugins['com.example.session-counter'] = { init, getStats };
 ```
 
 ---
 
-## 5. Command History
+## 3. Config Backup
 
-History of executed commands.
-
-### manifest.json
-```json
-{
-  "id": "cmd-history",
-  "name": "Command History",
-  "version": "1.0.0",
-  "description": "Command history per session",
-  "permissions": ["panel:register", "terminal:read", "session:info"]
-}
-```
-
-### index.js
-```javascript
-function init(api) {
-  let history = [];
-  let unsubscribe = null;
-
-  api.onSessionConnect((session) => {
-    history = [];
-    if (unsubscribe) unsubscribe();
-
-    // Capture inputs (typed commands)
-    unsubscribe = api.onTerminalInput(session.id, (data) => {
-      // Detect a command (ended by Enter)
-      if (data.includes('\r') || data.includes('\n')) {
-        const cmd = data.trim();
-        if (cmd && cmd.length > 0) {
-          history.unshift({
-            cmd: cmd.replace(/[\r\n]/g, ''),
-            time: new Date()
-          });
-          history = history.slice(0, 100);
-          updateUI();
-        }
-      }
-    });
-  });
-
-  api.registerPanel({
-    id: 'history-panel',
-    render: (container) => {
-      window._historyContainer = container;
-      updateUI();
-    }
-  });
-
-  function updateUI() {
-    const container = window._historyContainer;
-    if (!container) return;
-
-    container.innerHTML = `
-      <div style="padding: 12px; font-family: system-ui;">
-        <h3 style="margin: 0 0 12px 0; color: #fff; font-size: 14px;">
-          Command History
-        </h3>
-        <div style="max-height: 400px; overflow-y: auto;">
-          ${history.length === 0
-            ? '<p style="color: #666; text-align: center; padding: 20px;">No commands yet</p>'
-            : history.map(h => `
-              <div style="
-                padding: 8px 10px;
-                margin-bottom: 4px;
-                background: rgba(255,255,255,0.05);
-                border-radius: 6px;
-                font-family: 'JetBrains Mono', monospace;
-                font-size: 12px;
-                color: #9cd68d;
-                cursor: pointer;
-                transition: background 0.2s;
-              " class="history-item" data-cmd="${encodeURIComponent(h.cmd)}">
-                <span style="opacity: 0.5; margin-right: 8px;">$</span>${h.cmd}
-              </div>
-            `).join('')}
-        </div>
-      </div>
-    `;
-
-    // Click to re-execute
-    container.querySelectorAll('.history-item').forEach(item => {
-      item.addEventListener('mouseenter', () => {
-        item.style.background = 'rgba(255,255,255,0.1)';
-      });
-      item.addEventListener('mouseleave', () => {
-        item.style.background = 'rgba(255,255,255,0.05)';
-      });
-      item.addEventListener('click', async () => {
-        const session = api.getActiveSession();
-        if (session) {
-          const cmd = decodeURIComponent(item.dataset.cmd);
-          await api.writeToTerminal(session.id, cmd + '\n');
-        }
-      });
-    });
-  }
-}
-
-module.exports.default = init;
-```
-
----
-
-## 6. SSH Bookmarks
-
-Save commands per server.
+Backup and restore sessions, folders, and settings.
 
 ### manifest.json
 ```json
 {
-  "id": "ssh-bookmarks",
-  "name": "SSH Bookmarks",
+  "id": "com.example.config-backup",
+  "name": "Config Backup",
   "version": "1.0.0",
-  "description": "Favorite commands per server",
+  "api_version": "1.0.0",
+  "author": "Developer",
+  "description": "Backup and restore your configuration",
+  "main": "index.js",
   "permissions": [
-    "panel:register",
-    "terminal:write",
-    "session:info",
-    "storage:read",
-    "storage:write"
+    "sessions_read",
+    "sessions_write",
+    "folders_read",
+    "folders_write",
+    "settings_read",
+    "fs_read",
+    "fs_write"
   ]
 }
 ```
 
 ### index.js
 ```javascript
-function init(api) {
-  let bookmarks = {}; // { "host": [{ name, cmd }] }
-  let currentHost = null;
+const { invoke } = window.__TAURI__.core;
 
-  api.onLoad(async () => {
-    const saved = await api.storage.get('bookmarks');
-    if (saved) bookmarks = saved;
+async function init(pluginId) {
+  console.log('[Backup] Plugin initialized');
 
-    const session = api.getActiveSession();
-    if (session?.type === 'ssh') {
-      currentHost = session.host;
-    }
-  });
+  // Create initial backup on load
+  await createBackup(pluginId);
+}
 
-  api.onSessionConnect((session) => {
-    if (session.type === 'ssh') {
-      currentHost = session.host;
-      updateUI();
-    }
-  });
+async function createBackup(pluginId) {
+  console.log('[Backup] Creating backup...');
 
-  api.onSessionDisconnect(() => {
-    currentHost = null;
-    updateUI();
-  });
+  try {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 
-  api.registerPanel({
-    id: 'bookmarks-panel',
-    render: (container) => {
-      window._bookmarksContainer = container;
-      updateUI();
-    }
-  });
+    // Collect all data
+    const sessions = await invoke('plugin_api_list_sessions', { pluginId });
+    const folders = await invoke('plugin_api_list_folders', { pluginId });
+    const settings = await invoke('plugin_api_get_settings', { pluginId });
 
-  function updateUI() {
-    const container = window._bookmarksContainer;
-    if (!container) return;
-
-    const hostBookmarks = currentHost ? (bookmarks[currentHost] || []) : [];
-
-    container.innerHTML = `
-      <div style="padding: 12px; font-family: system-ui;">
-        <h3 style="margin: 0 0 4px 0; color: #fff; font-size: 14px;">
-          Bookmarks
-        </h3>
-        <p style="margin: 0 0 12px 0; color: #666; font-size: 11px;">
-          ${currentHost || 'Not connected'}
-        </p>
-
-        ${!currentHost ? `
-          <p style="color: #888; text-align: center; padding: 20px;">
-            Connect to a server to see bookmarks
-          </p>
-        ` : `
-          <div id="bookmark-list">
-            ${hostBookmarks.length === 0
-              ? '<p style="color: #666; font-size: 12px; text-align: center;">No bookmarks for this host</p>'
-              : hostBookmarks.map((b, i) => `
-                <div class="bookmark-item" style="
-                  display: flex;
-                  align-items: center;
-                  gap: 8px;
-                  padding: 8px;
-                  margin-bottom: 4px;
-                  background: rgba(255,255,255,0.05);
-                  border-radius: 6px;
-                ">
-                  <button data-index="${i}" class="run-bookmark" style="
-                    flex: 1;
-                    padding: 4px 8px;
-                    background: transparent;
-                    border: none;
-                    color: #ddd;
-                    text-align: left;
-                    cursor: pointer;
-                    font-size: 12px;
-                  ">
-                    <strong>${b.name}</strong>
-                    <span style="color: #666; font-size: 10px; display: block;">${b.cmd}</span>
-                  </button>
-                  <button data-index="${i}" class="del-bookmark" style="
-                    padding: 4px 8px;
-                    background: transparent;
-                    border: none;
-                    color: #e88b8b;
-                    cursor: pointer;
-                  ">x</button>
-                </div>
-              `).join('')}
-          </div>
-
-          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.1);">
-            <input id="bm-name" placeholder="Name" style="
-              width: 100%;
-              padding: 8px;
-              margin-bottom: 6px;
-              background: rgba(255,255,255,0.1);
-              border: none;
-              border-radius: 4px;
-              color: #fff;
-              font-size: 12px;
-            "/>
-            <input id="bm-cmd" placeholder="Command" style="
-              width: 100%;
-              padding: 8px;
-              background: rgba(255,255,255,0.1);
-              border: none;
-              border-radius: 4px;
-              color: #fff;
-              font-size: 12px;
-            "/>
-            <button id="add-bookmark" style="
-              width: 100%;
-              margin-top: 8px;
-              padding: 10px;
-              background: linear-gradient(135deg, #7da6e8, #5a8fd8);
-              border: none;
-              border-radius: 6px;
-              color: #fff;
-              cursor: pointer;
-              font-size: 12px;
-              font-weight: 500;
-            ">+ Add Bookmark</button>
-          </div>
-        `}
-      </div>
-    `;
-
-    // Run bookmark
-    container.querySelectorAll('.run-bookmark').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const session = api.getActiveSession();
-        if (session) {
-          const bm = hostBookmarks[btn.dataset.index];
-          await api.writeToTerminal(session.id, bm.cmd + '\n');
-        }
-      });
-    });
-
-    // Delete bookmark
-    container.querySelectorAll('.del-bookmark').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        hostBookmarks.splice(btn.dataset.index, 1);
-        bookmarks[currentHost] = hostBookmarks;
-        await api.storage.set('bookmarks', bookmarks);
-        updateUI();
-      });
-    });
-
-    // Add bookmark
-    container.querySelector('#add-bookmark')?.addEventListener('click', async () => {
-      const name = container.querySelector('#bm-name').value.trim();
-      const cmd = container.querySelector('#bm-cmd').value.trim();
-
-      if (name && cmd && currentHost) {
-        if (!bookmarks[currentHost]) bookmarks[currentHost] = [];
-        bookmarks[currentHost].push({ name, cmd });
-        await api.storage.set('bookmarks', bookmarks);
-        api.showNotification('Bookmark added!', 'success');
-        updateUI();
+    const backup = {
+      version: '1.0',
+      timestamp,
+      data: {
+        sessions,
+        folders,
+        settings
       }
+    };
+
+    // Save backup file
+    const filename = `backup-${timestamp}.json`;
+    await invoke('plugin_storage_write', {
+      pluginId,
+      path: `backups/${filename}`,
+      content: JSON.stringify(backup, null, 2)
     });
+
+    console.log('[Backup] Created:', filename);
+    console.log('[Backup] Sessions:', sessions.length);
+    console.log('[Backup] Folders:', folders.length);
+
+    return filename;
+
+  } catch (error) {
+    console.error('[Backup] Error:', error);
+    throw error;
   }
 }
 
-module.exports.default = init;
+async function listBackups(pluginId) {
+  try {
+    const files = await invoke('plugin_storage_list', {
+      pluginId,
+      path: 'backups'
+    });
+
+    return files
+      .filter(f => f.name.endsWith('.json'))
+      .sort((a, b) => b.modified - a.modified);
+
+  } catch {
+    return [];
+  }
+}
+
+async function restoreBackup(pluginId, filename) {
+  console.log('[Backup] Restoring from:', filename);
+
+  try {
+    // Read backup file
+    const content = await invoke('plugin_storage_read', {
+      pluginId,
+      path: `backups/${filename}`
+    });
+
+    const backup = JSON.parse(content);
+    let restored = { sessions: 0, folders: 0 };
+
+    // Restore folders first (sessions may reference them)
+    for (const folder of backup.data.folders) {
+      try {
+        await invoke('plugin_api_create_folder', {
+          pluginId,
+          name: folder.name,
+          color: folder.color,
+          parentId: folder.parentId
+        });
+        restored.folders++;
+      } catch (e) {
+        console.log('[Backup] Folder exists:', folder.name);
+      }
+    }
+
+    // Restore sessions
+    for (const session of backup.data.sessions) {
+      try {
+        await invoke('plugin_api_create_session', {
+          pluginId,
+          name: session.name,
+          host: session.host,
+          port: session.port,
+          username: session.username,
+          authType: session.authType,
+          keyPath: session.keyPath,
+          folderId: session.folderId,
+          color: session.color
+        });
+        restored.sessions++;
+      } catch (e) {
+        console.log('[Backup] Session exists:', session.name);
+      }
+    }
+
+    console.log('[Backup] Restored:', restored);
+    return restored;
+
+  } catch (error) {
+    console.error('[Backup] Restore error:', error);
+    throw error;
+  }
+}
+
+window.SimplyTermPlugins = window.SimplyTermPlugins || {};
+window.SimplyTermPlugins['com.example.config-backup'] = {
+  init,
+  createBackup,
+  listBackups,
+  restoreBackup
+};
 ```
 
 ---
 
-## 7. Color Theme
+## 4. Connection Logger
 
-Customize panel colors.
+Log session connection and disconnection events.
 
 ### manifest.json
 ```json
 {
-  "id": "color-theme",
-  "name": "Color Theme",
+  "id": "com.example.connection-logger",
+  "name": "Connection Logger",
   "version": "1.0.0",
-  "description": "Customize your colors",
-  "permissions": ["panel:register", "storage:read", "storage:write"]
+  "api_version": "1.0.0",
+  "author": "Developer",
+  "description": "Log all connection events",
+  "main": "index.js",
+  "permissions": [
+    "events_subscribe",
+    "sessions_read",
+    "fs_read",
+    "fs_write"
+  ]
 }
 ```
 
 ### index.js
 ```javascript
-function init(api) {
-  const defaultTheme = {
-    primary: '#7da6e8',
-    success: '#9cd68d',
-    warning: '#e8c878',
-    error: '#e88b8b',
-    background: '#1a1a1a'
+const { invoke } = window.__TAURI__.core;
+
+let pollInterval = null;
+
+async function init(pluginId) {
+  console.log('[Logger] Initializing...');
+
+  try {
+    // Subscribe to connection events
+    await invoke('plugin_api_subscribe_events', {
+      pluginId,
+      events: ['session_connected', 'session_disconnected', 'tab_opened', 'tab_closed']
+    });
+
+    console.log('[Logger] Subscribed to events');
+
+    // Start polling for events
+    pollInterval = setInterval(() => pollEvents(pluginId), 1000);
+
+  } catch (error) {
+    console.error('[Logger] Init error:', error);
+  }
+}
+
+async function pollEvents(pluginId) {
+  try {
+    const events = await invoke('plugin_api_get_events', { pluginId });
+
+    for (const event of events) {
+      await logEvent(pluginId, event);
+    }
+
+  } catch (error) {
+    console.error('[Logger] Poll error:', error);
+  }
+}
+
+async function logEvent(pluginId, event) {
+  const logEntry = {
+    timestamp: new Date(event.timestamp).toISOString(),
+    event: event.event,
+    source: event.source,
+    data: event.data
   };
 
-  let theme = { ...defaultTheme };
+  console.log('[Logger]', logEntry);
 
-  api.onLoad(async () => {
-    const saved = await api.storage.get('theme');
-    if (saved) theme = { ...defaultTheme, ...saved };
-  });
-
-  api.registerPanel({
-    id: 'theme-panel',
-    render: (container) => {
-      container.innerHTML = `
-        <div style="padding: 16px; font-family: system-ui;">
-          <h3 style="margin: 0 0 16px 0; color: #fff; font-size: 14px;">
-            Color Theme
-          </h3>
-
-          ${Object.entries(theme).map(([key, value]) => `
-            <div style="margin-bottom: 12px;">
-              <label style="
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                color: #aaa;
-                font-size: 12px;
-                text-transform: capitalize;
-              ">
-                ${key}
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <input
-                    type="color"
-                    value="${value}"
-                    data-key="${key}"
-                    class="color-input"
-                    style="
-                      width: 32px;
-                      height: 24px;
-                      border: none;
-                      border-radius: 4px;
-                      cursor: pointer;
-                    "
-                  />
-                  <span style="
-                    font-family: monospace;
-                    font-size: 10px;
-                    color: #666;
-                  ">${value}</span>
-                </div>
-              </label>
-            </div>
-          `).join('')}
-
-          <div style="display: flex; gap: 8px; margin-top: 16px;">
-            <button id="save-theme" style="
-              flex: 1;
-              padding: 10px;
-              background: ${theme.primary};
-              border: none;
-              border-radius: 6px;
-              color: #1a1a1a;
-              cursor: pointer;
-              font-size: 12px;
-              font-weight: 500;
-            ">Save</button>
-            <button id="reset-theme" style="
-              padding: 10px 16px;
-              background: rgba(255,255,255,0.1);
-              border: none;
-              border-radius: 6px;
-              color: #888;
-              cursor: pointer;
-              font-size: 12px;
-            ">Reset</button>
-          </div>
-
-          <!-- Preview -->
-          <div style="margin-top: 16px; padding: 12px; background: ${theme.background}; border-radius: 8px;">
-            <p style="margin: 0 0 8px 0; color: #888; font-size: 10px;">Preview</p>
-            <div style="display: flex; gap: 8px;">
-              ${['primary', 'success', 'warning', 'error'].map(k => `
-                <div style="
-                  width: 24px;
-                  height: 24px;
-                  background: ${theme[k]};
-                  border-radius: 4px;
-                "></div>
-              `).join('')}
-            </div>
-          </div>
-        </div>
-      `;
-
-      // Color change
-      container.querySelectorAll('.color-input').forEach(input => {
-        input.addEventListener('input', (e) => {
-          theme[e.target.dataset.key] = e.target.value;
-        });
+  // Append to log file
+  try {
+    let logs = [];
+    try {
+      const content = await invoke('plugin_storage_read', {
+        pluginId,
+        path: 'connection-log.json'
       });
-
-      // Save
-      container.querySelector('#save-theme').addEventListener('click', async () => {
-        await api.storage.set('theme', theme);
-        api.showNotification('Theme saved!', 'success');
-      });
-
-      // Reset
-      container.querySelector('#reset-theme').addEventListener('click', async () => {
-        theme = { ...defaultTheme };
-        await api.storage.set('theme', theme);
-        api.showNotification('Theme reset!', 'info');
-        api.hidePanel('theme-panel');
-        api.showPanel('theme-panel');
-      });
+      logs = JSON.parse(content);
+    } catch {
+      // File doesn't exist yet
     }
+
+    logs.unshift(logEntry);
+    logs = logs.slice(0, 500); // Keep last 500 entries
+
+    await invoke('plugin_storage_write', {
+      pluginId,
+      path: 'connection-log.json',
+      content: JSON.stringify(logs, null, 2)
+    });
+
+  } catch (error) {
+    console.error('[Logger] Save error:', error);
+  }
+}
+
+async function getLogs(pluginId, limit = 50) {
+  try {
+    const content = await invoke('plugin_storage_read', {
+      pluginId,
+      path: 'connection-log.json'
+    });
+    const logs = JSON.parse(content);
+    return logs.slice(0, limit);
+  } catch {
+    return [];
+  }
+}
+
+async function clearLogs(pluginId) {
+  await invoke('plugin_storage_write', {
+    pluginId,
+    path: 'connection-log.json',
+    content: '[]'
+  });
+  console.log('[Logger] Logs cleared');
+}
+
+function cleanup() {
+  if (pollInterval) {
+    clearInterval(pollInterval);
+    pollInterval = null;
+    console.log('[Logger] Stopped polling');
+  }
+}
+
+window.SimplyTermPlugins = window.SimplyTermPlugins || {};
+window.SimplyTermPlugins['com.example.connection-logger'] = {
+  init,
+  getLogs,
+  clearLogs,
+  cleanup
+};
+```
+
+---
+
+## 5. Vault Secrets Manager
+
+Store and retrieve encrypted secrets from the vault.
+
+### manifest.json
+```json
+{
+  "id": "com.example.secrets-manager",
+  "name": "Secrets Manager",
+  "version": "1.0.0",
+  "api_version": "1.0.0",
+  "author": "Developer",
+  "description": "Securely store API keys and secrets",
+  "main": "index.js",
+  "permissions": [
+    "vault_status",
+    "vault_read",
+    "vault_write",
+    "fs_read",
+    "fs_write"
+  ]
+}
+```
+
+### index.js
+```javascript
+const { invoke } = window.__TAURI__.core;
+
+async function init(pluginId) {
+  console.log('[Secrets] Initializing...');
+
+  const status = await checkVaultStatus(pluginId);
+  console.log('[Secrets] Vault status:', status);
+
+  if (!status.isUnlocked) {
+    console.log('[Secrets] Vault is locked - waiting for unlock...');
+  }
+}
+
+async function checkVaultStatus(pluginId) {
+  try {
+    return await invoke('plugin_api_vault_status', { pluginId });
+  } catch (error) {
+    console.error('[Secrets] Status error:', error);
+    return { exists: false, isUnlocked: false };
+  }
+}
+
+async function storeSecret(pluginId, key, value) {
+  const status = await checkVaultStatus(pluginId);
+
+  if (!status.isUnlocked) {
+    throw new Error('Vault is locked');
+  }
+
+  try {
+    await invoke('plugin_api_vault_store', {
+      pluginId,
+      key,
+      value
+    });
+    console.log('[Secrets] Stored:', key);
+
+    // Update key registry
+    await updateKeyRegistry(pluginId, key, 'add');
+
+    return true;
+  } catch (error) {
+    console.error('[Secrets] Store error:', error);
+    throw error;
+  }
+}
+
+async function getSecret(pluginId, key) {
+  const status = await checkVaultStatus(pluginId);
+
+  if (!status.isUnlocked) {
+    throw new Error('Vault is locked');
+  }
+
+  try {
+    const value = await invoke('plugin_api_vault_read', {
+      pluginId,
+      key
+    });
+    return value;
+  } catch (error) {
+    console.error('[Secrets] Read error:', error);
+    return null;
+  }
+}
+
+async function deleteSecret(pluginId, key) {
+  try {
+    const deleted = await invoke('plugin_api_vault_delete', {
+      pluginId,
+      key
+    });
+
+    if (deleted) {
+      await updateKeyRegistry(pluginId, key, 'remove');
+      console.log('[Secrets] Deleted:', key);
+    }
+
+    return deleted;
+  } catch (error) {
+    console.error('[Secrets] Delete error:', error);
+    return false;
+  }
+}
+
+async function listSecretKeys(pluginId) {
+  try {
+    const content = await invoke('plugin_storage_read', {
+      pluginId,
+      path: 'key-registry.json'
+    });
+    return JSON.parse(content);
+  } catch {
+    return [];
+  }
+}
+
+async function updateKeyRegistry(pluginId, key, action) {
+  let keys = await listSecretKeys(pluginId);
+
+  if (action === 'add' && !keys.includes(key)) {
+    keys.push(key);
+  } else if (action === 'remove') {
+    keys = keys.filter(k => k !== key);
+  }
+
+  await invoke('plugin_storage_write', {
+    pluginId,
+    path: 'key-registry.json',
+    content: JSON.stringify(keys)
   });
 }
 
-module.exports.default = init;
+window.SimplyTermPlugins = window.SimplyTermPlugins || {};
+window.SimplyTermPlugins['com.example.secrets-manager'] = {
+  init,
+  checkVaultStatus,
+  storeSecret,
+  getSecret,
+  deleteSecret,
+  listSecretKeys
+};
+```
+
+---
+
+## 6. Auto Organizer
+
+Automatically organize sessions into folders by hostname pattern.
+
+### manifest.json
+```json
+{
+  "id": "com.example.auto-organizer",
+  "name": "Auto Organizer",
+  "version": "1.0.0",
+  "api_version": "1.0.0",
+  "author": "Developer",
+  "description": "Organize sessions into folders by pattern",
+  "main": "index.js",
+  "permissions": [
+    "sessions_read",
+    "sessions_write",
+    "folders_read",
+    "folders_write",
+    "fs_read",
+    "fs_write"
+  ]
+}
+```
+
+### index.js
+```javascript
+const { invoke } = window.__TAURI__.core;
+
+// Default organization rules
+const DEFAULT_RULES = [
+  { pattern: 'prod', folder: 'Production', color: '#e88b8b' },
+  { pattern: 'staging', folder: 'Staging', color: '#e8c878' },
+  { pattern: 'dev', folder: 'Development', color: '#9cd68d' },
+  { pattern: 'db', folder: 'Databases', color: '#7da6e8' },
+  { pattern: 'web', folder: 'Web Servers', color: '#c49de8' }
+];
+
+async function init(pluginId) {
+  console.log('[Organizer] Initializing...');
+
+  // Load or create rules
+  let rules = await loadRules(pluginId);
+  if (rules.length === 0) {
+    rules = DEFAULT_RULES;
+    await saveRules(pluginId, rules);
+  }
+
+  console.log('[Organizer] Loaded', rules.length, 'rules');
+}
+
+async function loadRules(pluginId) {
+  try {
+    const content = await invoke('plugin_storage_read', {
+      pluginId,
+      path: 'rules.json'
+    });
+    return JSON.parse(content);
+  } catch {
+    return [];
+  }
+}
+
+async function saveRules(pluginId, rules) {
+  await invoke('plugin_storage_write', {
+    pluginId,
+    path: 'rules.json',
+    content: JSON.stringify(rules, null, 2)
+  });
+}
+
+async function organize(pluginId) {
+  console.log('[Organizer] Starting organization...');
+
+  const rules = await loadRules(pluginId);
+  const sessions = await invoke('plugin_api_list_sessions', { pluginId });
+  const folders = await invoke('plugin_api_list_folders', { pluginId });
+
+  // Create folder map
+  const folderMap = {};
+  for (const folder of folders) {
+    folderMap[folder.name] = folder.id;
+  }
+
+  let organized = 0;
+
+  for (const session of sessions) {
+    // Skip already organized sessions
+    if (session.folderId) continue;
+
+    // Find matching rule
+    const hostLower = session.host.toLowerCase();
+    const nameLower = session.name.toLowerCase();
+
+    for (const rule of rules) {
+      const pattern = rule.pattern.toLowerCase();
+
+      if (hostLower.includes(pattern) || nameLower.includes(pattern)) {
+        // Get or create folder
+        let folderId = folderMap[rule.folder];
+
+        if (!folderId) {
+          console.log('[Organizer] Creating folder:', rule.folder);
+          const newFolder = await invoke('plugin_api_create_folder', {
+            pluginId,
+            name: rule.folder,
+            color: rule.color
+          });
+          folderId = newFolder.id;
+          folderMap[rule.folder] = folderId;
+        }
+
+        // Move session to folder
+        await invoke('plugin_api_update_session', {
+          pluginId,
+          id: session.id,
+          folderId
+        });
+
+        console.log('[Organizer] Moved', session.name, 'to', rule.folder);
+        organized++;
+        break;
+      }
+    }
+  }
+
+  console.log('[Organizer] Organized', organized, 'sessions');
+  return { organized, total: sessions.length };
+}
+
+async function addRule(pluginId, pattern, folder, color) {
+  const rules = await loadRules(pluginId);
+  rules.push({ pattern, folder, color });
+  await saveRules(pluginId, rules);
+  console.log('[Organizer] Added rule:', pattern, '->', folder);
+}
+
+async function removeRule(pluginId, pattern) {
+  let rules = await loadRules(pluginId);
+  rules = rules.filter(r => r.pattern !== pattern);
+  await saveRules(pluginId, rules);
+  console.log('[Organizer] Removed rule:', pattern);
+}
+
+window.SimplyTermPlugins = window.SimplyTermPlugins || {};
+window.SimplyTermPlugins['com.example.auto-organizer'] = {
+  init,
+  loadRules,
+  saveRules,
+  organize,
+  addRule,
+  removeRule
+};
 ```
 
 ---
 
 ## Tips for Your Own Plugins
 
-1. **Start simple** - Get one feature working before adding more
-2. **Test often** - Disable/re-enable to see changes
-3. **Handle errors** - Sessions can be null, APIs can fail
-4. **Clean up** - Use `onUnload` to stop intervals/listeners
-5. **Log everything** - Use `console.log('[MyPlugin]')` to debug
+### 1. Always Handle Errors
+
+```javascript
+async function safeInvoke(command, params) {
+  try {
+    return await invoke(command, params);
+  } catch (error) {
+    if (error.code === 'permission_denied') {
+      console.error('[MyPlugin] Missing permission for:', command);
+    } else if (error.code === 'vault_locked') {
+      console.log('[MyPlugin] Vault is locked');
+    } else {
+      console.error('[MyPlugin] Error:', error.message);
+    }
+    return null;
+  }
+}
+```
+
+### 2. Check Vault Before Access
+
+```javascript
+async function useVault(pluginId) {
+  const status = await invoke('plugin_api_vault_status', { pluginId });
+
+  if (!status.exists) {
+    console.log('Vault not configured');
+    return null;
+  }
+
+  if (!status.isUnlocked) {
+    console.log('Vault is locked');
+    return null;
+  }
+
+  // Safe to use vault
+  return await invoke('plugin_api_vault_read', { pluginId, key: 'my-key' });
+}
+```
+
+### 3. Clean Up Resources
+
+```javascript
+let pollInterval = null;
+
+async function init(pluginId) {
+  pollInterval = setInterval(() => pollEvents(pluginId), 1000);
+}
+
+function cleanup() {
+  if (pollInterval) {
+    clearInterval(pollInterval);
+    pollInterval = null;
+  }
+}
+
+window.SimplyTermPlugins['my-plugin'] = { init, cleanup };
+```
+
+### 4. Use Namespaced Storage
+
+```javascript
+const STORAGE_VERSION = 'v1';
+
+async function saveData(pluginId, key, data) {
+  await invoke('plugin_storage_write', {
+    pluginId,
+    path: `${STORAGE_VERSION}/${key}.json`,
+    content: JSON.stringify(data)
+  });
+}
+```
+
+### 5. Prefix Your Logs
+
+```javascript
+const LOG_PREFIX = '[MyPlugin]';
+
+console.log(LOG_PREFIX, 'Starting...');
+console.error(LOG_PREFIX, 'Error:', error);
+```
 
 ---
 
-**Happy coding!**
+## Testing Your Plugin
+
+1. Copy your plugin folder to the plugins directory
+2. Open SimplyTerm
+3. Go to **Settings** > **Plugins**
+4. Click **Refresh**
+5. Grant the requested permissions
+6. Enable your plugin
+7. Open DevTools (`Ctrl+Shift+I` / `Cmd+Option+I`) to see console output
+
+---
+
+**SimplyTerm Plugin API v1.0.0**

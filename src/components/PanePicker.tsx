@@ -1,6 +1,6 @@
-import { Terminal, Server, Clock, Copy, FolderOpen, Wifi } from "lucide-react";
+import { Terminal, Server, Copy, FolderOpen, Wifi } from "lucide-react";
 import type { SshConnectionConfig } from "./ConnectionForm";
-import type { SavedSession, RecentSession } from "../types";
+import type { SavedSession } from "../types";
 
 export interface ActiveConnection {
   tabId: string;
@@ -16,11 +16,9 @@ interface PanePickerProps {
   onSelectLocal: () => void;
   onSelectDuplicate: () => void;
   onSelectSaved: (session: SavedSession) => void;
-  onSelectRecent: (session: RecentSession) => void;
   onSelectSftpForConnection?: (sessionId: string, ptySessionId: string) => void;
   currentSessionConfig?: SshConnectionConfig;
   savedSessions: SavedSession[];
-  recentSessions: RecentSession[];
   activeConnections?: ActiveConnection[];
 }
 
@@ -28,11 +26,9 @@ export function PanePicker({
   onSelectLocal,
   onSelectDuplicate,
   onSelectSaved,
-  onSelectRecent,
   onSelectSftpForConnection,
   currentSessionConfig,
   savedSessions,
-  recentSessions,
   activeConnections = [],
 }: PanePickerProps) {
   // Filter SSH connections that can have SFTP
@@ -142,33 +138,8 @@ export function PanePicker({
             </>
           )}
 
-          {/* Recent Sessions */}
-          {recentSessions.length > 0 && (
-            <>
-              <div className="px-3 pt-3 pb-1">
-                <span className="text-xs font-medium text-subtext-0 uppercase tracking-wider">
-                  Recent
-                </span>
-              </div>
-              {recentSessions.slice(0, 5).map((session) => (
-                <button
-                  key={session.id}
-                  onClick={() => onSelectRecent(session)}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-surface-0/50 transition-colors text-left"
-                >
-                  <div className="w-8 h-8 rounded bg-peach/20 flex items-center justify-center">
-                    <Clock size={16} className="text-peach" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm text-text truncate">{session.name}</div>
-                    <div className="text-xs text-subtext-0 truncate">
-                      {session.username}@{session.host}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </>
-          )}
+          {/* Plugin extension point for additional pane picker options */}
+          <div id="pane-picker-plugin-items" />
         </div>
       </div>
     </div>

@@ -19,15 +19,11 @@ use connectors::{
     check_host_key_only, HostKeyCheckResult, accept_pending_key, accept_and_update_pending_key, remove_pending_key,
     connect_telnet, connect_serial, list_serial_ports, SerialConfig, SerialPortInfo,
 };
-use plugins::{PluginManager, PluginState};
+use plugins::{PluginManager, InstalledPlugin, PluginState};
 use session::SessionManager;
 use storage::{
     load_sessions, save_sessions, SavedSession, AuthType,
-    load_recent_sessions, add_recent_session, remove_recent_session, clear_recent_sessions, RecentSession,
     load_settings as load_app_settings, save_settings as save_app_settings, AppSettings,
-    load_folders, create_folder as storage_create_folder,
-    update_folder as storage_update_folder, delete_folder as storage_delete_folder,
-    reorder_folders as storage_reorder_folders, SessionFolder,
     VaultState, VaultCredentialType,
 };
 
@@ -487,7 +483,8 @@ fn get_home_dir() -> Result<String, String> {
 // Commandes Storage (Sessions sauvegardées)
 // ============================================================================
 
-/// Structure pour la réponse frontend (inclut les métadonnées uniquement)
+/// Core session response (connection info only)
+/// Plugin-managed metadata (folders, tags, colors) is retrieved separately via session metadata API
 #[derive(serde::Serialize)]
 struct SavedSessionResponse {
     id: String,
@@ -497,9 +494,6 @@ struct SavedSessionResponse {
     username: String,
     auth_type: String,
     key_path: Option<String>,
-    folder_id: Option<String>,
-    tags: Vec<String>,
-    color: Option<String>,
 }
 
 impl From<SavedSession> for SavedSessionResponse {
@@ -515,9 +509,6 @@ impl From<SavedSession> for SavedSessionResponse {
                 AuthType::Key => "key".to_string(),
             },
             key_path: s.key_path,
-            folder_id: s.folder_id,
-            tags: s.tags,
-            color: s.color,
         }
     }
 }
@@ -528,6 +519,8 @@ fn load_saved_sessions() -> Result<Vec<SavedSessionResponse>, String> {
     Ok(sessions.into_iter().map(|s| s.into()).collect())
 }
 
+/// Save a session (core connection info only)
+/// Plugin-managed metadata should be stored via session metadata API
 #[tauri::command]
 fn save_session(
     app: AppHandle,
@@ -540,9 +533,6 @@ fn save_session(
     key_path: Option<String>,
     password: Option<String>,
     key_passphrase: Option<String>,
-    folder_id: Option<String>,
-    tags: Option<Vec<String>>,
-    color: Option<String>,
 ) -> Result<(), String> {
     let state = app.state::<AppState>();
 
@@ -560,11 +550,8 @@ fn save_session(
         host,
         port,
         username,
-        auth_type: auth.clone(),
+        auth_type: auth,
         key_path,
-        folder_id,
-        tags: tags.unwrap_or_default(),
-        color,
     };
 
     sessions.push(session);
@@ -630,196 +617,6 @@ fn get_session_credentials(app: AppHandle, id: String) -> Result<SessionCredenti
 struct SessionCredentials {
     password: Option<String>,
     key_passphrase: Option<String>,
-}
-
-// ============================================================================
-// Commandes Storage (Dossiers)
-// ============================================================================
-
-#[derive(serde::Serialize)]
-struct FolderResponse {
-    id: String,
-    name: String,
-    color: Option<String>,
-    parent_id: Option<String>,
-    order: i32,
-    expanded: bool,
-}
-
-impl From<SessionFolder> for FolderResponse {
-    fn from(f: SessionFolder) -> Self {
-        Self {
-            id: f.id,
-            name: f.name,
-            color: f.color,
-            parent_id: f.parent_id,
-            order: f.order,
-            expanded: f.expanded,
-        }
-    }
-}
-
-#[tauri::command]
-fn get_folders() -> Result<Vec<FolderResponse>, String> {
-    let folders = load_folders()?;
-    Ok(folders.into_iter().map(|f| f.into()).collect())
-}
-
-#[tauri::command]
-fn create_folder(name: String, color: Option<String>, parent_id: Option<String>) -> Result<FolderResponse, String> {
-    let folder = storage_create_folder(name, color, parent_id)?;
-    Ok(folder.into())
-}
-
-#[tauri::command]
-fn update_folder(
-    id: String,
-    name: Option<String>,
-    color: Option<String>,
-    parent_id: Option<Option<String>>,
-    expanded: Option<bool>,
-) -> Result<FolderResponse, String> {
-    let folder = storage_update_folder(id, name, color, parent_id, expanded)?;
-    Ok(folder.into())
-}
-
-#[tauri::command]
-fn delete_folder(id: String) -> Result<(), String> {
-    // Déplacer les sessions du dossier à la racine
-    let mut sessions = load_sessions()?;
-    for session in sessions.iter_mut() {
-        if session.folder_id.as_ref() == Some(&id) {
-            session.folder_id = None;
-        }
-    }
-    save_sessions(&sessions)?;
-
-    // Supprimer le dossier
-    storage_delete_folder(id)?;
-    Ok(())
-}
-
-#[tauri::command]
-fn reorder_folders(folder_ids: Vec<String>, parent_id: Option<String>) -> Result<(), String> {
-    storage_reorder_folders(folder_ids, parent_id)
-}
-
-/// Met à jour le dossier d'une session
-#[tauri::command]
-fn update_session_folder(session_id: String, folder_id: Option<String>) -> Result<(), String> {
-    let mut sessions = load_sessions()?;
-
-    if let Some(session) = sessions.iter_mut().find(|s| s.id == session_id) {
-        session.folder_id = folder_id;
-    } else {
-        return Err(format!("Session not found: {}", session_id));
-    }
-
-    save_sessions(&sessions)
-}
-
-/// Met à jour les tags d'une session
-#[tauri::command]
-fn update_session_tags(session_id: String, tags: Vec<String>) -> Result<(), String> {
-    let mut sessions = load_sessions()?;
-
-    if let Some(session) = sessions.iter_mut().find(|s| s.id == session_id) {
-        session.tags = tags;
-    } else {
-        return Err(format!("Session not found: {}", session_id));
-    }
-
-    save_sessions(&sessions)
-}
-
-/// Met à jour la couleur d'une session
-#[tauri::command]
-fn update_session_color(session_id: String, color: Option<String>) -> Result<(), String> {
-    let mut sessions = load_sessions()?;
-
-    if let Some(session) = sessions.iter_mut().find(|s| s.id == session_id) {
-        session.color = color;
-    } else {
-        return Err(format!("Session not found: {}", session_id));
-    }
-
-    save_sessions(&sessions)
-}
-
-// ============================================================================
-// Commandes Storage (Sessions récentes)
-// ============================================================================
-
-#[derive(serde::Serialize)]
-struct RecentSessionResponse {
-    id: String,
-    name: String,
-    host: String,
-    port: u16,
-    username: String,
-    auth_type: String,
-    key_path: Option<String>,
-    last_used: u64,
-}
-
-impl From<RecentSession> for RecentSessionResponse {
-    fn from(s: RecentSession) -> Self {
-        Self {
-            id: s.id,
-            name: s.name,
-            host: s.host,
-            port: s.port,
-            username: s.username,
-            auth_type: s.auth_type,
-            key_path: s.key_path,
-            last_used: s.last_used,
-        }
-    }
-}
-
-#[tauri::command]
-fn get_recent_sessions() -> Result<Vec<RecentSessionResponse>, String> {
-    let sessions = load_recent_sessions()?;
-    Ok(sessions.into_iter().map(|s| s.into()).collect())
-}
-
-#[tauri::command]
-fn add_to_recent(
-    name: String,
-    host: String,
-    port: u16,
-    username: String,
-    auth_type: String,
-    key_path: Option<String>,
-) -> Result<(), String> {
-    let session = RecentSession {
-        id: format!("recent-{}-{}", host, std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_millis())
-            .unwrap_or(0)),
-        name,
-        host,
-        port,
-        username,
-        auth_type,
-        key_path,
-        last_used: std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0),
-    };
-
-    add_recent_session(session)
-}
-
-#[tauri::command]
-fn remove_from_recent(id: String) -> Result<(), String> {
-    remove_recent_session(&id)
-}
-
-#[tauri::command]
-fn clear_recent() -> Result<(), String> {
-    clear_recent_sessions()
 }
 
 // ============================================================================
@@ -930,69 +727,52 @@ async fn tunnel_remove(app: AppHandle, tunnel_id: String) -> Result<(), String> 
 }
 
 // ============================================================================
-// Commandes Plugins
+// Plugin Commands
 // ============================================================================
 
 /// Response format for plugin list
 #[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 struct PluginResponse {
     id: String,
     name: String,
     version: String,
-    author: Option<String>,
-    description: Option<String>,
+    api_version: String,
+    author: String,
+    description: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    homepage: Option<String>,
+    main: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    icon: Option<String>,
     status: String,
     permissions: Vec<String>,
-    panels: Vec<PanelResponse>,
-    commands: Vec<CommandResponse>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error_message: Option<String>,
 }
 
-#[derive(serde::Serialize)]
-struct PanelResponse {
-    id: String,
-    title: String,
-    icon: Option<String>,
-    position: String,
-}
-
-#[derive(serde::Serialize)]
-struct CommandResponse {
-    id: String,
-    title: String,
-    shortcut: Option<String>,
-}
-
-impl From<PluginState> for PluginResponse {
-    fn from(state: PluginState) -> Self {
+impl From<InstalledPlugin> for PluginResponse {
+    fn from(plugin: InstalledPlugin) -> Self {
         Self {
-            id: state.manifest.id,
-            name: state.manifest.name,
-            version: state.manifest.version,
-            author: state.manifest.author,
-            description: state.manifest.description,
-            status: match state.status {
-                plugins::PluginStatus::Disabled => "disabled".to_string(),
-                plugins::PluginStatus::Enabled => "enabled".to_string(),
-                plugins::PluginStatus::Error => "error".to_string(),
+            id: plugin.manifest.id,
+            name: plugin.manifest.name,
+            version: plugin.manifest.version,
+            api_version: plugin.manifest.api_version,
+            author: plugin.manifest.author,
+            description: plugin.manifest.description,
+            homepage: plugin.manifest.homepage,
+            main: plugin.manifest.main,
+            icon: plugin.manifest.icon,
+            status: match plugin.state {
+                PluginState::Disabled => "disabled".to_string(),
+                PluginState::Enabled => "enabled".to_string(),
+                PluginState::Error => "error".to_string(),
             },
-            permissions: state.manifest.permissions.iter().map(|p| p.to_string()).collect(),
-            panels: state.manifest.panels.into_iter().map(|p| PanelResponse {
-                id: p.id,
-                title: p.title,
-                icon: p.icon,
-                position: match p.position {
-                    plugins::PanelPosition::Right => "right".to_string(),
-                    plugins::PanelPosition::Left => "left".to_string(),
-                    plugins::PanelPosition::Bottom => "bottom".to_string(),
-                    plugins::PanelPosition::FloatingLeft => "floating-left".to_string(),
-                    plugins::PanelPosition::FloatingRight => "floating-right".to_string(),
-                },
+            permissions: plugin.manifest.permissions.iter().map(|p| {
+                // Use serde serialization to get snake_case format
+                serde_json::to_string(p).unwrap_or_default().trim_matches('"').to_string()
             }).collect(),
-            commands: state.manifest.commands.into_iter().map(|c| CommandResponse {
-                id: c.id,
-                title: c.title,
-                shortcut: c.shortcut,
-            }).collect(),
+            error_message: plugin.error_message,
         }
     }
 }
@@ -1000,7 +780,8 @@ impl From<PluginState> for PluginResponse {
 #[tauri::command]
 fn list_plugins(app: AppHandle) -> Result<Vec<PluginResponse>, String> {
     let state = app.state::<AppState>();
-    let plugins = state.plugin_manager.list_plugins();
+    let plugins = state.plugin_manager.list_plugins()
+        .map_err(|e| e.message)?;
     Ok(plugins.into_iter().map(|p| p.into()).collect())
 }
 
@@ -1008,6 +789,7 @@ fn list_plugins(app: AppHandle) -> Result<Vec<PluginResponse>, String> {
 fn get_plugin_manifest(app: AppHandle, id: String) -> Result<PluginResponse, String> {
     let state = app.state::<AppState>();
     let plugin = state.plugin_manager.get_plugin(&id)
+        .map_err(|e| e.message)?
         .ok_or_else(|| format!("Plugin not found: {}", id))?;
     Ok(plugin.into())
 }
@@ -1016,71 +798,551 @@ fn get_plugin_manifest(app: AppHandle, id: String) -> Result<PluginResponse, Str
 fn enable_plugin(app: AppHandle, id: String) -> Result<(), String> {
     let state = app.state::<AppState>();
     state.plugin_manager.enable_plugin(&id)
+        .map_err(|e| e.message)
 }
 
 #[tauri::command]
 fn disable_plugin(app: AppHandle, id: String) -> Result<(), String> {
     let state = app.state::<AppState>();
     state.plugin_manager.disable_plugin(&id)
+        .map_err(|e| e.message)
 }
 
+#[tauri::command]
+fn grant_plugin_permissions(app: AppHandle, id: String) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    state.plugin_manager.grant_all_permissions(&id)
+        .map_err(|e| e.message)
+}
+
+#[tauri::command]
+fn uninstall_plugin(app: AppHandle, id: String) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    state.plugin_manager.uninstall_plugin(&id)
+        .map_err(|e| e.message)
+}
+
+#[tauri::command]
+fn plugin_storage_read(app: AppHandle, plugin_id: String, path: String) -> Result<String, String> {
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .map_err(|e| e.message)?
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    let data_dir = state.plugin_manager.get_plugin_data_dir(&plugin_id)
+        .map_err(|e| e.message)?;
+
+    plugins::api_v1::storage::read_file(
+        &plugin.granted_permissions,
+        &data_dir,
+        &path,
+    ).map_err(|e| e.message)
+}
+
+#[tauri::command]
+fn plugin_storage_write(app: AppHandle, plugin_id: String, path: String, content: String) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .map_err(|e| e.message)?
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    let data_dir = state.plugin_manager.get_plugin_data_dir(&plugin_id)
+        .map_err(|e| e.message)?;
+
+    plugins::api_v1::storage::write_file(
+        &plugin.granted_permissions,
+        &data_dir,
+        &path,
+        &content,
+    ).map_err(|e| e.message)
+}
+
+#[tauri::command]
+fn plugin_storage_delete(app: AppHandle, plugin_id: String, path: String) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .map_err(|e| e.message)?
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    let data_dir = state.plugin_manager.get_plugin_data_dir(&plugin_id)
+        .map_err(|e| e.message)?;
+
+    plugins::api_v1::storage::delete_file(
+        &plugin.granted_permissions,
+        &data_dir,
+        &path,
+    ).map_err(|e| e.message)
+}
+
+#[tauri::command]
+fn plugin_storage_list(app: AppHandle, plugin_id: String, path: String) -> Result<Vec<plugins::api_v1::storage::FileEntry>, String> {
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .map_err(|e| e.message)?
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    let data_dir = state.plugin_manager.get_plugin_data_dir(&plugin_id)
+        .map_err(|e| e.message)?;
+
+    plugins::api_v1::storage::list_directory(
+        &plugin.granted_permissions,
+        &data_dir,
+        &path,
+    ).map_err(|e| e.message)
+}
+
+/// Write to terminal (for plugins)
+#[tauri::command]
+fn plugin_api_write_to_terminal(
+    app: AppHandle,
+    plugin_id: String,
+    session_id: String,
+    data: String,
+) -> Result<(), String> {
+    use plugins::manifest::Permission;
+
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .map_err(|e| e.message)?
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    // Check permission
+    if !plugin.granted_permissions.has(Permission::TerminalWrite) {
+        return Err("Permission denied: terminal_write required".to_string());
+    }
+
+    state.session_manager.write(&session_id, data.as_bytes())
+}
+
+/// Get plugin main file content (for loading in frontend)
 #[tauri::command]
 fn get_plugin_file(app: AppHandle, plugin_id: String, file_path: String) -> Result<String, String> {
     let state = app.state::<AppState>();
-    state.plugin_manager.get_plugin_file(&plugin_id, &file_path)
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .map_err(|e| e.message)?
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    let full_path = plugin.install_path.join(&file_path);
+
+    std::fs::read_to_string(&full_path)
+        .map_err(|e| format!("Failed to read plugin file: {}", e))
 }
 
+/// Refresh plugins list (scan for new/updated plugins)
 #[tauri::command]
 fn refresh_plugins(app: AppHandle) -> Result<Vec<PluginResponse>, String> {
     let state = app.state::<AppState>();
-    state.plugin_manager.refresh()?;
-    let plugins = state.plugin_manager.list_plugins();
+
+    println!("[refresh_plugins] Called, scanning plugins...");
+
+    // Scan plugins directory for new plugins
+    match state.plugin_manager.scan_plugins() {
+        Ok(discovered) => println!("[refresh_plugins] Discovered {} new plugins", discovered.len()),
+        Err(e) => println!("[refresh_plugins] Scan error: {}", e.message),
+    }
+
+    // Return updated list
+    let plugins = state.plugin_manager.list_plugins()
+        .map_err(|e| e.message)?;
+    println!("[refresh_plugins] Returning {} plugins", plugins.len());
     Ok(plugins.into_iter().map(|p| p.into()).collect())
 }
 
+/// Get the plugins directory path
 #[tauri::command]
-fn plugin_storage_get(app: AppHandle, plugin_id: String, key: String) -> Result<Option<serde_json::Value>, String> {
+fn get_plugins_dir(app: AppHandle) -> Result<String, String> {
+    let state = app.state::<AppState>();
+    Ok(state.plugin_manager.plugins_dir().to_string_lossy().to_string())
+}
+
+// ============================================================================
+// Plugin API v1 - Sessions
+// ============================================================================
+
+#[tauri::command]
+fn plugin_api_list_sessions(app: AppHandle, plugin_id: String) -> Result<Vec<SavedSessionResponse>, String> {
+    use plugins::manifest::Permission;
+
     let state = app.state::<AppState>();
     let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .map_err(|e| e.message)?
         .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
 
-    let api = plugins::PluginApi::new(plugin_id, plugin.manifest.permissions)?;
-    api.storage_get(&key)
+    if !plugin.granted_permissions.has(Permission::SessionsRead) {
+        return Err("Permission denied: sessions_read required".to_string());
+    }
+
+    let sessions = load_sessions()?;
+    Ok(sessions.into_iter().map(|s| s.into()).collect())
 }
 
 #[tauri::command]
-fn plugin_storage_set(app: AppHandle, plugin_id: String, key: String, value: serde_json::Value) -> Result<(), String> {
+fn plugin_api_get_session(app: AppHandle, plugin_id: String, id: String) -> Result<Option<SavedSessionResponse>, String> {
+    use plugins::manifest::Permission;
+
     let state = app.state::<AppState>();
     let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .map_err(|e| e.message)?
         .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
 
-    let api = plugins::PluginApi::new(plugin_id, plugin.manifest.permissions)?;
-    api.storage_set(&key, value)
+    if !plugin.granted_permissions.has(Permission::SessionsRead) {
+        return Err("Permission denied: sessions_read required".to_string());
+    }
+
+    let sessions = load_sessions()?;
+    Ok(sessions.into_iter().find(|s| s.id == id).map(|s| s.into()))
 }
 
+/// Create a new session (core connection info only)
+/// Plugin-managed metadata should be stored via session metadata API
 #[tauri::command]
-fn plugin_storage_delete(app: AppHandle, plugin_id: String, key: String) -> Result<(), String> {
-    let state = app.state::<AppState>();
-    let plugin = state.plugin_manager.get_plugin(&plugin_id)
-        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
-
-    let api = plugins::PluginApi::new(plugin_id, plugin.manifest.permissions)?;
-    api.storage_delete(&key)
-}
-
-#[tauri::command]
-fn plugin_invoke(
+fn plugin_api_create_session(
     app: AppHandle,
     plugin_id: String,
-    command: String,
-    args: std::collections::HashMap<String, serde_json::Value>,
+    name: String,
+    host: String,
+    port: u16,
+    username: String,
+    auth_type: String,
+    key_path: Option<String>,
+) -> Result<SavedSessionResponse, String> {
+    use plugins::manifest::Permission;
+
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .map_err(|e| e.message)?
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    if !plugin.granted_permissions.has(Permission::SessionsWrite) {
+        return Err("Permission denied: sessions_write required".to_string());
+    }
+
+    let id = uuid::Uuid::new_v4().to_string();
+    let auth = match auth_type.as_str() {
+        "key" => AuthType::Key,
+        _ => AuthType::Password,
+    };
+
+    let session = SavedSession {
+        id: id.clone(),
+        name,
+        host,
+        port,
+        username,
+        auth_type: auth,
+        key_path,
+    };
+
+    let mut sessions = load_sessions()?;
+    sessions.push(session.clone());
+    save_sessions(&sessions)?;
+
+    Ok(session.into())
+}
+
+/// Update session (core connection info only)
+/// Plugin-managed metadata should be stored via session metadata API
+#[tauri::command]
+fn plugin_api_update_session(
+    app: AppHandle,
+    plugin_id: String,
+    id: String,
+    name: Option<String>,
+    host: Option<String>,
+    port: Option<u16>,
+    username: Option<String>,
+    auth_type: Option<String>,
+    key_path: Option<Option<String>>,
+) -> Result<SavedSessionResponse, String> {
+    use plugins::manifest::Permission;
+
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .map_err(|e| e.message)?
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    if !plugin.granted_permissions.has(Permission::SessionsWrite) {
+        return Err("Permission denied: sessions_write required".to_string());
+    }
+
+    let mut sessions = load_sessions()?;
+    let session = sessions.iter_mut()
+        .find(|s| s.id == id)
+        .ok_or_else(|| format!("Session not found: {}", id))?;
+
+    if let Some(n) = name { session.name = n; }
+    if let Some(h) = host { session.host = h; }
+    if let Some(p) = port { session.port = p; }
+    if let Some(u) = username { session.username = u; }
+    if let Some(at) = auth_type {
+        session.auth_type = match at.as_str() {
+            "key" => AuthType::Key,
+            _ => AuthType::Password,
+        };
+    }
+    if let Some(kp) = key_path { session.key_path = kp; }
+
+    let updated = session.clone();
+    save_sessions(&sessions)?;
+
+    Ok(updated.into())
+}
+
+#[tauri::command]
+fn plugin_api_delete_session(app: AppHandle, plugin_id: String, id: String) -> Result<(), String> {
+    use plugins::manifest::Permission;
+
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .map_err(|e| e.message)?
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    if !plugin.granted_permissions.has(Permission::SessionsWrite) {
+        return Err("Permission denied: sessions_write required".to_string());
+    }
+
+    let mut sessions = load_sessions()?;
+    sessions.retain(|s| s.id != id);
+    save_sessions(&sessions)
+}
+
+// ============================================================================
+// Plugin API v1 - Session Metadata
+// ============================================================================
+
+#[tauri::command]
+fn plugin_api_get_session_metadata(
+    app: AppHandle,
+    plugin_id: String,
+    session_id: String,
+) -> Result<Option<serde_json::Value>, String> {
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .map_err(|e| e.message)?
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    let data_dir = state.plugin_manager.get_plugin_data_dir(&plugin_id)
+        .map_err(|e| e.message)?;
+
+    plugins::api_v1::session_metadata::get_session_metadata(
+        &plugin.granted_permissions,
+        &data_dir,
+        &session_id,
+    ).map_err(|e| e.message)
+}
+
+#[tauri::command]
+fn plugin_api_get_all_session_metadata(
+    app: AppHandle,
+    plugin_id: String,
+) -> Result<std::collections::HashMap<String, serde_json::Value>, String> {
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .map_err(|e| e.message)?
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    let data_dir = state.plugin_manager.get_plugin_data_dir(&plugin_id)
+        .map_err(|e| e.message)?;
+
+    plugins::api_v1::session_metadata::get_all_session_metadata(
+        &plugin.granted_permissions,
+        &data_dir,
+    ).map_err(|e| e.message)
+}
+
+#[tauri::command]
+fn plugin_api_set_session_metadata(
+    app: AppHandle,
+    plugin_id: String,
+    session_id: String,
+    metadata: serde_json::Value,
+) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .map_err(|e| e.message)?
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    let data_dir = state.plugin_manager.get_plugin_data_dir(&plugin_id)
+        .map_err(|e| e.message)?;
+
+    plugins::api_v1::session_metadata::set_session_metadata(
+        &plugin.granted_permissions,
+        &data_dir,
+        &session_id,
+        metadata,
+    ).map_err(|e| e.message)
+}
+
+#[tauri::command]
+fn plugin_api_update_session_metadata(
+    app: AppHandle,
+    plugin_id: String,
+    session_id: String,
+    updates: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
     let state = app.state::<AppState>();
     let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .map_err(|e| e.message)?
         .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
 
-    let api = plugins::PluginApi::new(plugin_id, plugin.manifest.permissions)?;
-    api.invoke(&command, args)
+    let data_dir = state.plugin_manager.get_plugin_data_dir(&plugin_id)
+        .map_err(|e| e.message)?;
+
+    plugins::api_v1::session_metadata::update_session_metadata(
+        &plugin.granted_permissions,
+        &data_dir,
+        &session_id,
+        updates,
+    ).map_err(|e| e.message)
+}
+
+#[tauri::command]
+fn plugin_api_delete_session_metadata(
+    app: AppHandle,
+    plugin_id: String,
+    session_id: String,
+) -> Result<bool, String> {
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .map_err(|e| e.message)?
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    let data_dir = state.plugin_manager.get_plugin_data_dir(&plugin_id)
+        .map_err(|e| e.message)?;
+
+    plugins::api_v1::session_metadata::delete_session_metadata(
+        &plugin.granted_permissions,
+        &data_dir,
+        &session_id,
+    ).map_err(|e| e.message)
+}
+
+// ============================================================================
+// Plugin API v1 - Settings
+// ============================================================================
+
+#[tauri::command]
+fn plugin_api_get_settings(app: AppHandle, plugin_id: String) -> Result<AppSettings, String> {
+    use plugins::manifest::Permission;
+
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .map_err(|e| e.message)?
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    if !plugin.granted_permissions.has(Permission::SettingsRead) {
+        return Err("Permission denied: settings_read required".to_string());
+    }
+
+    load_app_settings()
+}
+
+// ============================================================================
+// Plugin API v1 - Vault
+// ============================================================================
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PluginVaultStatus {
+    exists: bool,
+    is_unlocked: bool,
+}
+
+#[tauri::command]
+fn plugin_api_vault_status(app: AppHandle, plugin_id: String) -> Result<PluginVaultStatus, String> {
+    use plugins::manifest::Permission;
+
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .map_err(|e| e.message)?
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    if !plugin.granted_permissions.has(Permission::VaultStatus) {
+        return Err("Permission denied: vault_status required".to_string());
+    }
+
+    Ok(PluginVaultStatus {
+        exists: state.vault.exists(),
+        is_unlocked: state.vault.is_unlocked(),
+    })
+}
+
+#[tauri::command]
+fn plugin_api_vault_store(
+    app: AppHandle,
+    plugin_id: String,
+    key: String,
+    value: String,
+) -> Result<(), String> {
+    use plugins::manifest::Permission;
+
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .map_err(|e| e.message)?
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    if !plugin.granted_permissions.has(Permission::VaultWrite) {
+        return Err("Permission denied: vault_write required".to_string());
+    }
+
+    if !state.vault.is_unlocked() {
+        return Err("Vault is locked".to_string());
+    }
+
+    // Use credentials system with namespaced session_id
+    // Format: "plugin:plugin_id:key" as session_id, Password as type
+    let namespaced_id = format!("plugin:{}:{}", plugin_id, key);
+    state.vault.store_credential(&namespaced_id, VaultCredentialType::Password, &value)
+}
+
+#[tauri::command]
+fn plugin_api_vault_read(
+    app: AppHandle,
+    plugin_id: String,
+    key: String,
+) -> Result<Option<String>, String> {
+    use plugins::manifest::Permission;
+
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .map_err(|e| e.message)?
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    if !plugin.granted_permissions.has(Permission::VaultRead) {
+        return Err("Permission denied: vault_read required".to_string());
+    }
+
+    if !state.vault.is_unlocked() {
+        return Err("Vault is locked".to_string());
+    }
+
+    let namespaced_id = format!("plugin:{}:{}", plugin_id, key);
+    state.vault.get_credential(&namespaced_id, VaultCredentialType::Password)
+}
+
+#[tauri::command]
+fn plugin_api_vault_delete(
+    app: AppHandle,
+    plugin_id: String,
+    key: String,
+) -> Result<bool, String> {
+    use plugins::manifest::Permission;
+
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .map_err(|e| e.message)?
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    if !plugin.granted_permissions.has(Permission::VaultWrite) {
+        return Err("Permission denied: vault_write required".to_string());
+    }
+
+    if !state.vault.is_unlocked() {
+        return Err("Vault is locked".to_string());
+    }
+
+    let namespaced_id = format!("plugin:{}:{}", plugin_id, key);
+    state.vault.delete_credential(&namespaced_id, VaultCredentialType::Password)
 }
 
 // ============================================================================
@@ -1093,7 +1355,27 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             let session_manager = SessionManager::new(app.handle().clone());
-            let plugin_manager = Arc::new(PluginManager::default());
+
+            // Plugins are stored with the app (removed with app uninstall)
+            // In dev mode: uses project root/plugins
+            // In production: uses app installation directory/plugins
+            let plugins_base_dir = if cfg!(debug_assertions) {
+                // In dev mode, use CARGO_MANIFEST_DIR (src-tauri/) and go up one level to project root
+                let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+                manifest_dir.parent()
+                    .map(|p| p.to_path_buf())
+                    .unwrap_or(manifest_dir)
+            } else {
+                // In production, use the resource directory (app install folder)
+                app.path().resource_dir()
+                    .expect("Failed to get resource directory")
+            };
+
+            let plugin_manager = Arc::new(
+                PluginManager::with_app_dir(plugins_base_dir)
+                    .expect("Failed to initialize plugin manager")
+            );
+
             let vault = Arc::new(VaultState::new().expect("Failed to initialize vault"));
             let edit_watcher = Arc::new(Mutex::new(EditWatcher::new(
                 session_manager.clone(),
@@ -1139,25 +1421,11 @@ pub fn run() {
             sftp_edit_external,
             sftp_stop_editing,
             sftp_get_editing_files,
-            // Saved sessions
+            // Saved sessions (core only - plugin metadata via session_metadata API)
             load_saved_sessions,
             save_session,
             delete_saved_session,
             get_session_credentials,
-            // Folders
-            get_folders,
-            create_folder,
-            update_folder,
-            delete_folder,
-            reorder_folders,
-            update_session_folder,
-            update_session_tags,
-            update_session_color,
-            // Recent sessions
-            get_recent_sessions,
-            add_to_recent,
-            remove_from_recent,
-            clear_recent,
             // Settings
             load_settings,
             save_settings,
@@ -1170,14 +1438,36 @@ pub fn run() {
             // Plugins
             list_plugins,
             get_plugin_manifest,
-            enable_plugin,
-            disable_plugin,
             get_plugin_file,
             refresh_plugins,
-            plugin_storage_get,
-            plugin_storage_set,
+            get_plugins_dir,
+            enable_plugin,
+            disable_plugin,
+            grant_plugin_permissions,
+            uninstall_plugin,
+            plugin_storage_read,
+            plugin_storage_write,
             plugin_storage_delete,
-            plugin_invoke,
+            plugin_storage_list,
+            // Plugin API v1 - Core
+            plugin_api_write_to_terminal,
+            plugin_api_list_sessions,
+            plugin_api_get_session,
+            plugin_api_create_session,
+            plugin_api_update_session,
+            plugin_api_delete_session,
+            // Plugin API v1 - Session Metadata
+            plugin_api_get_session_metadata,
+            plugin_api_get_all_session_metadata,
+            plugin_api_set_session_metadata,
+            plugin_api_update_session_metadata,
+            plugin_api_delete_session_metadata,
+            // Plugin API v1 - Settings
+            plugin_api_get_settings,
+            plugin_api_vault_status,
+            plugin_api_vault_store,
+            plugin_api_vault_read,
+            plugin_api_vault_delete,
             // Vault
             storage::vault::get_vault_status,
             storage::vault::create_vault,

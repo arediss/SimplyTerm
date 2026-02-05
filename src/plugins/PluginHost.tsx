@@ -8,7 +8,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { pluginManager } from './PluginManager';
 import { PluginPanel } from './PluginPanel';
 import { PluginWidget } from './PluginWidget';
-import type { PluginManifest, PanelRegistration, SessionInfo, ModalConfig, NotificationType } from './types';
+import type { PluginManifest, PanelRegistration, SessionInfo, ModalConfig, NotificationType, PromptConfig } from './types';
 
 interface PanelEntry {
   pluginId: string;
@@ -20,6 +20,7 @@ interface PluginHostProps {
   // Callbacks from App.tsx
   onShowNotification: (message: string, type: NotificationType) => void;
   onShowModal: (config: ModalConfig) => Promise<unknown>;
+  onShowPrompt: (config: PromptConfig) => Promise<string | null>;
   getSessions: () => SessionInfo[];
   getActiveSession: () => SessionInfo | null;
 }
@@ -27,6 +28,7 @@ interface PluginHostProps {
 export function PluginHost({
   onShowNotification,
   onShowModal,
+  onShowPrompt,
   getSessions,
   getActiveSession,
 }: PluginHostProps) {
@@ -37,9 +39,10 @@ export function PluginHost({
   useEffect(() => {
     pluginManager.onShowNotification = onShowNotification;
     pluginManager.onShowModal = onShowModal;
+    pluginManager.onShowPrompt = onShowPrompt;
     pluginManager.getSessions = getSessions;
     pluginManager.getActiveSession = getActiveSession;
-  }, [onShowNotification, onShowModal, getSessions, getActiveSession]);
+  }, [onShowNotification, onShowModal, onShowPrompt, getSessions, getActiveSession]);
 
   // Subscribe to plugin events
   useEffect(() => {
@@ -151,10 +154,11 @@ export function usePlugins() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const list = await pluginManager.listPlugins();
+      // Use refresh() to scan for new plugins, not just list existing ones
+      const list = await pluginManager.refresh();
       setPlugins(list);
     } catch (error) {
-      console.error('Failed to list plugins:', error);
+      console.error('Failed to refresh plugins:', error);
     } finally {
       setLoading(false);
     }

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { invoke } from "@tauri-apps/api/core";
 import i18n from "../i18n";
 import {
   X,
@@ -28,10 +29,12 @@ import {
   Key,
   ShieldCheck,
 } from "lucide-react";
-import { usePlugins, type PluginManifest } from "../plugins";
+import { usePlugins, type PluginManifest, pluginManager } from "../plugins";
 import { useVault } from "../hooks/useVault";
 import { getThemes } from "../themes";
-import BastionManager from "./BastionManager";
+import { PluginSettingsPanel } from "../plugins/PluginSettingsPanel";
+import type { SettingsPanelRegistration } from "../plugins/types";
+// BastionManager moved to plugin: com.simplyterm.bastions
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -83,7 +86,7 @@ export const defaultSettings: AppSettings = {
   },
 };
 
-type SettingsSection = "appearance" | "terminal" | "connections" | "security" | "plugins" | "about";
+type SettingsSection = "appearance" | "terminal" | "connections" | "security" | "plugins" | "about" | `plugin:${string}`;
 
 function SettingsModal({
   isOpen,
@@ -95,7 +98,46 @@ function SettingsModal({
 }: SettingsModalProps) {
   const { t } = useTranslation();
   const [activeSection, setActiveSection] = useState<SettingsSection>("appearance");
+  const [pluginPanels, setPluginPanels] = useState<Map<string, { pluginId: string; panel: SettingsPanelRegistration }>>(
+    new Map(pluginManager.registeredSettingsPanels)
+  );
 
+  // Subscribe to plugin settings panel changes
+  useEffect(() => {
+    const unsubscribe = pluginManager.subscribe((event) => {
+      if (event.type === 'settings:register' || event.type === 'settings:unregister') {
+        setPluginPanels(new Map(pluginManager.registeredSettingsPanels));
+      }
+    });
+
+    // Initial load
+    setPluginPanels(new Map(pluginManager.registeredSettingsPanels));
+
+    return unsubscribe;
+  }, []);
+
+  // Get current plugin panel if a plugin section is active
+  const activePluginPanel = useMemo(() => {
+    if (activeSection.startsWith('plugin:')) {
+      const panelId = activeSection.replace('plugin:', '');
+      return pluginPanels.get(panelId);
+    }
+    return null;
+  }, [activeSection, pluginPanels]);
+
+  // Build plugin sections from registered settings panels
+  // NOTE: useMemo must be called before any conditional returns
+  const pluginSections = useMemo(() => {
+    return Array.from(pluginPanels.entries())
+      .sort(([, a], [, b]) => (a.panel.config.order ?? 100) - (b.panel.config.order ?? 100))
+      .map(([panelId, { panel }]) => ({
+        id: `plugin:${panelId}` as SettingsSection,
+        label: panel.config.title,
+        icon: <Puzzle size={18} />,
+      }));
+  }, [pluginPanels]);
+
+  // Early return AFTER all hooks
   if (!isOpen) return null;
 
   const updateTerminalSetting = <K extends keyof AppSettings["terminal"]>(
@@ -118,7 +160,7 @@ function SettingsModal({
     });
   };
 
-  const sections: { id: SettingsSection; label: string; icon: React.ReactNode }[] = [
+  const coreSections: { id: SettingsSection; label: string; icon: React.ReactNode }[] = [
     { id: "appearance", label: t("settings.sections.appearance"), icon: <Palette size={18} /> },
     { id: "terminal", label: t("settings.sections.terminal"), icon: <Terminal size={18} /> },
     { id: "connections", label: t("settings.sections.connections"), icon: <Link2 size={18} /> },
@@ -126,6 +168,9 @@ function SettingsModal({
     { id: "plugins", label: t("settings.sections.plugins"), icon: <Puzzle size={18} /> },
     { id: "about", label: t("settings.sections.about"), icon: <Info size={18} /> },
   ];
+
+  // Combine core and plugin sections
+  const sections = [...coreSections, ...pluginSections];
 
   return (
     <>
@@ -208,6 +253,13 @@ function SettingsModal({
               {activeSection === "security" && <SecuritySettings />}
               {activeSection === "plugins" && <PluginsSettings />}
               {activeSection === "about" && <AboutSettings />}
+              {activePluginPanel && (
+                <PluginSettingsPanel
+                  key={activePluginPanel.panel.config.id}
+                  pluginId={activePluginPanel.pluginId}
+                  panel={activePluginPanel.panel}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -425,29 +477,7 @@ function ConnectionsSettings({
 
   return (
     <div className="space-y-6">
-      {/* Bastions / Jump Hosts */}
-      {vault.status?.isUnlocked && (
-        <SettingGroup
-          title={t("settings.bastions.title")}
-          description={t("settings.bastions.description")}
-        >
-          <BastionManager />
-        </SettingGroup>
-      )}
-
-      {!vault.status?.isUnlocked && (
-        <SettingGroup
-          title={t("settings.bastions.title")}
-          description={t("settings.bastions.description")}
-        >
-          <div className="flex items-center gap-3 p-4 bg-warning/10 border border-warning/20 rounded-lg">
-            <Lock size={20} className="text-warning shrink-0" />
-            <p className="text-sm text-warning">
-              {t("settings.bastions.vaultLocked")}
-            </p>
-          </div>
-        </SettingGroup>
-      )}
+      {/* Jump Hosts section moved to plugin: com.simplyterm.bastions */}
 
       <SettingGroup
         title={t("settings.connections.savedTitle")}
@@ -1280,6 +1310,12 @@ function PluginsSettings() {
   const { t } = useTranslation();
   const { plugins, loading, refresh, enablePlugin, disablePlugin } = usePlugins();
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [pluginsDir, setPluginsDir] = useState<string>("");
+
+  // Fetch plugins directory on mount
+  useEffect(() => {
+    invoke<string>("get_plugins_dir").then(setPluginsDir).catch(console.error);
+  }, []);
 
   const handleTogglePlugin = async (plugin: PluginManifest) => {
     setActionLoading(plugin.id);
@@ -1334,7 +1370,7 @@ function PluginsSettings() {
             <Puzzle size={32} className="mx-auto mb-3 opacity-50" />
             <p className="text-sm">{t("settings.plugins.noPlugins")}</p>
             <p className="text-xs mt-1">
-              {t("settings.plugins.pluginDirHint")}
+              {t("settings.plugins.pluginDirHint")} <code className="px-1 py-0.5 bg-surface-0/50 rounded text-[10px]">{pluginsDir || "plugins/"}</code>
             </p>
           </div>
         ) : (
@@ -1409,7 +1445,7 @@ function PluginsSettings() {
         <div className="p-3 bg-surface-0/20 rounded-lg text-xs text-text-muted space-y-2">
           <p>
             <strong className="text-text">1.</strong> {t("settings.plugins.installStep1")}{" "}
-            <code className="px-1 py-0.5 bg-surface-0/50 rounded">~/.simplyterm/plugins/</code>
+            <code className="px-1 py-0.5 bg-surface-0/50 rounded">{pluginsDir || "plugins/"}</code>
           </p>
           <p>
             <strong className="text-text">2.</strong> {t("settings.plugins.installStep2")}

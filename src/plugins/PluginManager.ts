@@ -2,6 +2,7 @@
  * Plugin Manager - Frontend orchestration of plugins
  *
  * Handles loading, lifecycle, and communication with plugins.
+ * Supports both legacy (module.exports.default) and new (window.SimplyTermPlugins) formats.
  */
 
 import { invoke } from '@tauri-apps/api/core';
@@ -16,7 +17,20 @@ import type {
   CommandRegistration,
   PluginEvent,
   PluginEventHandler,
+  PluginModule,
+  SidebarViewRegistration,
+  SidebarSectionRegistration,
+  SettingsPanelRegistration,
+  ContextMenuItemConfig,
+  PromptConfig,
 } from './types';
+
+// Declare the global window property for plugins
+declare global {
+  interface Window {
+    SimplyTermPlugins?: Record<string, PluginModule>;
+  }
+}
 
 export class PluginManager {
   private plugins: Map<string, LoadedPlugin> = new Map();
@@ -25,12 +39,17 @@ export class PluginManager {
   // External callbacks (set by App.tsx)
   public onShowNotification: (message: string, type: NotificationType) => void = () => {};
   public onShowModal: (config: ModalConfig) => Promise<unknown> = async () => null;
+  public onShowPrompt: (config: PromptConfig) => Promise<string | null> = async () => null;
   public getSessions: () => SessionInfo[] = () => [];
   public getActiveSession: () => SessionInfo | null = () => null;
 
   // Panel and command registrations (observable by UI)
   public registeredPanels: Map<string, { pluginId: string; panel: PanelRegistration; position: string }> = new Map();
   public registeredCommands: Map<string, { pluginId: string; command: CommandRegistration }> = new Map();
+  public registeredSidebarViews: Map<string, { pluginId: string; view: SidebarViewRegistration }> = new Map();
+  public registeredSidebarSections: Map<string, { pluginId: string; section: SidebarSectionRegistration }> = new Map(); // deprecated
+  public registeredSettingsPanels: Map<string, { pluginId: string; panel: SettingsPanelRegistration }> = new Map();
+  public registeredContextMenuItems: Map<string, { pluginId: string; item: ContextMenuItemConfig }> = new Map();
 
   /**
    * Subscribe to plugin events
@@ -62,6 +81,9 @@ export class PluginManager {
    * Enable a plugin (backend + frontend load)
    */
   async enablePlugin(id: string): Promise<void> {
+    // Grant all permissions (for now - in the future we might want to show a permissions dialog)
+    await invoke('grant_plugin_permissions', { id });
+
     // Enable in backend
     await invoke('enable_plugin', { id });
 
@@ -95,7 +117,7 @@ export class PluginManager {
       // Get plugin main file
       const mainFile = await invoke<string>('get_plugin_file', {
         pluginId: id,
-        filePath: 'index.js',
+        filePath: manifest.main || 'index.js',
       });
 
       // Create plugin state
@@ -104,6 +126,10 @@ export class PluginManager {
         api: null as unknown as LoadedPlugin['api'], // Will be set below
         panels: new Map(),
         commands: new Map(),
+        sidebarViews: new Map(),
+        sidebarSections: new Map(),
+        settingsPanels: new Map(),
+        contextMenuItems: new Map(),
         subscriptions: [],
       };
 
@@ -111,10 +137,19 @@ export class PluginManager {
       const api = createPluginAPI(manifest, pluginState, {
         onShowNotification: this.onShowNotification.bind(this),
         onShowModal: this.onShowModal.bind(this),
+        onShowPrompt: this.onShowPrompt.bind(this),
         onPanelRegister: this.handlePanelRegister.bind(this),
         onCommandRegister: this.handleCommandRegister.bind(this),
         onPanelShow: this.handlePanelShow.bind(this),
         onPanelHide: this.handlePanelHide.bind(this),
+        onSidebarViewRegister: this.handleSidebarViewRegister.bind(this),
+        onSidebarViewUnregister: this.handleSidebarViewUnregister.bind(this),
+        onSidebarSectionRegister: this.handleSidebarSectionRegister.bind(this),
+        onSidebarSectionUnregister: this.handleSidebarSectionUnregister.bind(this),
+        onSettingsPanelRegister: this.handleSettingsPanelRegister.bind(this),
+        onSettingsPanelUnregister: this.handleSettingsPanelUnregister.bind(this),
+        onContextMenuItemRegister: this.handleContextMenuItemRegister.bind(this),
+        onContextMenuItemUnregister: this.handleContextMenuItemUnregister.bind(this),
         getSessions: this.getSessions.bind(this),
         getActiveSession: this.getActiveSession.bind(this),
       });
@@ -145,21 +180,18 @@ export class PluginManager {
   }
 
   /**
-   * Execute plugin code in a sandboxed context
+   * Execute plugin code
    *
-   * SECURITY WARNING: This uses `new Function()` which is similar to eval().
-   * Plugins have full JavaScript execution capabilities within the renderer process.
+   * Supports two formats:
+   * 1. New format (v1): window.SimplyTermPlugins[id] = { init, cleanup }
+   * 2. Legacy format: module.exports.default = (api) => {}
    *
-   * Mitigations in place:
-   * 1. Plugins must be manually installed by the user in ~/.simplyterm/plugins/
-   * 2. Plugin HTML output is sanitized via DOMPurify (see sanitize.ts)
-   * 3. Plugins don't have direct filesystem access (must use Tauri API)
-   * 4. CSP headers restrict external script loading
-   *
-   * Future improvements could include:
-   * - Running plugins in isolated Web Workers (limits DOM access)
-   * - Using sandboxed iframes with postMessage communication
-   * - Implementing a capability-based permission system
+   * SECURITY NOTE: Plugins have full JavaScript execution within the renderer.
+   * Mitigations:
+   * - Plugins must be manually installed by the user
+   * - HTML output is sanitized via DOMPurify
+   * - No direct filesystem access (must use Tauri API)
+   * - CSP headers restrict external script loading
    */
   private async executePluginCode(
     code: string,
@@ -167,31 +199,44 @@ export class PluginManager {
     pluginId: string
   ): Promise<void> {
     try {
-      // Create a function from the module code
-      // The plugin exports a default function that receives the API
+      // Initialize global plugins object
+      window.SimplyTermPlugins = window.SimplyTermPlugins || {};
+
+      // Execute the plugin code in global context
+      // This allows plugins to register themselves on window.SimplyTermPlugins
       const wrappedCode = `
-        return (function(api) {
+        (function() {
+          // Provide CommonJS-like environment for legacy plugins
+          var module = { exports: { default: null } };
+          var exports = module.exports;
+
           ${code}
-          if (typeof module !== 'undefined' && module.exports && typeof module.exports.default === 'function') {
-            return module.exports.default(api);
+
+          // If legacy format was used, convert to new format
+          if (typeof module.exports.default === 'function') {
+            window.SimplyTermPlugins = window.SimplyTermPlugins || {};
+            window.SimplyTermPlugins['${pluginId}'] = {
+              init: function(api) {
+                return module.exports.default(api);
+              }
+            };
           }
-          if (typeof exports !== 'undefined' && typeof exports.default === 'function') {
-            return exports.default(api);
-          }
-        })
+        })();
       `;
 
-      // Create a minimal module/exports context for CommonJS compatibility
-      const moduleContext: { exports: { default: unknown } } = { exports: { default: null } };
+      // Execute the code
+      // eslint-disable-next-line no-new-func
+      new Function(wrappedCode)();
 
-      const fn = new Function('module', 'exports', 'api', wrappedCode);
-      const initFn = fn(moduleContext, moduleContext.exports, api);
-
-      if (typeof initFn === 'function') {
-        await initFn(api);
-      } else if (typeof moduleContext.exports.default === 'function') {
-        await (moduleContext.exports.default as (api: LoadedPlugin['api']) => Promise<void>)(api);
+      // Check if plugin registered itself
+      const pluginModule = window.SimplyTermPlugins?.[pluginId];
+      if (pluginModule && typeof pluginModule.init === 'function') {
+        // Pass the API object to the init function
+        await pluginModule.init(api);
+      } else {
+        console.warn(`[Plugin ${pluginId}] No init function found`);
       }
+
     } catch (error) {
       console.error(`Error executing plugin ${pluginId}:`, error);
       throw error;
@@ -204,6 +249,16 @@ export class PluginManager {
   unloadPlugin(id: string): void {
     const plugin = this.plugins.get(id);
     if (!plugin) return;
+
+    // Call cleanup if available
+    const pluginModule = window.SimplyTermPlugins?.[id];
+    if (pluginModule?.cleanup) {
+      try {
+        pluginModule.cleanup();
+      } catch (e) {
+        console.error(`Error in plugin ${id} cleanup:`, e);
+      }
+    }
 
     // Call onUnload callback
     if (plugin.onUnloadCallback) {
@@ -232,8 +287,33 @@ export class PluginManager {
       this.registeredCommands.delete(commandId);
     });
 
+    // Remove registered sidebar views
+    plugin.sidebarViews.forEach((_, viewId) => {
+      this.registeredSidebarViews.delete(viewId);
+    });
+
+    // Remove registered sidebar sections (deprecated)
+    plugin.sidebarSections.forEach((_, sectionId) => {
+      this.registeredSidebarSections.delete(sectionId);
+    });
+
+    // Remove registered settings panels
+    plugin.settingsPanels.forEach((_, panelId) => {
+      this.registeredSettingsPanels.delete(panelId);
+    });
+
+    // Remove registered context menu items
+    plugin.contextMenuItems.forEach((_, itemId) => {
+      this.registeredContextMenuItems.delete(itemId);
+    });
+
     // Remove from loaded plugins
     this.plugins.delete(id);
+
+    // Remove from global registry
+    if (window.SimplyTermPlugins) {
+      delete window.SimplyTermPlugins[id];
+    }
 
     this.emit({ type: 'plugin:unloaded', pluginId: id });
   }
@@ -254,6 +334,8 @@ export class PluginManager {
 
     for (const plugin of enabledPlugins) {
       try {
+        // Ensure permissions are granted before loading
+        await invoke('grant_plugin_permissions', { id: plugin.id });
         await this.loadPlugin(plugin.id);
       } catch (error) {
         console.error(`Failed to load plugin ${plugin.id}:`, error);
@@ -277,10 +359,8 @@ export class PluginManager {
 
   // Panel registration handler
   private handlePanelRegister(pluginId: string, panel: PanelRegistration): void {
-    // Get position from manifest
-    const loadedPlugin = this.plugins.get(pluginId);
-    const manifestPanel = loadedPlugin?.manifest.panels.find(p => p.id === panel.id);
-    const position = manifestPanel?.position || 'right';
+    // Default position if not specified in manifest
+    const position = 'right';
 
     this.registeredPanels.set(panel.id, { pluginId, panel, position });
     this.emit({ type: 'panel:register', pluginId, panelId: panel.id });
@@ -300,6 +380,89 @@ export class PluginManager {
   private handleCommandRegister(pluginId: string, command: CommandRegistration): void {
     this.registeredCommands.set(command.id, { pluginId, command });
     this.emit({ type: 'command:register', pluginId, commandId: command.id });
+  }
+
+  // Sidebar view (tab) registration handlers
+  private handleSidebarViewRegister(pluginId: string, view: SidebarViewRegistration): void {
+    const plugin = this.plugins.get(pluginId);
+    if (plugin) {
+      plugin.sidebarViews.set(view.config.id, view);
+      this.registeredSidebarViews.set(view.config.id, { pluginId, view });
+      this.emit({ type: 'sidebar-view:register', pluginId, viewId: view.config.id });
+    }
+  }
+
+  private handleSidebarViewUnregister(pluginId: string, viewId: string): void {
+    const plugin = this.plugins.get(pluginId);
+    if (plugin) {
+      plugin.sidebarViews.delete(viewId);
+      this.registeredSidebarViews.delete(viewId);
+      this.emit({ type: 'sidebar-view:unregister', pluginId, viewId });
+    }
+  }
+
+  // Sidebar section registration handlers (deprecated)
+  private handleSidebarSectionRegister(pluginId: string, section: SidebarSectionRegistration): void {
+    const plugin = this.plugins.get(pluginId);
+    if (plugin) {
+      plugin.sidebarSections.set(section.config.id, section);
+      this.registeredSidebarSections.set(section.config.id, { pluginId, section });
+      this.emit({ type: 'sidebar:register', pluginId, sectionId: section.config.id });
+    }
+  }
+
+  private handleSidebarSectionUnregister(pluginId: string, sectionId: string): void {
+    const plugin = this.plugins.get(pluginId);
+    if (plugin) {
+      plugin.sidebarSections.delete(sectionId);
+      this.registeredSidebarSections.delete(sectionId);
+      this.emit({ type: 'sidebar:unregister', pluginId, sectionId });
+    }
+  }
+
+  // Settings panel registration handlers
+  private handleSettingsPanelRegister(pluginId: string, panel: SettingsPanelRegistration): void {
+    const plugin = this.plugins.get(pluginId);
+    if (plugin) {
+      plugin.settingsPanels.set(panel.config.id, panel);
+      this.registeredSettingsPanels.set(panel.config.id, { pluginId, panel });
+      this.emit({ type: 'settings:register', pluginId, panelId: panel.config.id });
+    }
+  }
+
+  private handleSettingsPanelUnregister(pluginId: string, panelId: string): void {
+    const plugin = this.plugins.get(pluginId);
+    if (plugin) {
+      plugin.settingsPanels.delete(panelId);
+      this.registeredSettingsPanels.delete(panelId);
+      this.emit({ type: 'settings:unregister', pluginId, panelId });
+    }
+  }
+
+  // Context menu item registration handlers
+  private handleContextMenuItemRegister(pluginId: string, item: ContextMenuItemConfig): void {
+    const plugin = this.plugins.get(pluginId);
+    if (plugin) {
+      plugin.contextMenuItems.set(item.id, item);
+      this.registeredContextMenuItems.set(item.id, { pluginId, item });
+      this.emit({ type: 'context-menu:register', pluginId, itemId: item.id });
+    }
+  }
+
+  private handleContextMenuItemUnregister(pluginId: string, itemId: string): void {
+    const plugin = this.plugins.get(pluginId);
+    if (plugin) {
+      plugin.contextMenuItems.delete(itemId);
+      this.registeredContextMenuItems.delete(itemId);
+      this.emit({ type: 'context-menu:unregister', pluginId, itemId });
+    }
+  }
+
+  /**
+   * Get context menu items for a specific context type
+   */
+  getContextMenuItems(contextType: string): { pluginId: string; item: ContextMenuItemConfig }[] {
+    return Array.from(this.registeredContextMenuItems.values());
   }
 
   /**

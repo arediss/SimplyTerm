@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, forwardRef } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { Menu, Plus, X, Minus, Square, Copy, ChevronDown, Terminal, Clock, ArrowLeftRight } from "lucide-react";
+import { Menu, Plus, X, Minus, Square, Copy, ChevronDown, Terminal, ArrowLeftRight } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Tab, RecentSession } from "../types";
+import { Tab } from "../types";
 
 interface FloatingTabsProps {
   tabs: Tab[];
@@ -12,8 +12,6 @@ interface FloatingTabsProps {
   onTabClose: (tabId: string) => void;
   onNewTab: () => void;
   onLocalTerminal: () => void;
-  onRecentSessionConnect: (session: RecentSession) => void;
-  recentSessions: RecentSession[];
   onToggleSidebar: () => void;
   isSidebarOpen: boolean;
   onToggleTunnelSidebar: () => void;
@@ -28,8 +26,6 @@ function FloatingTabs({
   onTabClose,
   onNewTab,
   onLocalTerminal,
-  onRecentSessionConnect,
-  recentSessions,
   onToggleSidebar,
   isSidebarOpen,
   onToggleTunnelSidebar,
@@ -146,10 +142,10 @@ function FloatingTabs({
               >
                 <Plus size={14} />
               </button>
-              
+
               {/* Séparateur */}
               <div className="w-px h-4 bg-surface-0/30" />
-              
+
               {/* Bouton dropdown */}
               <button
                 ref={dropdownButtonRef}
@@ -216,11 +212,6 @@ function FloatingTabs({
           }}
           onNewConnection={() => {
             onNewTab();
-            setIsDropdownOpen(false);
-          }}
-          recentSessions={recentSessions}
-          onRecentSessionConnect={(session) => {
-            onRecentSessionConnect(session);
             setIsDropdownOpen(false);
           }}
         />,
@@ -293,20 +284,13 @@ interface QuickConnectDropdownProps {
   position: { x: number; y: number };
   onLocalTerminal: () => void;
   onNewConnection: () => void;
-  recentSessions: RecentSession[];
-  onRecentSessionConnect: (session: RecentSession) => void;
 }
 
 const QuickConnectDropdown = forwardRef<HTMLDivElement, QuickConnectDropdownProps>(({
   position,
   onLocalTerminal,
   onNewConnection,
-  recentSessions,
-  onRecentSessionConnect,
 }, ref) => {
-  // Limiter l'affichage des récentes
-  const displayedRecent = recentSessions.slice(0, 4);
-
   return (
     <div
       ref={ref}
@@ -330,24 +314,8 @@ const QuickConnectDropdown = forwardRef<HTMLDivElement, QuickConnectDropdownProp
         </button>
       </div>
 
-      {/* Section Récentes - format compact */}
-      {displayedRecent.length > 0 && (
-        <>
-          <div className="h-px bg-surface-0/30" />
-          <div className="p-1.5">
-            {displayedRecent.map((session) => (
-              <button
-                key={session.id}
-                onClick={() => onRecentSessionConnect(session)}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-0/50 transition-colors"
-              >
-                <Clock size={14} className="text-text-muted" />
-                <span className="text-sm text-text truncate">{session.name}</span>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+      {/* Plugin extension point for quick connect items */}
+      <div id="quick-connect-plugin-items" />
     </div>
   );
 });

@@ -66,6 +66,10 @@ export interface BastionProfileInfo {
   updatedAt: number;
 }
 
+/**
+ * Core saved session (connection info only)
+ * Plugin-managed metadata (folders, tags, colors) is stored separately via session metadata API
+ */
 export interface SavedSession {
   id: string;
   name: string;
@@ -74,30 +78,8 @@ export interface SavedSession {
   username: string;
   auth_type: "password" | "key";
   key_path?: string;
-  folder_id?: string;
-  tags: string[];
-  color?: string;
 }
 
-export interface SessionFolder {
-  id: string;
-  name: string;
-  color?: string;
-  parent_id?: string;
-  order: number;
-  expanded: boolean;
-}
-
-export interface RecentSession {
-  id: string;
-  name: string;
-  host: string;
-  port: number;
-  username: string;
-  auth_type: "password" | "key";
-  key_path?: string;
-  last_used: number;
-}
 
 export interface Tab {
   id: string;

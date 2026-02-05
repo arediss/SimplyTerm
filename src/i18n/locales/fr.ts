@@ -374,7 +374,7 @@ export default {
       // Message aucun plugin installé
       noPlugins: "Aucun plugin installé",
       // Indication du dossier plugins
-      pluginDirHint: "Placez vos plugins dans ~/.simplyterm/plugins/",
+      pluginDirHint: "Placez vos plugins dans",
       // Préfixe auteur du plugin
       byAuthor: "par {{author}}",
       // Titre du groupe installation
@@ -630,6 +630,8 @@ export default {
   sidebar: {
     // Placeholder de recherche
     searchPlaceholder: "Rechercher...",
+    // Label onglet toutes les sessions
+    allSessions: "Toutes",
     // En-tête section sessions sauvegardées
     saved: "Sauvegardées",
     // En-tête section sessions récentes

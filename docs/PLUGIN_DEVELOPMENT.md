@@ -1,6 +1,6 @@
 # SimplyTerm Plugin Development Guide
 
-> Create powerful plugins for SimplyTerm in minutes.
+> Create powerful plugins for SimplyTerm with the API v1
 
 ---
 
@@ -9,8 +9,8 @@
 1. [Quick Start](#quick-start)
 2. [Plugin Structure](#plugin-structure)
 3. [The manifest.json File](#the-manifestjson-file)
-4. [The Plugin API](#the-plugin-api)
-5. [Permissions](#permissions)
+4. [Permissions System](#permissions-system)
+5. [Using the API](#using-the-api)
 6. [Practical Examples](#practical-examples)
 7. [Best Practices](#best-practices)
 8. [Debugging](#debugging)
@@ -20,63 +20,88 @@
 
 ## Quick Start
 
-### 1. Create your plugin folder
+### 1. Find your plugin directory
+
+Plugins are stored in the application data directory:
+
+| OS | Path |
+|---|---|
+| Windows | `%APPDATA%\com.simplyterm.app\plugins\` |
+| macOS | `~/Library/Application Support/com.simplyterm.app/plugins/` |
+| Linux | `~/.local/share/com.simplyterm.app/plugins/` |
+
+### 2. Create your plugin folder
 
 ```bash
-mkdir -p ~/.simplyterm/plugins/my-plugin
-cd ~/.simplyterm/plugins/my-plugin
+# Windows (PowerShell)
+mkdir "$env:APPDATA\com.simplyterm.app\plugins\my-plugin"
+
+# macOS/Linux
+mkdir -p ~/.local/share/com.simplyterm.app/plugins/my-plugin
 ```
 
-### 2. Create manifest.json
+### 3. Create manifest.json
 
 ```json
 {
-  "id": "my-plugin",
+  "id": "com.example.my-plugin",
   "name": "My Plugin",
   "version": "1.0.0",
+  "api_version": "1.0.0",
   "author": "Your Name",
   "description": "A short description of your plugin",
   "main": "index.js",
-  "permissions": ["panel:register"]
+  "permissions": ["sessions_read", "fs_read", "fs_write"]
 }
 ```
 
-### 3. Create index.js
+### 4. Create index.js
 
 ```javascript
-function init(api) {
-  api.onLoad(() => {
-    console.log('Plugin loaded!');
-    api.showNotification('My plugin is active!', 'success');
+// Plugin entry point
+const { invoke } = window.__TAURI__.core;
+
+async function init(pluginId) {
+  console.log('[MyPlugin] Initializing...');
+
+  // Read sessions (requires sessions_read permission)
+  try {
+    const sessions = await invoke('plugin_api_list_sessions', { pluginId });
+    console.log('[MyPlugin] Found sessions:', sessions.length);
+  } catch (error) {
+    console.error('[MyPlugin] Error:', error);
+  }
+
+  // Store some data (requires fs_write permission)
+  await invoke('plugin_storage_write', {
+    pluginId,
+    path: 'config.json',
+    content: JSON.stringify({ initialized: true, timestamp: Date.now() })
   });
 
-  api.registerPanel({
-    id: 'my-panel',
-    render: (container) => {
-      container.innerHTML = '<h2>Hello World!</h2>';
-    }
-  });
+  console.log('[MyPlugin] Ready!');
 }
 
-module.exports.default = init;
+// Export the init function
+window.SimplyTermPlugins = window.SimplyTermPlugins || {};
+window.SimplyTermPlugins['com.example.my-plugin'] = { init };
 ```
 
-### 4. Activate the plugin
+### 5. Enable the plugin
 
 1. Open SimplyTerm
 2. Go to **Settings** → **Plugins**
 3. Click **Refresh**
-4. Enable your plugin
-
-Done! Your plugin is now active.
+4. Grant permissions when prompted
+5. Enable your plugin
 
 ---
 
 ## Plugin Structure
 
 ```
-~/.simplyterm/plugins/
-└── my-plugin/
+plugins/
+└── com.example.my-plugin/
     ├── manifest.json      # REQUIRED - Plugin metadata
     ├── index.js           # REQUIRED - Entry point
     ├── styles.css         # Optional - Custom styles
@@ -84,628 +109,542 @@ Done! Your plugin is now active.
     └── assets/            # Optional - Additional resources
 ```
 
+### Data Directory
+
+Each plugin has an isolated data directory for storing files:
+
+```
+plugins/data/
+└── com.example.my-plugin/
+    ├── config.json
+    ├── cache/
+    └── ...
+```
+
 ---
 
 ## The manifest.json File
 
-The manifest defines your plugin's metadata and permissions.
-
-### Complete structure
+### Complete Example
 
 ```json
 {
-  "id": "my-plugin",
-  "name": "My Plugin",
+  "id": "com.example.sync-plugin",
+  "name": "Config Sync",
   "version": "1.0.0",
+  "api_version": "1.0.0",
   "author": "Developer",
-  "description": "A clear and concise description",
+  "description": "Sync your sessions and settings across devices",
+  "homepage": "https://github.com/example/sync-plugin",
   "main": "index.js",
+  "icon": "icon.svg",
   "permissions": [
-    "panel:register",
-    "terminal:read",
-    "terminal:write",
-    "session:info",
-    "storage:read",
-    "storage:write",
-    "command:register",
-    "backend:exec"
-  ],
-  "panels": [
-    {
-      "id": "stats-panel",
-      "title": "Statistics",
-      "icon": "icon.svg",
-      "position": "right"
-    }
-  ],
-  "commands": [
-    {
-      "id": "refresh-data",
-      "title": "Refresh Data",
-      "shortcut": "Ctrl+Shift+R"
-    }
+    "sessions_read",
+    "sessions_write",
+    "folders_read",
+    "folders_write",
+    "settings_read",
+    "vault_status",
+    "vault_read",
+    "vault_write",
+    "network_http",
+    "fs_read",
+    "fs_write"
   ]
 }
 ```
 
-### Required fields
+### Required Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | string | Unique identifier (kebab-case recommended) |
+| `id` | string | Unique identifier (reverse domain notation recommended) |
 | `name` | string | Display name in UI |
 | `version` | string | Semver version (e.g., "1.0.0") |
+| `api_version` | string | Required API version (currently "1.0.0") |
+| `author` | string | Author name or organization |
+| `description` | string | Short description |
+| `main` | string | Entry file (e.g., "index.js") |
+| `permissions` | string[] | Required permissions |
 
-### Optional fields
+### Optional Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `author` | string | Author name |
-| `description` | string | Short description |
-| `main` | string | Entry file (default: "index.js") |
-| `permissions` | string[] | Required permissions |
-| `panels` | PanelConfig[] | Panel configuration |
-| `commands` | CommandConfig[] | Custom commands |
+| `homepage` | string | Plugin homepage or repository URL |
+| `icon` | string | Relative path to plugin icon |
 
 ---
 
-## The Plugin API
-
-Your `init` function receives the `api` object which provides access to all features.
-
-### Lifecycle
-
-```javascript
-function init(api) {
-  // Called when the plugin is loaded
-  api.onLoad(() => {
-    console.log('Plugin activated!');
-  });
-
-  // Called when the plugin is deactivated
-  api.onUnload(() => {
-    console.log('Plugin deactivated!');
-    // Clean up your resources here
-  });
-}
-```
-
----
-
-### Panels
-
-Create user interfaces in side panels.
-
-```javascript
-api.registerPanel({
-  id: 'my-panel',
-  render: (container) => {
-    // container is a DOM element
-    container.innerHTML = `
-      <div style="padding: 16px;">
-        <h2>My Panel</h2>
-        <button id="my-btn">Click me</button>
-      </div>
-    `;
-
-    // Add event listeners
-    container.querySelector('#my-btn').addEventListener('click', () => {
-      api.showNotification('Button clicked!', 'success');
-    });
-
-    // Return a cleanup function (optional)
-    return () => {
-      console.log('Panel closed');
-    };
-  }
-});
-
-// Show/hide a panel
-api.showPanel('my-panel');
-api.hidePanel('my-panel');
-```
-
-**Required permission:** `panel:register`
-
----
-
-### Commands
-
-Register commands accessible via keyboard shortcuts.
-
-```javascript
-api.registerCommand({
-  id: 'my-command',
-  handler: () => {
-    console.log('Command executed!');
-    api.showNotification('Action performed', 'info');
-  }
-});
-
-// Execute a command programmatically
-api.executeCommand('my-command');
-```
-
-**Required permission:** `command:register`
-
----
-
-### Terminal
-
-Interact with the active terminal.
-
-#### Read terminal output
-
-```javascript
-// Listen to everything displayed in the terminal
-const unsubscribe = api.onTerminalOutput(sessionId, (data) => {
-  console.log('Output:', data);
-
-  // Example: detect an error
-  if (data.includes('error')) {
-    api.showNotification('Error detected!', 'error');
-  }
-});
-
-// Stop listening
-unsubscribe();
-```
-
-**Required permission:** `terminal:read`
-
-#### Write to terminal
-
-```javascript
-// Send a command
-await api.writeToTerminal(sessionId, 'ls -la\n');
-
-// Send text without executing
-await api.writeToTerminal(sessionId, 'echo "Hello"');
-```
-
-**Required permission:** `terminal:write`
-
-#### Execute command silently
-
-```javascript
-// Run a command without showing it in terminal
-const output = await api.execCommand(sessionId, 'hostname');
-console.log('Server:', output.trim());
-```
-
-**Required permission:** `backend:exec`
-
----
-
-### Sessions
-
-Access information about active sessions.
-
-```javascript
-// Active session
-const session = api.getActiveSession();
-// Returns: { id, type, host, port, username, status }
-
-if (session) {
-  console.log(`Connected to ${session.username}@${session.host}`);
-}
-
-// All sessions
-const sessions = api.getAllSessions();
-sessions.forEach(s => console.log(s.id, s.type));
-```
-
-#### Session events
-
-```javascript
-// When a new session connects
-api.onSessionConnect((session) => {
-  console.log('New session:', session.type);
-  if (session.type === 'ssh') {
-    console.log(`SSH to ${session.host}`);
-  }
-});
-
-// When a session disconnects
-api.onSessionDisconnect((sessionId) => {
-  console.log('Session closed:', sessionId);
-});
-```
-
-**Required permission:** `session:info`
-
----
-
-### Storage
-
-Store persistent data (scoped per plugin).
-
-```javascript
-// Save
-await api.storage.set('config', { theme: 'dark', interval: 5000 });
-await api.storage.set('counter', 42);
-
-// Retrieve
-const config = await api.storage.get('config');
-// { theme: 'dark', interval: 5000 }
-
-const counter = await api.storage.get('counter');
-// 42
-
-// Delete
-await api.storage.delete('counter');
-```
-
-**Required permissions:** `storage:read`, `storage:write`
-
----
-
-### Notifications
-
-Display toast notifications.
-
-```javascript
-api.showNotification('Operation successful!', 'success');
-api.showNotification('Warning...', 'warning');
-api.showNotification('Error!', 'error');
-api.showNotification('Information', 'info');
-```
-
-**No permission required**
-
----
-
-### Backend (Advanced)
-
-Call Rust backend functions.
-
-```javascript
-try {
-  const result = await api.invokeBackend('get_session_info', {
-    session_id: 'ssh-123'
-  });
-  console.log(result);
-} catch (error) {
-  console.error('Backend error:', error);
-}
-```
-
-**Required permission:** `backend:exec`
-
----
-
-## Permissions
-
-Permissions control what your plugin can do.
-
-| Permission | Description |
-|------------|-------------|
-| `terminal:read` | Read terminal output |
-| `terminal:write` | Write to terminal |
-| `panel:register` | Create UI panels |
-| `command:register` | Create commands |
-| `session:info` | Access session info |
-| `storage:read` | Read plugin storage |
-| `storage:write` | Write to plugin storage |
-| `backend:exec` | Call Rust functions |
-
-### Principle of least privilege
-
-Only add permissions you actually need.
+## Permissions System
+
+Plugins must declare all required permissions in their manifest. Users will be prompted to approve these permissions before the plugin can be enabled.
+
+### Permission Categories
+
+| Category | Permissions | Description |
+|----------|------------|-------------|
+| Sessions | `sessions_read`, `sessions_write`, `sessions_connect` | Access to saved sessions |
+| Folders | `folders_read`, `folders_write` | Access to folder structure |
+| Vault | `vault_status`, `vault_read`, `vault_write` | Access to encrypted storage |
+| Settings | `settings_read`, `settings_write` | Access to app settings |
+| Events | `events_subscribe`, `events_emit` | Event system access |
+| Storage | `fs_read`, `fs_write` | Sandboxed file storage |
+| Shell | `shell_execute` | Execute whitelisted commands |
+| Network | `network_http`, `network_websocket` | Network access |
+| UI | `ui_menu`, `ui_notifications`, `ui_settings`, `ui_panels`, `ui_commands`, `ui_modals` | UI integration |
+| Terminal | `terminal_read`, `terminal_write` | Terminal I/O access |
+| Clipboard | `clipboard_read`, `clipboard_write` | Clipboard access |
+| Bastions | `bastions_read`, `bastions_write` | Jump host profiles |
+| Known Hosts | `known_hosts_read`, `known_hosts_write` | SSH known hosts |
+
+### Risk Levels
+
+| Level | Color | Description |
+|-------|-------|-------------|
+| Low | Green | Read-only, non-sensitive data |
+| Medium | Yellow | Write access or network |
+| High | Red | Sensitive data or system access |
+
+### Principle of Least Privilege
+
+Only request permissions you actually need:
 
 ```json
-// Bad - too many permissions
-"permissions": ["terminal:read", "terminal:write", "backend:exec", "storage:read", "storage:write"]
+// Good - minimal permissions
+"permissions": ["sessions_read", "fs_read", "fs_write"]
 
-// Good - just what's needed
-"permissions": ["panel:register", "session:info"]
+// Bad - too many permissions
+"permissions": ["sessions_read", "sessions_write", "sessions_connect", "vault_read", "vault_write", "shell_execute"]
+```
+
+---
+
+## Using the API
+
+### Basic Pattern
+
+All API calls use Tauri's `invoke` function:
+
+```javascript
+const { invoke } = window.__TAURI__.core;
+
+async function example(pluginId) {
+  try {
+    const result = await invoke('command_name', { pluginId, ...params });
+    return result;
+  } catch (error) {
+    console.error('Error:', error.message);
+  }
+}
+```
+
+### Sessions API
+
+```javascript
+// List all sessions
+const sessions = await invoke('plugin_api_list_sessions', { pluginId });
+
+// Create a session
+const newSession = await invoke('plugin_api_create_session', {
+  pluginId,
+  name: 'My Server',
+  host: 'example.com',
+  port: 22,
+  username: 'admin',
+  authType: 'key',
+  keyPath: '~/.ssh/id_rsa'
+});
+
+// Update a session
+await invoke('plugin_api_update_session', {
+  pluginId,
+  id: session.id,
+  name: 'New Name'
+});
+
+// Delete a session
+await invoke('plugin_api_delete_session', { pluginId, id: session.id });
+```
+
+### Storage API (Sandboxed)
+
+```javascript
+// Write a file
+await invoke('plugin_storage_write', {
+  pluginId,
+  path: 'data/config.json',
+  content: JSON.stringify({ key: 'value' })
+});
+
+// Read a file
+const content = await invoke('plugin_storage_read', {
+  pluginId,
+  path: 'data/config.json'
+});
+const config = JSON.parse(content);
+
+// List directory
+const files = await invoke('plugin_storage_list', {
+  pluginId,
+  path: 'data'
+});
+
+// Delete a file
+await invoke('plugin_storage_delete', {
+  pluginId,
+  path: 'data/old-config.json'
+});
+```
+
+### Vault API (Encrypted Storage)
+
+```javascript
+// Check vault status
+const status = await invoke('plugin_api_vault_status', { pluginId });
+if (!status.isUnlocked) {
+  console.log('Vault is locked, cannot access encrypted data');
+  return;
+}
+
+// Store encrypted data
+await invoke('plugin_api_vault_store', {
+  pluginId,
+  key: 'api-token',
+  value: 'secret-token-value'
+});
+
+// Read encrypted data
+const token = await invoke('plugin_api_vault_read', {
+  pluginId,
+  key: 'api-token'
+});
+
+// Delete encrypted data
+await invoke('plugin_api_vault_delete', {
+  pluginId,
+  key: 'api-token'
+});
+```
+
+### Settings API
+
+```javascript
+// Read settings
+const settings = await invoke('plugin_api_get_settings', { pluginId });
+console.log('Theme:', settings.appearance.theme);
+console.log('Font size:', settings.terminal.fontSize);
+
+// Update appearance
+await invoke('plugin_api_update_appearance_settings', {
+  pluginId,
+  theme: 'dark',
+  accentColor: '#7DA6E8'
+});
+```
+
+### Events API
+
+```javascript
+// Subscribe to events
+await invoke('plugin_api_subscribe_events', {
+  pluginId,
+  events: ['session_connected', 'session_disconnected', 'vault_unlocked']
+});
+
+// Poll for events (call periodically)
+const events = await invoke('plugin_api_get_events', { pluginId });
+for (const event of events) {
+  console.log(`Event: ${event.event} from ${event.source}`);
+  console.log('Data:', event.data);
+}
+
+// Emit custom event (for inter-plugin communication)
+await invoke('plugin_api_emit_event', {
+  pluginId,
+  eventName: 'my-custom-event',
+  data: { message: 'Hello from my plugin!' }
+});
 ```
 
 ---
 
 ## Practical Examples
 
-### Connection counter plugin
+### Config Backup Plugin
 
 ```javascript
-function init(api) {
-  let connectionCount = 0;
+const { invoke } = window.__TAURI__.core;
 
-  api.onLoad(async () => {
-    // Load saved counter
-    const saved = await api.storage.get('count');
-    if (saved !== null) connectionCount = saved;
-  });
+async function init(pluginId) {
+  console.log('[Backup] Initializing...');
 
-  api.onSessionConnect(async (session) => {
-    if (session.type === 'ssh') {
-      connectionCount++;
-      await api.storage.set('count', connectionCount);
-      api.showNotification(`Connection #${connectionCount}`, 'info');
-    }
-  });
-
-  api.registerPanel({
-    id: 'counter-panel',
-    render: (container) => {
-      container.innerHTML = `
-        <div style="padding: 20px; text-align: center;">
-          <h2 style="font-size: 48px; color: #7da6e8;">${connectionCount}</h2>
-          <p>SSH connections</p>
-        </div>
-      `;
-    }
-  });
+  // Create backup on load
+  await createBackup(pluginId);
 }
 
-module.exports.default = init;
+async function createBackup(pluginId) {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+  // Get all sessions
+  const sessions = await invoke('plugin_api_list_sessions', { pluginId });
+
+  // Get all folders
+  const folders = await invoke('plugin_api_list_folders', { pluginId });
+
+  // Get settings
+  const settings = await invoke('plugin_api_get_settings', { pluginId });
+
+  // Create backup object
+  const backup = {
+    version: '1.0',
+    timestamp,
+    sessions,
+    folders,
+    settings
+  };
+
+  // Save backup
+  await invoke('plugin_storage_write', {
+    pluginId,
+    path: `backups/backup-${timestamp}.json`,
+    content: JSON.stringify(backup, null, 2)
+  });
+
+  console.log('[Backup] Created backup:', timestamp);
+}
+
+async function restoreBackup(pluginId, backupPath) {
+  // Read backup file
+  const content = await invoke('plugin_storage_read', {
+    pluginId,
+    path: backupPath
+  });
+
+  const backup = JSON.parse(content);
+
+  // Restore sessions
+  for (const session of backup.sessions) {
+    await invoke('plugin_api_create_session', {
+      pluginId,
+      ...session
+    });
+  }
+
+  console.log('[Backup] Restored', backup.sessions.length, 'sessions');
+}
+
+window.SimplyTermPlugins = window.SimplyTermPlugins || {};
+window.SimplyTermPlugins['com.example.backup'] = { init, createBackup, restoreBackup };
 ```
 
-### Quick Commands plugin
+### Session Statistics Plugin
 
 ```javascript
-function init(api) {
-  const quickCommands = [
-    { name: 'Disk Usage', cmd: 'df -h\n' },
-    { name: 'Memory', cmd: 'free -m\n' },
-    { name: 'Processes', cmd: 'ps aux | head -20\n' },
-  ];
+const { invoke } = window.__TAURI__.core;
 
-  api.registerPanel({
-    id: 'quick-commands',
-    render: (container) => {
-      container.innerHTML = `
-        <div style="padding: 12px;">
-          <h3 style="margin: 0 0 12px 0;">Quick Commands</h3>
-          ${quickCommands.map((c, i) => `
-            <button
-              data-index="${i}"
-              style="
-                display: block;
-                width: 100%;
-                padding: 8px 12px;
-                margin-bottom: 8px;
-                background: rgba(255,255,255,0.1);
-                border: none;
-                border-radius: 6px;
-                color: #fff;
-                cursor: pointer;
-                text-align: left;
-              "
-            >${c.name}</button>
-          `).join('')}
-        </div>
-      `;
+async function init(pluginId) {
+  // Subscribe to session events
+  await invoke('plugin_api_subscribe_events', {
+    pluginId,
+    events: ['session_connected', 'session_disconnected']
+  });
 
-      container.querySelectorAll('button').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const session = api.getActiveSession();
-          if (session) {
-            const cmd = quickCommands[btn.dataset.index].cmd;
-            await api.writeToTerminal(session.id, cmd);
-          } else {
-            api.showNotification('No active session', 'warning');
-          }
-        });
-      });
+  // Load stats
+  let stats = await loadStats(pluginId);
+
+  // Poll for events
+  setInterval(async () => {
+    const events = await invoke('plugin_api_get_events', { pluginId });
+
+    for (const event of events) {
+      if (event.event === 'session_connected') {
+        stats.totalConnections++;
+        stats.lastConnection = Date.now();
+        await saveStats(pluginId, stats);
+      }
     }
+  }, 1000);
+}
+
+async function loadStats(pluginId) {
+  try {
+    const content = await invoke('plugin_storage_read', {
+      pluginId,
+      path: 'stats.json'
+    });
+    return JSON.parse(content);
+  } catch {
+    return { totalConnections: 0, lastConnection: null };
+  }
+}
+
+async function saveStats(pluginId, stats) {
+  await invoke('plugin_storage_write', {
+    pluginId,
+    path: 'stats.json',
+    content: JSON.stringify(stats)
   });
 }
 
-module.exports.default = init;
+window.SimplyTermPlugins = window.SimplyTermPlugins || {};
+window.SimplyTermPlugins['com.example.stats'] = { init };
 ```
 
 ---
 
 ## Best Practices
 
-### 1. Clean up your resources
+### 1. Handle Errors Gracefully
 
 ```javascript
-api.onUnload(() => {
-  // Stop intervals
-  if (myInterval) clearInterval(myInterval);
-
-  // Subscriptions are automatically cleaned up
-  // but you can also do it manually
-});
-```
-
-### 2. Handle errors
-
-```javascript
-try {
-  await api.writeToTerminal(sessionId, 'command\n');
-} catch (error) {
-  api.showNotification('Error: ' + error.message, 'error');
-  console.error('[MyPlugin]', error);
+async function safeInvoke(command, params) {
+  try {
+    return await invoke(command, params);
+  } catch (error) {
+    if (error.code === 'permission_denied') {
+      console.error('[MyPlugin] Missing permission for:', command);
+    } else if (error.code === 'vault_locked') {
+      console.log('[MyPlugin] Vault is locked, skipping...');
+    } else {
+      console.error('[MyPlugin] Error:', error.message);
+    }
+    return null;
+  }
 }
 ```
 
-### 3. Check session before acting
+### 2. Check Vault Status Before Access
 
 ```javascript
-const session = api.getActiveSession();
-if (!session) {
-  api.showNotification('Connect first', 'warning');
-  return;
-}
+async function getSecureData(pluginId, key) {
+  const status = await invoke('plugin_api_vault_status', { pluginId });
 
-if (session.type !== 'ssh') {
-  api.showNotification('SSH only', 'info');
-  return;
+  if (!status.exists) {
+    console.log('No vault configured');
+    return null;
+  }
+
+  if (!status.isUnlocked) {
+    console.log('Vault is locked');
+    return null;
+  }
+
+  return await invoke('plugin_api_vault_read', { pluginId, key });
 }
 ```
 
-### 4. Prefix your logs
+### 3. Use Namespaced Storage Keys
 
 ```javascript
-console.log('[MyPlugin] Message...');
-console.error('[MyPlugin] Error:', error);
+const STORAGE_PREFIX = 'v1/';
+
+async function saveConfig(pluginId, config) {
+  await invoke('plugin_storage_write', {
+    pluginId,
+    path: `${STORAGE_PREFIX}config.json`,
+    content: JSON.stringify(config)
+  });
+}
 ```
 
-### 5. Use inline styles
-
-Panels don't have access to the app's global styles.
+### 4. Prefix Your Console Logs
 
 ```javascript
-container.innerHTML = `
-  <div style="
-    font-family: system-ui, sans-serif;
-    padding: 16px;
-    color: #fff;
-  ">
-    Styled content
-  </div>
-`;
+const LOG_PREFIX = '[MyPlugin]';
+
+console.log(LOG_PREFIX, 'Initializing...');
+console.error(LOG_PREFIX, 'Error:', error);
+```
+
+### 5. Clean Up Resources
+
+```javascript
+let eventPollInterval = null;
+
+function init(pluginId) {
+  eventPollInterval = setInterval(() => pollEvents(pluginId), 1000);
+}
+
+function cleanup() {
+  if (eventPollInterval) {
+    clearInterval(eventPollInterval);
+    eventPollInterval = null;
+  }
+}
 ```
 
 ---
 
 ## Debugging
 
-### Developer console
+### Developer Console
 
 1. Launch SimplyTerm
 2. Open DevTools: `Ctrl+Shift+I` (Windows/Linux) or `Cmd+Option+I` (Mac)
 3. Go to the **Console** tab
 
-### Useful logs
+### Debug Logging
 
 ```javascript
-// Verify plugin loads
-api.onLoad(() => {
-  console.log('[MyPlugin] Loaded successfully');
-  console.log('[MyPlugin] Active session:', api.getActiveSession());
-});
+async function init(pluginId) {
+  console.log('[MyPlugin] Starting with ID:', pluginId);
 
-// Log events
-api.onSessionConnect((s) => {
-  console.log('[MyPlugin] Session connected:', s);
-});
+  const sessions = await invoke('plugin_api_list_sessions', { pluginId });
+  console.log('[MyPlugin] Found sessions:', sessions);
+
+  const status = await invoke('plugin_api_vault_status', { pluginId });
+  console.log('[MyPlugin] Vault status:', status);
+}
 ```
 
-### Common errors
+### Common Errors
 
 | Error | Cause | Solution |
 |-------|-------|----------|
-| "Plugin not found" | Invalid ID in manifest | Check ID matches folder name |
-| "Permission denied" | Missing permission | Add permission to manifest |
-| "Missing session_id" | Session not checked | Check `getActiveSession()` before acting |
+| `permission_denied` | Missing permission | Add permission to manifest |
+| `vault_locked` | Vault not unlocked | Check vault status first |
+| `not_found` | Resource doesn't exist | Check IDs and paths |
+| `storage_error` | File system issue | Check file permissions |
 
 ---
 
 ## FAQ
 
-### How do I reload my plugin after changes?
+### Where is my plugin data stored?
 
-1. Disable the plugin in Settings → Plugins
-2. Click "Refresh"
-3. Re-enable the plugin
+In the application data directory under `plugins/data/<plugin-id>/`.
 
-### Can I use frameworks (React, Vue)?
+### Can I use npm packages?
 
-No, plugins run in a simple context. Use vanilla JavaScript and template strings.
+Not directly. You need to bundle dependencies with your plugin using a bundler like esbuild or webpack.
 
-### Where is my data stored?
+### How do I update my plugin?
 
-```
-~/.simplyterm/plugin-data/<plugin-id>/
-```
-
-### How do I distribute my plugin?
-
-Create a zip of your plugin folder. Users extract it to `~/.simplyterm/plugins/`.
+1. Update your code
+2. Increment the version in manifest.json
+3. Users will see the new version in Settings → Plugins
 
 ### Can plugins communicate with each other?
 
-No, each plugin is isolated for security reasons.
+Yes, via the Events API. Use `events_emit` to send events and `events_subscribe` to receive them.
 
----
+### How do I distribute my plugin?
 
-## Starter Template
+Create a zip of your plugin folder. Users extract it to their plugins directory and refresh in settings.
 
-Copy this template to get started quickly:
+### What happens to plugin data when the app is uninstalled?
 
-```javascript
-/**
- * My Plugin for SimplyTerm
- * @version 1.0.0
- */
-
-function init(api) {
-  // === Plugin state ===
-  let isActive = false;
-
-  // === Lifecycle ===
-  api.onLoad(async () => {
-    console.log('[MyPlugin] Loaded');
-    isActive = true;
-
-    // Load saved data
-    const savedData = await api.storage.get('data');
-    if (savedData) {
-      console.log('[MyPlugin] Data restored:', savedData);
-    }
-  });
-
-  api.onUnload(() => {
-    console.log('[MyPlugin] Unloaded');
-    isActive = false;
-  });
-
-  // === Panel ===
-  api.registerPanel({
-    id: 'my-panel',
-    render: (container) => {
-      updateUI(container);
-      return () => {
-        // Cleanup if needed
-      };
-    }
-  });
-
-  // === Events ===
-  api.onSessionConnect((session) => {
-    console.log('[MyPlugin] New session:', session.type);
-  });
-
-  // === Functions ===
-  function updateUI(container) {
-    const session = api.getActiveSession();
-    container.innerHTML = `
-      <div style="padding: 16px; font-family: system-ui;">
-        <h2 style="color: #fff; margin: 0 0 16px 0;">My Plugin</h2>
-        <p style="color: #888;">
-          ${session ? `Connected to ${session.host}` : 'Not connected'}
-        </p>
-        <button id="action-btn" style="
-          padding: 8px 16px;
-          background: #7da6e8;
-          border: none;
-          border-radius: 6px;
-          color: #1a1a1a;
-          cursor: pointer;
-        ">Action</button>
-      </div>
-    `;
-
-    container.querySelector('#action-btn')?.addEventListener('click', handleAction);
-  }
-
-  async function handleAction() {
-    api.showNotification('Action executed!', 'success');
-  }
-}
-
-// CommonJS export
-module.exports.default = init;
-```
+Plugin data is stored in the app data directory and is removed when the app is uninstalled.
 
 ---
 
 ## Resources
 
-- [SimplyTerm Source Code](https://github.com/arediss/SimplyTerm)
+- [Plugin API Reference](./PLUGIN_API_REFERENCE.md)
 - [Plugin Examples](./PLUGIN_EXAMPLES.md)
-- [Report a Bug](https://github.com/arediss/SimplyTerm/issues)
+- [Report Issues](https://github.com/arediss/SimplyTerm/issues)
+
+---
+
+**SimplyTerm Plugin API v1.0.0**

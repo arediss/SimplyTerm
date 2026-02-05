@@ -11,7 +11,8 @@ import NewConnectionModal from "./components/NewConnectionModal";
 import SettingsModal from "./components/SettingsModal";
 import { CommandPalette, useCommandPalette, CommandHandlers, CommandContext } from "./components/CommandPalette";
 import { StatusBar } from "./components/StatusBar";
-import { PluginHost, pluginManager, type SessionInfo, type ModalConfig, type NotificationType } from "./plugins";
+import { PluginHost, pluginManager, type SessionInfo, type ModalConfig, type NotificationType, type PromptConfig } from "./plugins";
+import PromptModal from "./components/PromptModal";
 import {
   SplitPane,
   type PaneNode,
@@ -31,7 +32,7 @@ import { VaultSetupModal, VaultUnlockModal } from "./components/vault";
 import TunnelManager from "./components/TunnelManager";
 import TunnelSidebar from "./components/TunnelSidebar";
 import { useSessions, useAppSettings, useVaultFlow } from "./hooks";
-import { SavedSession, RecentSession, Tab, TelnetConnectionConfig, SerialConnectionConfig } from "./types";
+import { SavedSession, Tab, TelnetConnectionConfig, SerialConnectionConfig } from "./types";
 import { ConnectionType } from "./components/ConnectionTypeSelector";
 import { generateSessionId, generateTabId, expandHomeDir, isModifierPressed, modifierKey } from "./utils";
 import { applyTheme } from "./themes";
@@ -44,18 +45,9 @@ function App() {
   // Use extracted hooks
   const {
     savedSessions,
-    folders,
-    recentSessions,
     loadSavedSessions,
-    createFolder,
-    updateFolder,
-    deleteFolder,
-    moveSessionToFolder,
     deleteSavedSession: handleDeleteSavedSession,
-    deleteRecentSession: handleDeleteRecentSession,
-    clearRecentSessions: handleClearRecentSessions,
     clearAllSavedSessions,
-    addToRecentSessions,
   } = useSessions();
 
   const {
@@ -122,6 +114,12 @@ function App() {
 
   // Notification state (for plugins)
   const [notification, setNotification] = useState<{ message: string; type: NotificationType } | null>(null);
+
+  // Prompt modal state (for plugins)
+  const [promptModal, setPromptModal] = useState<{
+    config: PromptConfig;
+    resolve: (value: string | null) => void;
+  } | null>(null);
 
   // Helper to check host key before SSH connection
   const checkHostKeyBeforeConnect = async (
@@ -485,16 +483,6 @@ function App() {
           status: 'connected',
         });
 
-        // Ajouter aux sessions récentes
-        await addToRecentSessions({
-          name: config.name,
-          host: config.host,
-          port: config.port,
-          username: config.username,
-          authType: config.authType,
-          keyPath: config.keyPath,
-        });
-
         // Si on était en mode édition (reconnexion à une session existante), sauvegarder directement les credentials
         if (editingSessionId) {
           try {
@@ -771,15 +759,6 @@ function App() {
             status: 'connected',
           });
 
-          // Mettre à jour les sessions récentes
-          await addToRecentSessions({
-            name: saved.name,
-            host: saved.host,
-            port: saved.port,
-            username: saved.username,
-            authType: saved.auth_type,
-            keyPath: saved.key_path,
-          });
         } catch (error) {
           console.error("[SavedSession] SSH connection failed:", error);
           setConnectionError(String(error));
@@ -794,21 +773,6 @@ function App() {
       setConnectionError(String(error));
       setIsConnecting(false);
     }
-  };
-
-  // Se connecter à une session récente (pré-remplit le formulaire)
-  const handleConnectToRecentSession = async (recent: RecentSession) => {
-    setInitialConnectionConfig({
-      name: recent.name,
-      host: recent.host,
-      port: recent.port,
-      username: recent.username,
-      authType: recent.auth_type,
-      keyPath: recent.key_path,
-    });
-    setConnectionError(undefined);
-    setIsConnectionModalOpen(true);
-    setOpenSidebar("none");
   };
 
   const handleCloseTab = (tabId: string) => {
@@ -1093,39 +1057,12 @@ function App() {
           username: saved.username,
           status: 'connected',
         });
-
-        await addToRecentSessions({
-          name: saved.name,
-          host: saved.host,
-          port: saved.port,
-          username: saved.username,
-          authType: saved.auth_type,
-          keyPath: saved.key_path,
-        });
       } catch (error) {
         console.error("Failed to connect to saved session:", error);
         handleClosePane(pendingPaneId);
       }
     },
-    [tabs, activeTabId, handleClosePane, addToRecentSessions]
-  );
-
-  // Handler for selecting a recent session in a pending pane
-  const handlePendingSelectRecent = useCallback(
-    (pendingPaneId: string, recent: RecentSession) => {
-      // Close the pending pane and open the connection modal with pre-filled config
-      handleClosePane(pendingPaneId);
-      setInitialConnectionConfig({
-        name: recent.name,
-        host: recent.host,
-        port: recent.port,
-        username: recent.username,
-        authType: recent.auth_type,
-        keyPath: recent.key_path,
-      });
-      setIsConnectionModalOpen(true);
-    },
-    [handleClosePane]
+    [tabs, activeTabId, handleClosePane]
   );
 
   // Handler for selecting SFTP for an active SSH connection in a pending pane
@@ -1440,9 +1377,28 @@ function App() {
 
   const handleShowModal = useCallback(async (_config: ModalConfig): Promise<unknown> => {
     // TODO: Implement plugin modal support
-    // TODO: Implement plugin modal support
     return null;
   }, []);
+
+  const handleShowPrompt = useCallback((config: PromptConfig): Promise<string | null> => {
+    return new Promise((resolve) => {
+      setPromptModal({ config, resolve });
+    });
+  }, []);
+
+  const handlePromptConfirm = useCallback((value: string) => {
+    if (promptModal) {
+      promptModal.resolve(value);
+      setPromptModal(null);
+    }
+  }, [promptModal]);
+
+  const handlePromptCancel = useCallback(() => {
+    if (promptModal) {
+      promptModal.resolve(null);
+      setPromptModal(null);
+    }
+  }, [promptModal]);
 
   const getSessions = useCallback((): SessionInfo[] => {
     return tabs.map(tab => {
@@ -1537,11 +1493,9 @@ function App() {
                       onSelectLocal={() => handlePendingSelectLocal(paneId)}
                       onSelectDuplicate={() => handlePendingSelectDuplicate(paneId)}
                       onSelectSaved={(session) => handlePendingSelectSaved(paneId, session)}
-                      onSelectRecent={(session) => handlePendingSelectRecent(paneId, session)}
                       onSelectSftpForConnection={(sessionId, ptySessionId) => handlePendingSelectSftp(paneId, sessionId, ptySessionId)}
                       currentSessionConfig={tab.sshConfig}
                       savedSessions={savedSessions}
-                      recentSessions={recentSessions}
                       activeConnections={activeConnections}
                     />
                   )}
@@ -1560,8 +1514,6 @@ function App() {
         onTabClose={handleCloseTab}
         onNewTab={handleOpenConnectionModal}
         onLocalTerminal={handleNewLocalTab}
-        onRecentSessionConnect={handleConnectToRecentSession}
-        recentSessions={recentSessions}
         onToggleSidebar={() => setOpenSidebar(openSidebar === "menu" ? "none" : "menu")}
         isSidebarOpen={isSidebarOpen}
         onToggleTunnelSidebar={() => setOpenSidebar(openSidebar === "tunnel" ? "none" : "tunnel")}
@@ -1574,21 +1526,12 @@ function App() {
         isOpen={isSidebarOpen}
         onClose={() => setOpenSidebar("none")}
         savedSessions={savedSessions}
-        folders={folders}
-        recentSessions={recentSessions}
         onSavedSessionConnect={handleConnectToSavedSession}
         onSavedSessionEdit={handleEditSavedSession}
         onSavedSessionDelete={handleDeleteSavedSession}
         onSavedSessionSftp={handleOpenSftpTab}
         onSavedSessionTunnel={handleOpenTunnelTab}
-        onRecentSessionConnect={handleConnectToRecentSession}
-        onRecentSessionDelete={handleDeleteRecentSession}
-        onClearRecentSessions={handleClearRecentSessions}
         onOpenSettings={() => setIsSettingsOpen(true)}
-        onCreateFolder={createFolder}
-        onUpdateFolder={updateFolder}
-        onDeleteFolder={deleteFolder}
-        onMoveSessionToFolder={moveSessionToFolder}
         vaultExists={vault.status?.exists}
         vaultUnlocked={vault.status?.isUnlocked}
         onVaultLock={lockVault}
@@ -1683,7 +1626,7 @@ function App() {
         settings={appSettings}
         onSettingsChange={handleSettingsChange}
         savedSessionsCount={savedSessions.length}
-        onClearAllSessions={() => clearAllSavedSessions(savedSessions)}
+        onClearAllSessions={clearAllSavedSessions}
       />
 
       {/* Command Palette */}
@@ -1725,6 +1668,7 @@ function App() {
       <PluginHost
         onShowNotification={handleShowNotification}
         onShowModal={handleShowModal}
+        onShowPrompt={handleShowPrompt}
         getSessions={getSessions}
         getActiveSession={getActiveSessionInfo}
       />
@@ -1744,6 +1688,14 @@ function App() {
           {notification.message}
         </div>
       )}
+
+      {/* Plugin Prompt Modal */}
+      <PromptModal
+        isOpen={!!promptModal}
+        config={promptModal?.config || { title: '' }}
+        onConfirm={handlePromptConfirm}
+        onCancel={handlePromptCancel}
+      />
 
       {/* Vault Setup Modal */}
       <VaultSetupModal

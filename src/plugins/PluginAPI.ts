@@ -1,7 +1,8 @@
 /**
  * Plugin API Implementation
  *
- * Provides the SimplyTermPluginAPI to plugins in a sandboxed manner.
+ * Provides the SimplyTermPluginAPI to plugins.
+ * Uses the new v1 API with permission checking on the backend.
  */
 
 import { invoke } from '@tauri-apps/api/core';
@@ -16,7 +17,18 @@ import type {
   CommandRegistration,
   LoadedPlugin,
   PluginManifest,
+  FileEntry,
+  SessionMetadata,
+  PromptConfig,
 } from './types';
+import type { SidebarViewRegistration, SidebarSectionRegistration, SettingsPanelRegistration, ContextMenuItemConfig } from './extensionTypes';
+
+/**
+ * Check if a plugin has a specific permission
+ */
+function hasPermission(permissions: string[], perm: string): boolean {
+  return permissions.includes(perm);
+}
 
 /**
  * Create a Plugin API instance for a specific plugin
@@ -27,18 +39,30 @@ export function createPluginAPI(
   callbacks: {
     onShowNotification: (message: string, type: NotificationType) => void;
     onShowModal: (config: ModalConfig) => Promise<unknown>;
+    onShowPrompt: (config: PromptConfig) => Promise<string | null>;
     onPanelRegister: (pluginId: string, panel: PanelRegistration) => void;
     onCommandRegister: (pluginId: string, command: CommandRegistration) => void;
     onPanelShow: (panelId: string) => void;
     onPanelHide: (panelId: string) => void;
+    onSidebarViewRegister: (pluginId: string, view: SidebarViewRegistration) => void;
+    onSidebarViewUnregister: (pluginId: string, viewId: string) => void;
+    onSidebarSectionRegister: (pluginId: string, section: SidebarSectionRegistration) => void;
+    onSidebarSectionUnregister: (pluginId: string, sectionId: string) => void;
+    onSettingsPanelRegister: (pluginId: string, panel: SettingsPanelRegistration) => void;
+    onSettingsPanelUnregister: (pluginId: string, panelId: string) => void;
+    onContextMenuItemRegister: (pluginId: string, item: ContextMenuItemConfig) => void;
+    onContextMenuItemUnregister: (pluginId: string, itemId: string) => void;
     getSessions: () => SessionInfo[];
     getActiveSession: () => SessionInfo | null;
   }
 ): SimplyTermPluginAPI {
   const pluginId = manifest.id;
-  const hasPermission = (perm: string) => manifest.permissions.includes(perm);
+  const permissions = manifest.permissions;
 
   const api: SimplyTermPluginAPI = {
+    // Plugin ID
+    pluginId,
+
     // Lifecycle
     onLoad(callback: () => void) {
       pluginState.onLoadCallback = callback;
@@ -50,8 +74,8 @@ export function createPluginAPI(
 
     // Panels
     registerPanel(config: PanelRegistration) {
-      if (!hasPermission('panel:register')) {
-        console.warn(`[Plugin ${pluginId}] Missing permission: panel:register`);
+      if (!hasPermission(permissions, 'ui_panels')) {
+        console.warn(`[Plugin ${pluginId}] Missing permission: ui_panels`);
         return;
       }
       pluginState.panels.set(config.id, config);
@@ -66,10 +90,70 @@ export function createPluginAPI(
       callbacks.onPanelHide(panelId);
     },
 
+    // Sidebar views (tabs) - recommended
+    registerSidebarView(config: SidebarViewRegistration) {
+      if (!hasPermission(permissions, 'ui_sidebar')) {
+        console.warn(`[Plugin ${pluginId}] Missing permission: ui_sidebar`);
+        return;
+      }
+      pluginState.sidebarViews.set(config.config.id, config);
+      callbacks.onSidebarViewRegister(pluginId, config);
+    },
+
+    unregisterSidebarView(viewId: string) {
+      pluginState.sidebarViews.delete(viewId);
+      callbacks.onSidebarViewUnregister(pluginId, viewId);
+    },
+
+    // Sidebar sections (deprecated - use registerSidebarView)
+    registerSidebarSection(config: SidebarSectionRegistration) {
+      if (!hasPermission(permissions, 'ui_sidebar')) {
+        console.warn(`[Plugin ${pluginId}] Missing permission: ui_sidebar`);
+        return;
+      }
+      pluginState.sidebarSections.set(config.config.id, config);
+      callbacks.onSidebarSectionRegister(pluginId, config);
+    },
+
+    unregisterSidebarSection(sectionId: string) {
+      pluginState.sidebarSections.delete(sectionId);
+      callbacks.onSidebarSectionUnregister(pluginId, sectionId);
+    },
+
+    // Settings panels
+    registerSettingsPanel(config: SettingsPanelRegistration) {
+      if (!hasPermission(permissions, 'ui_settings')) {
+        console.warn(`[Plugin ${pluginId}] Missing permission: ui_settings`);
+        return;
+      }
+      pluginState.settingsPanels.set(config.config.id, config);
+      callbacks.onSettingsPanelRegister(pluginId, config);
+    },
+
+    unregisterSettingsPanel(panelId: string) {
+      pluginState.settingsPanels.delete(panelId);
+      callbacks.onSettingsPanelUnregister(pluginId, panelId);
+    },
+
+    // Context menu items
+    registerContextMenuItem(config: ContextMenuItemConfig) {
+      if (!hasPermission(permissions, 'ui_context_menu')) {
+        console.warn(`[Plugin ${pluginId}] Missing permission: ui_context_menu`);
+        return;
+      }
+      pluginState.contextMenuItems.set(config.id, config);
+      callbacks.onContextMenuItemRegister(pluginId, config);
+    },
+
+    unregisterContextMenuItem(itemId: string) {
+      pluginState.contextMenuItems.delete(itemId);
+      callbacks.onContextMenuItemUnregister(pluginId, itemId);
+    },
+
     // Commands
     registerCommand(config: CommandRegistration) {
-      if (!hasPermission('command:register')) {
-        console.warn(`[Plugin ${pluginId}] Missing permission: command:register`);
+      if (!hasPermission(permissions, 'ui_commands')) {
+        console.warn(`[Plugin ${pluginId}] Missing permission: ui_commands`);
         return;
       }
       pluginState.commands.set(config.id, config);
@@ -85,8 +169,8 @@ export function createPluginAPI(
 
     // Terminal hooks
     onTerminalOutput(sessionId: string, callback: (data: string) => void): Unsubscribe {
-      if (!hasPermission('terminal:read')) {
-        console.warn(`[Plugin ${pluginId}] Missing permission: terminal:read`);
+      if (!hasPermission(permissions, 'terminal_read')) {
+        console.warn(`[Plugin ${pluginId}] Missing permission: terminal_read`);
         return () => {};
       }
 
@@ -107,8 +191,8 @@ export function createPluginAPI(
     },
 
     onTerminalInput(sessionId: string, callback: (data: string) => void): Unsubscribe {
-      if (!hasPermission('terminal:read')) {
-        console.warn(`[Plugin ${pluginId}] Missing permission: terminal:read`);
+      if (!hasPermission(permissions, 'terminal_read')) {
+        console.warn(`[Plugin ${pluginId}] Missing permission: terminal_read`);
         return () => {};
       }
 
@@ -129,25 +213,17 @@ export function createPluginAPI(
     },
 
     async writeToTerminal(sessionId: string, data: string): Promise<void> {
-      if (!hasPermission('terminal:write')) {
-        throw new Error('Missing permission: terminal:write');
+      if (!hasPermission(permissions, 'terminal_write')) {
+        throw new Error('Missing permission: terminal_write');
       }
 
-      await invoke('write_to_pty', { sessionId, data });
+      await invoke('plugin_api_write_to_terminal', { pluginId, sessionId, data });
     },
 
-    async execCommand(sessionId: string, command: string): Promise<string> {
-      if (!hasPermission('backend:exec')) {
-        throw new Error('Missing permission: backend:exec');
-      }
-
-      return invoke<string>('ssh_exec_command', { sessionId, command });
-    },
-
-    // Session events - callbacks are stored on pluginState and called by PluginManager
+    // Session events
     onSessionConnect(callback: (session: SessionInfo) => void): Unsubscribe {
-      if (!hasPermission('session:info')) {
-        console.warn(`[Plugin ${pluginId}] Missing permission: session:info`);
+      if (!hasPermission(permissions, 'events_subscribe')) {
+        console.warn(`[Plugin ${pluginId}] Missing permission: events_subscribe`);
         return () => {};
       }
 
@@ -162,8 +238,8 @@ export function createPluginAPI(
     },
 
     onSessionDisconnect(callback: (sessionId: string) => void): Unsubscribe {
-      if (!hasPermission('session:info')) {
-        console.warn(`[Plugin ${pluginId}] Missing permission: session:info`);
+      if (!hasPermission(permissions, 'events_subscribe')) {
+        console.warn(`[Plugin ${pluginId}] Missing permission: events_subscribe`);
         return () => {};
       }
 
@@ -177,66 +253,145 @@ export function createPluginAPI(
       return unsubscribe;
     },
 
-    getActiveSession(): SessionInfo | null {
-      if (!hasPermission('session:info')) {
-        console.warn(`[Plugin ${pluginId}] Missing permission: session:info`);
-        return null;
+    onSessionCreated(callback: (sessionId: string) => void): Unsubscribe {
+      if (!hasPermission(permissions, 'events_subscribe')) {
+        console.warn(`[Plugin ${pluginId}] Missing permission: events_subscribe`);
+        return () => {};
       }
+
+      pluginState.onSessionCreatedCallback = callback;
+
+      const unsubscribe = () => {
+        pluginState.onSessionCreatedCallback = undefined;
+      };
+
+      pluginState.subscriptions.push(unsubscribe);
+      return unsubscribe;
+    },
+
+    onSessionDeleted(callback: (sessionId: string) => void): Unsubscribe {
+      if (!hasPermission(permissions, 'events_subscribe')) {
+        console.warn(`[Plugin ${pluginId}] Missing permission: events_subscribe`);
+        return () => {};
+      }
+
+      pluginState.onSessionDeletedCallback = callback;
+
+      const unsubscribe = () => {
+        pluginState.onSessionDeletedCallback = undefined;
+      };
+
+      pluginState.subscriptions.push(unsubscribe);
+      return unsubscribe;
+    },
+
+    getActiveSession(): SessionInfo | null {
       return callbacks.getActiveSession();
     },
 
     getAllSessions(): SessionInfo[] {
-      if (!hasPermission('session:info')) {
-        console.warn(`[Plugin ${pluginId}] Missing permission: session:info`);
-        return [];
-      }
       return callbacks.getSessions();
     },
 
-    // Backend bridge
-    async invokeBackend<T>(command: string, args?: Record<string, unknown>): Promise<T> {
-      if (!hasPermission('backend:exec')) {
-        throw new Error('Missing permission: backend:exec');
-      }
-
-      return invoke<T>('plugin_invoke', {
-        pluginId,
-        command,
-        args: args || {},
-      });
+    // Backend API bridge
+    async invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+      // Add pluginId to all calls for permission checking on backend
+      return invoke<T>(command, { pluginId, ...args });
     },
 
-    // Storage
+    // Storage (sandboxed)
     storage: {
-      async get<T>(key: string): Promise<T | null> {
-        if (!hasPermission('storage:read')) {
-          throw new Error('Missing permission: storage:read');
+      async read(path: string): Promise<string> {
+        if (!hasPermission(permissions, 'fs_read')) {
+          throw new Error('Missing permission: fs_read');
         }
-        return invoke<T | null>('plugin_storage_get', { pluginId, key });
+        return invoke<string>('plugin_storage_read', { pluginId, path });
       },
 
-      async set<T>(key: string, value: T): Promise<void> {
-        if (!hasPermission('storage:write')) {
-          throw new Error('Missing permission: storage:write');
+      async write(path: string, content: string): Promise<void> {
+        if (!hasPermission(permissions, 'fs_write')) {
+          throw new Error('Missing permission: fs_write');
         }
-        await invoke('plugin_storage_set', { pluginId, key, value });
+        await invoke('plugin_storage_write', { pluginId, path, content });
       },
 
-      async delete(key: string): Promise<void> {
-        if (!hasPermission('storage:write')) {
-          throw new Error('Missing permission: storage:write');
+      async delete(path: string): Promise<void> {
+        if (!hasPermission(permissions, 'fs_write')) {
+          throw new Error('Missing permission: fs_write');
         }
-        await invoke('plugin_storage_delete', { pluginId, key });
+        await invoke('plugin_storage_delete', { pluginId, path });
+      },
+
+      async list(path: string): Promise<FileEntry[]> {
+        if (!hasPermission(permissions, 'fs_read')) {
+          throw new Error('Missing permission: fs_read');
+        }
+        return invoke<FileEntry[]>('plugin_storage_list', { pluginId, path });
+      },
+    },
+
+    // Session metadata (sandboxed per plugin)
+    sessionMetadata: {
+      async get(sessionId: string): Promise<SessionMetadata | null> {
+        if (!hasPermission(permissions, 'sessions_metadata_read')) {
+          throw new Error('Missing permission: sessions_metadata_read');
+        }
+        return invoke<SessionMetadata | null>('plugin_api_get_session_metadata', { pluginId, sessionId });
+      },
+
+      async getAll(): Promise<Map<string, SessionMetadata>> {
+        if (!hasPermission(permissions, 'sessions_metadata_read')) {
+          throw new Error('Missing permission: sessions_metadata_read');
+        }
+        const data = await invoke<Record<string, SessionMetadata>>('plugin_api_get_all_session_metadata', { pluginId });
+        return new Map(Object.entries(data));
+      },
+
+      async set(sessionId: string, data: SessionMetadata): Promise<void> {
+        if (!hasPermission(permissions, 'sessions_metadata_write')) {
+          throw new Error('Missing permission: sessions_metadata_write');
+        }
+        await invoke('plugin_api_set_session_metadata', { pluginId, sessionId, metadata: data });
+      },
+
+      async update(sessionId: string, updates: SessionMetadata): Promise<SessionMetadata> {
+        if (!hasPermission(permissions, 'sessions_metadata_write')) {
+          throw new Error('Missing permission: sessions_metadata_write');
+        }
+        return invoke<SessionMetadata>('plugin_api_update_session_metadata', { pluginId, sessionId, updates });
+      },
+
+      async delete(sessionId: string): Promise<boolean> {
+        if (!hasPermission(permissions, 'sessions_metadata_write')) {
+          throw new Error('Missing permission: sessions_metadata_write');
+        }
+        return invoke<boolean>('plugin_api_delete_session_metadata', { pluginId, sessionId });
       },
     },
 
     // UI utilities
     showNotification(message: string, type: NotificationType = 'info') {
+      if (!hasPermission(permissions, 'ui_notifications')) {
+        console.warn(`[Plugin ${pluginId}] Missing permission: ui_notifications`);
+        return;
+      }
       callbacks.onShowNotification(message, type);
     },
 
     showModal(config: ModalConfig): Promise<unknown> {
+      if (!hasPermission(permissions, 'ui_modals')) {
+        console.warn(`[Plugin ${pluginId}] Missing permission: ui_modals`);
+        return Promise.resolve(null);
+      }
       return callbacks.onShowModal(config);
+    },
+
+    showPrompt(config: PromptConfig): Promise<string | null> {
+      if (!hasPermission(permissions, 'ui_modals')) {
+        console.warn(`[Plugin ${pluginId}] Missing permission: ui_modals`);
+        return Promise.resolve(null);
+      }
+      return callbacks.onShowPrompt(config);
     },
   };
 
