@@ -314,7 +314,8 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
             ) : (
               <div className="flex flex-col items-center gap-4">
                 <PinInput
-                  length={4}
+                  key={pinStep}
+                  length={6}
                   onComplete={handlePinComplete}
                   error={error || undefined}
                   autoFocus
