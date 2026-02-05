@@ -111,8 +111,13 @@ export function applyTheme(themeId: string): void {
     root.style.setProperty(property, value);
   }
 
-  // Apply background gradient to body
-  document.body.style.background = theme.colors.backgroundGradient;
+  // Apply background gradient to body (only if blur is not enabled)
+  // When blur is enabled, CSS handles transparency
+  if (root.dataset.blur !== "true") {
+    document.body.style.background = theme.colors.backgroundGradient;
+  } else {
+    document.body.style.background = "transparent";
+  }
 
   // Set data attribute for CSS selectors
   root.dataset.theme = themeId;

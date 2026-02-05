@@ -177,10 +177,7 @@ export function SplitPane({
   if (node.type === "terminal") {
     return (
       <div
-        className={`
-          w-full h-full relative group
-          ${isFocused ? "ring-1 ring-blue/50 ring-inset" : ""}
-        `}
+        className="w-full h-full relative group"
         onClick={() => onFocusPane(node.id)}
       >
         {renderTerminal(node.id, node.ptySessionId, isFocused)}
@@ -202,10 +199,7 @@ export function SplitPane({
   if (node.type === "sftp") {
     return (
       <div
-        className={`
-          w-full h-full relative group
-          ${isFocused ? "ring-1 ring-blue/50 ring-inset" : ""}
-        `}
+        className="w-full h-full relative group"
         onClick={() => onFocusPane(node.id)}
       >
         {renderSftp ? renderSftp(node.id, node.sessionId, node.initialPath) : <div className="w-full h-full bg-base" />}
@@ -225,10 +219,7 @@ export function SplitPane({
   if (node.type === "pending") {
     return (
       <div
-        className={`
-          w-full h-full relative group
-          ${isFocused ? "ring-1 ring-blue/50 ring-inset" : ""}
-        `}
+        className="w-full h-full relative group"
         onClick={() => onFocusPane(node.id)}
       >
         {renderPending ? renderPending(node.id) : <div className="w-full h-full bg-base" />}

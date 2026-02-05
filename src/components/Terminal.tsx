@@ -82,6 +82,7 @@ function Terminal({ sessionId, type, onExit, isActive = true, appTheme = "dark",
       letterSpacing: 0,
       scrollback: terminalSettings.scrollback,
       allowProposedApi: true,
+      allowTransparency: true, // Always enabled for themes with transparency support
       theme: getTerminalTheme(appTheme),
     });
 

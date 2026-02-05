@@ -75,6 +75,20 @@ function App() {
     applyTheme(themeId);
   }, [appSettings.appearance?.theme]);
 
+  // Apply window blur effect (separate from theme)
+  useEffect(() => {
+    const effect = appSettings.appearance?.windowEffect ?? "none";
+    const hasBlur = effect !== "none";
+
+    // Set data attribute for CSS
+    document.documentElement.dataset.blur = hasBlur ? "true" : "false";
+
+    // Apply native window effect
+    invoke("set_window_effect", { effect }).catch((err) => {
+      console.warn(`Failed to apply window effect "${effect}":`, err);
+    });
+  }, [appSettings.appearance?.windowEffect]);
+
   // Sidebar state - un seul sidebar ouvert à la fois
   const [openSidebar, setOpenSidebar] = useState<"none" | "menu" | "tunnel">("none");
   const isSidebarOpen = openSidebar === "menu";

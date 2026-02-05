@@ -110,6 +110,16 @@ export default {
       languageTitle: "Language",
       // Language selection description
       languageDesc: "Choose your preferred language",
+      // Window effect group title
+      windowEffectTitle: "Window effect",
+      // Window effect description
+      windowEffectDesc: "Native transparency effect for the window",
+      // Effect options
+      effectNone: "None",
+      effectAcrylic: "Acrylic",
+      effectMica: "Mica",
+      // Note about window effect
+      windowEffectNote: "Acrylic adds blur to the background. Mica uses a tinted system backdrop. Windows 11 required for Mica.",
     },
 
     // --- Terminal section ---

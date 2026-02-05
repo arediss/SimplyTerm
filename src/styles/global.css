@@ -105,6 +105,29 @@
     opacity: 0.4 !important;
   }
 
+  /* Transparent terminal for blur effect - let native blur show through */
+  [data-blur="true"] .xterm,
+  [data-blur="true"] .xterm-viewport,
+  [data-blur="true"] .xterm-screen,
+  [data-blur="true"] .xterm-scrollable-element {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+
+  [data-blur="true"] .bg-terminal {
+    background: transparent !important;
+  }
+
+  /* Dark tint overlay for blur effect */
+  [data-blur="true"] #root::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 10, 15, 0.5);
+    pointer-events: none;
+    z-index: -1;
+  }
+
   select,
   select option {
     background: var(--color-surface-1);

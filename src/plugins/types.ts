@@ -342,6 +342,7 @@ export interface AppSettings {
   appearance: {
     theme: string;
     accentColor: string;
+    windowEffect?: string; // "none" | "acrylic" | "mica"
   };
   ui: {
     statusBarVisible: boolean;

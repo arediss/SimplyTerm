@@ -110,6 +110,16 @@ export default {
       languageTitle: "Langue",
       // Description de la sélection de langue
       languageDesc: "Choisissez votre langue préférée",
+      // Titre du groupe effet de fenêtre
+      windowEffectTitle: "Effet de fenêtre",
+      // Description de l'effet de fenêtre
+      windowEffectDesc: "Effet de transparence natif pour la fenêtre",
+      // Options d'effet
+      effectNone: "Aucun",
+      effectAcrylic: "Acrylique",
+      effectMica: "Mica",
+      // Note sur l'effet de fenêtre
+      windowEffectNote: "Acrylique ajoute un flou à l'arrière-plan. Mica utilise un fond système teinté. Windows 11 requis pour Mica.",
     },
 
     // --- Section Terminal ---

@@ -5,6 +5,13 @@
  * Each theme defines UI colors (CSS variables) and terminal colors (xterm).
  */
 
+/** Window effect types for native transparency */
+export type WindowEffect =
+  | "none"           // Solid background, no transparency
+  | "acrylic"        // Windows 10+ acrylic blur
+  | "mica"           // Windows 11 mica effect
+  | "vibrancy";      // macOS vibrancy
+
 /** Theme metadata */
 export interface ThemeMeta {
   /** Unique theme identifier (e.g., "dark", "light", "dracula") */
@@ -19,6 +26,8 @@ export interface ThemeMeta {
   variant: "dark" | "light";
   /** Preview colors for theme selector [background, surface, accent] */
   preview: [string, string, string];
+  /** Native window effect (transparency/blur) */
+  windowEffect?: WindowEffect;
 }
 
 /** UI color variables (applied as CSS custom properties) */

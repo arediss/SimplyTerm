@@ -620,6 +620,72 @@ struct SessionCredentials {
 }
 
 // ============================================================================
+// Window Effects Commands
+// ============================================================================
+
+#[tauri::command]
+async fn set_window_effect(app: AppHandle, effect: String) -> Result<(), String> {
+    use tauri::Manager;
+
+    let window = app.get_webview_window("main")
+        .ok_or_else(|| "Main window not found".to_string())?;
+
+    if effect == "none" {
+        // Clear effects by passing None
+        window.set_effects(None)
+            .map_err(|e| format!("Failed to clear effects: {}", e))?;
+        return Ok(());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use tauri::window::{Effect, EffectState};
+
+        let win_effect = match effect.as_str() {
+            "acrylic" => Effect::Acrylic,
+            "mica" => Effect::Mica,
+            "mica_dark" | "vibrancy" => Effect::MicaDark,
+            "tabbed" => Effect::Tabbed,
+            _ => return Err(format!("Unknown effect: {}", effect)),
+        };
+
+        window.set_effects(
+            tauri::window::EffectsBuilder::new()
+                .effect(win_effect)
+                .state(EffectState::Active)
+                .build()
+        ).map_err(|e| format!("Failed to set effect: {}", e))?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        use tauri::window::{Effect, EffectState};
+
+        let mac_effect = match effect.as_str() {
+            "vibrancy" | "acrylic" => Effect::HudWindow,
+            "mica" | "mica_dark" => Effect::UnderWindowBackground,
+            _ => return Err(format!("Unknown effect: {}", effect)),
+        };
+
+        window.set_effects(
+            tauri::window::EffectsBuilder::new()
+                .effect(mac_effect)
+                .state(EffectState::Active)
+                .build()
+        ).map_err(|e| format!("Failed to set effect: {}", e))?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // Linux doesn't support native blur effects
+        // The window will just be transparent, CSS overlay will provide the dark tint
+        // This is less pretty than Windows/macOS but still usable
+    }
+
+    Ok(())
+}
+
+// ============================================================================
 // Settings Commands
 // ============================================================================
 
@@ -1630,6 +1696,8 @@ pub fn run() {
             plugin_api_get_server_stats,
             // Plugin API v1 - HTTP Proxy
             plugin_api_http_request,
+            // Window Effects
+            set_window_effect,
             // Vault
             storage::vault::get_vault_status,
             storage::vault::create_vault,

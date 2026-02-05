@@ -23,6 +23,9 @@ pub struct TerminalSettings {
 pub struct AppearanceSettings {
     pub theme: String,
     pub accent_color: String,
+    /// Window blur effect: "none", "acrylic", "mica"
+    #[serde(default)]
+    pub window_effect: String,
 }
 
 /// UI settings
@@ -79,6 +82,7 @@ impl Default for AppSettings {
             appearance: AppearanceSettings {
                 theme: "dark".to_string(),
                 accent_color: "#7DA6E8".to_string(),
+                window_effect: "none".to_string(),
             },
             ui: UiSettings::default(),
             security: SecuritySettings::default(),
