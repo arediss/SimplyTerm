@@ -17,7 +17,6 @@ import {
   Clock,
   Folder,
   Tag,
-  type LucideIcon,
 } from "lucide-react";
 import { SavedSession } from "../types";
 import { pluginManager } from "../plugins";
@@ -368,7 +367,7 @@ interface PluginSidebarViewProps {
 
 function PluginSidebarView({ pluginId, view }: PluginSidebarViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const cleanupRef = useRef<(() => void) | void>();
+  const cleanupRef = useRef<(() => void) | void>(undefined);
 
   const renderContent = useCallback(() => {
     if (containerRef.current && view.render) {

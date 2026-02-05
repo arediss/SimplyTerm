@@ -18,7 +18,7 @@ interface PluginSettingsPanelProps {
  */
 export function PluginSettingsPanel({ pluginId, panel }: PluginSettingsPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const cleanupRef = useRef<(() => void) | void>();
+  const cleanupRef = useRef<(() => void) | void>(undefined);
 
   // Render the panel content
   const renderContent = useCallback(() => {

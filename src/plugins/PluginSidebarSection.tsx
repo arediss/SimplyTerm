@@ -20,7 +20,7 @@ interface PluginSidebarSectionProps {
  */
 function PluginSidebarSection({ pluginId, section }: PluginSidebarSectionProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const cleanupRef = useRef<(() => void) | void>();
+  const cleanupRef = useRef<(() => void) | void>(undefined);
   const [isCollapsed, setIsCollapsed] = useState(section.config.defaultCollapsed ?? false);
 
   // Render the section content

@@ -471,8 +471,6 @@ function ConnectionsSettings({
 }) {
   const { t } = useTranslation();
   const [confirmClear, setConfirmClear] = useState(false);
-  const vault = useVault();
-
   const handleClearAll = () => {
     if (confirmClear) {
       onClearAllSessions();

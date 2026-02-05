@@ -545,7 +545,7 @@ export class PluginManager {
   /**
    * Get context menu items for a specific context type
    */
-  getContextMenuItems(contextType: string): { pluginId: string; item: ContextMenuItemConfig }[] {
+  getContextMenuItems(_contextType: string): { pluginId: string; item: ContextMenuItemConfig }[] {
     return Array.from(this.registeredContextMenuItems.values());
   }
 

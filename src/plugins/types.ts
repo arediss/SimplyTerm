@@ -4,10 +4,11 @@
  * API v1 - Unified types for backend and frontend plugin system
  */
 
-import type { SidebarSectionRegistration, SidebarViewRegistration, SettingsPanelRegistration, ContextMenuItemConfig, ContextMenuContext, StatusBarItemConfig, StatusBarItemHandle } from './extensionTypes';
+import type { SidebarSectionRegistration, SidebarViewRegistration, SettingsPanelRegistration, ContextMenuItemConfig, StatusBarItemConfig, StatusBarItemHandle } from './extensionTypes';
 
 // Re-export extension types
-export type { SidebarSectionRegistration, SidebarViewRegistration, SettingsPanelRegistration, ContextMenuItemConfig, ContextMenuContext, StatusBarItemConfig, StatusBarItemHandle } from './extensionTypes';
+export type { SidebarSectionRegistration, SidebarViewRegistration, SettingsPanelRegistration, ContextMenuItemConfig, StatusBarItemConfig, StatusBarItemHandle } from './extensionTypes';
+export type { ContextMenuContext } from './extensionTypes';
 
 // ============================================================================
 // Manifest Types (from backend)
@@ -258,7 +259,7 @@ export interface FileEntry {
 // ============================================================================
 
 export interface PluginModule {
-  init: (pluginId: string) => void | Promise<void>;
+  init: (api: SimplyTermPluginAPI) => void | Promise<void>;
   cleanup?: () => void;
 }
 
