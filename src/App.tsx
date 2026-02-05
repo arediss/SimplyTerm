@@ -13,6 +13,7 @@ import { CommandPalette, useCommandPalette, CommandHandlers, CommandContext } fr
 import { StatusBar } from "./components/StatusBar";
 import { PluginHost, pluginManager, type SessionInfo, type ModalConfig, type NotificationType, type PromptConfig } from "./plugins";
 import PromptModal from "./components/PromptModal";
+import PluginModal from "./components/PluginModal";
 import {
   SplitPane,
   type PaneNode,
@@ -118,6 +119,12 @@ function App() {
   // Prompt modal state (for plugins)
   const [promptModal, setPromptModal] = useState<{
     config: PromptConfig;
+    resolve: (value: string | null) => void;
+  } | null>(null);
+
+  // Plugin modal state
+  const [pluginModal, setPluginModal] = useState<{
+    config: ModalConfig;
     resolve: (value: string | null) => void;
   } | null>(null);
 
@@ -1375,10 +1382,32 @@ function App() {
     setTimeout(() => setNotification(null), 3000);
   }, []);
 
-  const handleShowModal = useCallback(async (_config: ModalConfig): Promise<unknown> => {
-    // TODO: Implement plugin modal support
-    return null;
+  const handleShowModal = useCallback((config: ModalConfig): Promise<unknown> => {
+    return new Promise((resolve) => {
+      setPluginModal({ config, resolve });
+    });
   }, []);
+
+  const handleModalButtonClick = useCallback(async (index: number) => {
+    if (pluginModal) {
+      const buttons = pluginModal.config.buttons && pluginModal.config.buttons.length > 0
+        ? pluginModal.config.buttons
+        : [{ label: "Close", variant: "secondary" as const }];
+      const button = buttons[index];
+      if (button?.onClick) {
+        await button.onClick();
+      }
+      pluginModal.resolve(button?.label ?? null);
+      setPluginModal(null);
+    }
+  }, [pluginModal]);
+
+  const handleModalClose = useCallback(() => {
+    if (pluginModal) {
+      pluginModal.resolve(null);
+      setPluginModal(null);
+    }
+  }, [pluginModal]);
 
   const handleShowPrompt = useCallback((config: PromptConfig): Promise<string | null> => {
     return new Promise((resolve) => {
@@ -1695,6 +1724,14 @@ function App() {
         config={promptModal?.config || { title: '' }}
         onConfirm={handlePromptConfirm}
         onCancel={handlePromptCancel}
+      />
+
+      {/* Plugin Modal */}
+      <PluginModal
+        isOpen={!!pluginModal}
+        config={pluginModal?.config || { title: '', content: '' }}
+        onButtonClick={handleModalButtonClick}
+        onClose={handleModalClose}
       />
 
       {/* Vault Setup Modal */}

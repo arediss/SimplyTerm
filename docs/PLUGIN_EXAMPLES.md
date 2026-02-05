@@ -20,6 +20,7 @@ Copy these examples to your plugins directory to test them.
 4. [Connection Logger](#4-connection-logger) - Log connection events
 5. [Vault Secrets Manager](#5-vault-secrets-manager) - Store encrypted secrets
 6. [Auto Organizer](#6-auto-organizer) - Organize sessions into folders
+7. [Confirmation Dialog](#7-confirmation-dialog) - Modal dialogs with button variants
 
 ---
 
@@ -755,6 +756,85 @@ window.SimplyTermPlugins['com.example.auto-organizer'] = {
   organize,
   addRule,
   removeRule
+};
+```
+
+---
+
+## 7. Confirmation Dialog
+
+Use `showModal()` to ask the user for confirmation before performing actions.
+
+### manifest.json
+```json
+{
+  "id": "com.example.confirm-dialog",
+  "name": "Confirm Dialog Demo",
+  "version": "1.0.0",
+  "api_version": "1.0.0",
+  "author": "Developer",
+  "description": "Demonstrates modal dialogs with button variants",
+  "main": "index.js",
+  "permissions": ["sessions_read", "ui_modals"]
+}
+```
+
+### index.js
+```javascript
+async function init(pluginId, api) {
+  console.log('[ConfirmDialog] Ready');
+}
+
+async function deleteAllSessions(pluginId, api) {
+  // Ask for confirmation with a danger modal
+  const result = await api.showModal({
+    title: 'Delete All Sessions',
+    content: 'This will permanently delete all your saved sessions. This action cannot be undone.',
+    buttons: [
+      { label: 'Cancel', variant: 'secondary' },
+      { label: 'Delete All', variant: 'danger' }
+    ]
+  });
+
+  if (result === 'Delete All') {
+    console.log('[ConfirmDialog] User confirmed deletion');
+    // Perform the deletion...
+  } else {
+    console.log('[ConfirmDialog] User cancelled (result:', result, ')');
+  }
+}
+
+async function showInfo(pluginId, api) {
+  // Simple informational modal (no buttons = default "Close" button)
+  await api.showModal({
+    title: 'About This Plugin',
+    content: 'Confirm Dialog Demo v1.0.0\nA simple example of using modal dialogs.'
+  });
+}
+
+async function showChoices(pluginId, api) {
+  // Modal with multiple actions
+  const result = await api.showModal({
+    title: 'Export Format',
+    content: 'Choose the format for exporting your sessions.',
+    buttons: [
+      { label: 'Cancel', variant: 'secondary' },
+      { label: 'CSV', variant: 'secondary' },
+      { label: 'JSON', variant: 'primary' }
+    ]
+  });
+
+  if (result && result !== 'Cancel') {
+    console.log('[ConfirmDialog] Exporting as:', result);
+  }
+}
+
+window.SimplyTermPlugins = window.SimplyTermPlugins || {};
+window.SimplyTermPlugins['com.example.confirm-dialog'] = {
+  init,
+  deleteAllSessions,
+  showInfo,
+  showChoices
 };
 ```
 

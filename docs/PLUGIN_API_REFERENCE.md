@@ -577,16 +577,46 @@ api.showNotification('Hello from my plugin!', 'success');
 
 #### Show Modal
 
+Display a modal dialog and wait for user interaction.
+
 ```typescript
 const result = await api.showModal({
   title: 'Confirm Action',
-  content: 'Are you sure?',
+  content: 'Are you sure you want to proceed?',
   buttons: [
     { label: 'Cancel', variant: 'secondary' },
+    { label: 'Delete', variant: 'danger' },
     { label: 'Confirm', variant: 'primary' }
   ]
 });
+// result: string | null
+// - Click button → returns the button's label (e.g. "Confirm")
+// - Escape / click overlay → returns null
 ```
+
+**Parameters:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `title` | string | Modal header title |
+| `content` | string \| HTMLElement | Modal body content |
+| `buttons` | ModalButton[] | Optional. Defaults to a single "Close" button |
+
+**ModalButton:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `label` | string | Button text (also used as the resolve value) |
+| `variant` | string | `'primary'` \| `'secondary'` \| `'danger'`. Default: `'secondary'` |
+| `onClick` | function | Optional async callback executed before resolving |
+
+**Button variants:**
+
+| Variant | Style |
+|---------|-------|
+| `primary` | Accent background, dark text |
+| `secondary` | Subtle background, muted text |
+| `danger` | Red-tinted background, red text |
 
 ---
 
