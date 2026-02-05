@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import Modal from "./Modal";
 import { SshConnectionConfig } from "./ConnectionForm";
 import { ConnectionType } from "./ConnectionTypeSelector";
-import { TelnetConnectionConfig, SerialConnectionConfig, SerialPortInfo, BastionProfileInfo } from "../types";
+import { TelnetConnectionConfig, SerialConnectionConfig, SerialPortInfo } from "../types";
 import {
   Terminal,
   Wifi,
@@ -66,10 +66,6 @@ export function NewConnectionModal({
   const [sshPassword, setSshPassword] = useState("");
   const [sshKeyPath, setSshKeyPath] = useState("");
   const [sshKeyPassphrase, setSshKeyPassphrase] = useState("");
-  // Jump Host (Bastion) - now uses saved profiles
-  const [selectedBastionId, setSelectedBastionId] = useState<string>("");
-  const [bastions, setBastions] = useState<BastionProfileInfo[]>([]);
-  const [bastionsLoading, setBastionsLoading] = useState(false);
 
   // Telnet state
   const [telnetName, setTelnetName] = useState("");
@@ -87,25 +83,6 @@ export function NewConnectionModal({
   const [availablePorts, setAvailablePorts] = useState<SerialPortInfo[]>([]);
   const [isLoadingPorts, setIsLoadingPorts] = useState(false);
 
-  // Load bastions when modal opens
-  useEffect(() => {
-    if (isOpen && connectionType === "ssh") {
-      loadBastions();
-    }
-  }, [isOpen, connectionType]);
-
-  const loadBastions = async () => {
-    setBastionsLoading(true);
-    try {
-      const list = await invoke<BastionProfileInfo[]>("list_bastions");
-      setBastions(list);
-    } catch (err) {
-      // Vault might be locked, that's OK
-      setBastions([]);
-    } finally {
-      setBastionsLoading(false);
-    }
-  };
 
   // Initialize from props
   useEffect(() => {
@@ -116,7 +93,6 @@ export function NewConnectionModal({
       setSshUsername(initialSshConfig.username || "");
       setSshAuthType(initialSshConfig.authType || "password");
       setSshKeyPath(initialSshConfig.keyPath || "");
-      // Note: Jump host is now selected from saved bastions, not individual fields
     }
   }, [initialSshConfig]);
 
@@ -172,49 +148,6 @@ export function NewConnectionModal({
 
     switch (connectionType) {
       case "ssh":
-        // Fetch bastion credentials if a bastion is selected
-        let bastionConfig: {
-          useJumpHost: boolean;
-          jumpHost?: string;
-          jumpPort?: number;
-          jumpUsername?: string;
-          jumpAuthType?: "password" | "key";
-          jumpPassword?: string;
-          jumpKeyPath?: string;
-          jumpKeyPassphrase?: string;
-        } = { useJumpHost: false };
-
-        if (selectedBastionId) {
-          try {
-            const bastion = await invoke<{
-              id: string;
-              name: string;
-              host: string;
-              port: number;
-              username: string;
-              auth_type: "password" | "key";
-              password?: string;
-              key_path?: string;
-              key_passphrase?: string;
-            } | null>("get_bastion_credentials", { id: selectedBastionId });
-
-            if (bastion) {
-              bastionConfig = {
-                useJumpHost: true,
-                jumpHost: bastion.host,
-                jumpPort: bastion.port,
-                jumpUsername: bastion.username,
-                jumpAuthType: bastion.auth_type,
-                jumpPassword: bastion.password,
-                jumpKeyPath: bastion.key_path,
-                jumpKeyPassphrase: bastion.key_passphrase,
-              };
-            }
-          } catch (err) {
-            console.error("Failed to get bastion credentials:", err);
-          }
-        }
-
         onSshConnect({
           name: sshName || `${sshUsername}@${sshHost}`,
           host: sshHost,
@@ -224,7 +157,6 @@ export function NewConnectionModal({
           password: sshAuthType === "password" ? sshPassword : undefined,
           keyPath: sshAuthType === "key" ? sshKeyPath : undefined,
           keyPassphrase: sshAuthType === "key" ? sshKeyPassphrase : undefined,
-          ...bastionConfig,
         });
         break;
       case "telnet":
@@ -304,10 +236,6 @@ export function NewConnectionModal({
                 setKeyPath={setSshKeyPath}
                 keyPassphrase={sshKeyPassphrase}
                 setKeyPassphrase={setSshKeyPassphrase}
-                selectedBastionId={selectedBastionId}
-                setSelectedBastionId={setSelectedBastionId}
-                bastions={bastions}
-                bastionsLoading={bastionsLoading}
               />
             )}
 
@@ -468,11 +396,6 @@ interface SshFormContentProps {
   setKeyPath: (v: string) => void;
   keyPassphrase: string;
   setKeyPassphrase: (v: string) => void;
-  // Bastion selection (simplified)
-  selectedBastionId: string;
-  setSelectedBastionId: (v: string) => void;
-  bastions: BastionProfileInfo[];
-  bastionsLoading: boolean;
 }
 
 function SshFormContent(props: SshFormContentProps) {
@@ -582,40 +505,6 @@ function SshFormContent(props: SshFormContentProps) {
         </div>
       )}
 
-      {/* Jump Host - Simple Dropdown */}
-      <div className="border-t border-surface-0/50 pt-3">
-        <FormField label={t("connection.jumpHost.title")} icon={<Server size={12} />}>
-          <select
-            value={props.selectedBastionId}
-            onChange={(e) => props.setSelectedBastionId(e.target.value)}
-            className="input-field"
-            disabled={props.bastionsLoading}
-          >
-            <option value="">{t("connection.jumpHost.none")}</option>
-            {props.bastions.map((bastion) => (
-              <option key={bastion.id} value={bastion.id}>
-                {bastion.name} ({bastion.username}@{bastion.host})
-              </option>
-            ))}
-          </select>
-        </FormField>
-        {props.selectedBastionId && props.bastions.find((b) => b.id === props.selectedBastionId) && (
-          <p className="mt-1 text-xs text-text-muted">
-            {props.bastions.find((b) => b.id === props.selectedBastionId)?.authType === "password" ? (
-              <Lock size={10} className="inline mr-1" />
-            ) : (
-              <Key size={10} className="inline mr-1" />
-            )}
-            {props.bastions.find((b) => b.id === props.selectedBastionId)?.host}:
-            {props.bastions.find((b) => b.id === props.selectedBastionId)?.port}
-          </p>
-        )}
-        {props.bastions.length === 0 && !props.bastionsLoading && (
-          <p className="mt-1 text-xs text-text-muted">
-            {t("connection.jumpHost.configureInSettings")}
-          </p>
-        )}
-      </div>
     </div>
   );
 }
