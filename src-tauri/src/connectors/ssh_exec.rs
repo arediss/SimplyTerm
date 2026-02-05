@@ -12,7 +12,7 @@ use russh::ChannelMsg;
 use std::sync::Arc;
 use async_trait::async_trait;
 
-use super::{SshAuth, SshConfig};
+use super::{SshAuth, SshConfig, load_ssh_key};
 use super::known_hosts::{verify_host_key, HostKeyVerification};
 
 /// Handler for exec connections with host key verification
@@ -75,8 +75,7 @@ pub async fn ssh_exec(config: &SshConfig, command: &str) -> Result<String, Strin
             .await
             .map_err(|e| format!("Authentication failed: {}", e))?,
         SshAuth::KeyFile { path, passphrase } => {
-            let key = russh_keys::load_secret_key(path, passphrase.as_deref())
-                .map_err(|e| format!("Failed to load key: {}", e))?;
+            let key = load_ssh_key(path, passphrase.as_deref())?;
             session
                 .authenticate_publickey(&config.username, Arc::new(key))
                 .await

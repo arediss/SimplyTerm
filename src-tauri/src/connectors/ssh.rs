@@ -31,6 +31,29 @@ pub struct SshConfig {
     pub jump_host: Option<JumpHostConfig>,
 }
 
+/// Load an SSH private key, handling both encrypted and unencrypted keys.
+/// For unencrypted keys, russh_keys requires `None` as passphrase.
+/// For encrypted keys, we need the actual passphrase.
+/// This function tries both approaches to handle any key type.
+pub fn load_ssh_key(path: &str, passphrase: Option<&str>) -> Result<russh_keys::key::KeyPair, String> {
+    // Normalize empty string to None
+    let passphrase = passphrase.filter(|p| !p.is_empty());
+
+    // First try without passphrase (works for unencrypted keys)
+    match russh_keys::load_secret_key(path, None) {
+        Ok(k) => Ok(k),
+        Err(e) => {
+            // If that failed and we have a passphrase, try with it
+            if let Some(pass) = passphrase {
+                russh_keys::load_secret_key(path, Some(pass))
+                    .map_err(|e2| format!("Failed to load key: {}", e2))
+            } else {
+                Err(format!("Failed to load key: {}", e))
+            }
+        }
+    }
+}
+
 /// SSH authentication method
 #[derive(Debug, Clone)]
 pub enum SshAuth {
@@ -264,8 +287,7 @@ async fn authenticate_session<H: Handler + Send>(
             .await
             .map_err(|e| format!("Authentication failed: {}", e))?,
         SshAuth::KeyFile { path, passphrase } => {
-            let key = russh_keys::load_secret_key(path, passphrase.as_deref())
-                .map_err(|e| format!("Failed to load key: {}", e))?;
+            let key = load_ssh_key(path, passphrase.as_deref())?;
             session
                 .authenticate_publickey(username, Arc::new(key))
                 .await

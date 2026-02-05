@@ -12,7 +12,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::oneshot;
 
 use super::manager::{TunnelHandle, TunnelInfo, TunnelManager, TunnelStatus, TunnelType};
-use crate::connectors::{SshAuth, SshConfig};
+use crate::connectors::{SshAuth, SshConfig, load_ssh_key};
 use crate::connectors::known_hosts::{verify_host_key, HostKeyVerification};
 
 /// Create a new SSH session for the tunnel (separate from the terminal session)
@@ -38,8 +38,7 @@ async fn create_ssh_session(config: &SshConfig) -> Result<Handle<TunnelHandler>,
             .await
             .map_err(|e| format!("Password auth failed: {}", e))?,
         SshAuth::KeyFile { path, passphrase } => {
-            let key = russh_keys::load_secret_key(path, passphrase.as_deref())
-                .map_err(|e| format!("Failed to load key: {}", e))?;
+            let key = load_ssh_key(path, passphrase.as_deref())?;
             session
                 .authenticate_publickey(&config.username, Arc::new(key))
                 .await

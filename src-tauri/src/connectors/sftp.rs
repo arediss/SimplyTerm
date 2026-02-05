@@ -8,7 +8,7 @@ use russh_sftp::client::SftpSession;
 use std::sync::Arc;
 use async_trait::async_trait;
 
-use super::{SshAuth, SshConfig};
+use super::{SshAuth, SshConfig, load_ssh_key};
 
 /// Simple handler for SFTP connections
 struct SftpHandler;
@@ -55,8 +55,7 @@ pub async fn sftp_list_dir(config: &SshConfig, path: &str) -> Result<Vec<FileEnt
             .await
             .map_err(|e| format!("Authentication failed: {}", e))?,
         SshAuth::KeyFile { path, passphrase } => {
-            let key = russh_keys::load_secret_key(path, passphrase.as_deref())
-                .map_err(|e| format!("Failed to load key: {}", e))?;
+            let key = load_ssh_key(path, passphrase.as_deref())?;
             session
                 .authenticate_publickey(&config.username, Arc::new(key))
                 .await
@@ -166,8 +165,7 @@ pub async fn sftp_read_file(config: &SshConfig, path: &str) -> Result<Vec<u8>, S
             .await
             .map_err(|e| format!("Authentication failed: {}", e))?,
         SshAuth::KeyFile { path, passphrase } => {
-            let key = russh_keys::load_secret_key(path, passphrase.as_deref())
-                .map_err(|e| format!("Failed to load key: {}", e))?;
+            let key = load_ssh_key(path, passphrase.as_deref())?;
             session
                 .authenticate_publickey(&config.username, Arc::new(key))
                 .await
@@ -219,8 +217,7 @@ pub async fn sftp_write_file(config: &SshConfig, path: &str, data: Vec<u8>) -> R
             .await
             .map_err(|e| format!("Authentication failed: {}", e))?,
         SshAuth::KeyFile { path, passphrase } => {
-            let key = russh_keys::load_secret_key(path, passphrase.as_deref())
-                .map_err(|e| format!("Failed to load key: {}", e))?;
+            let key = load_ssh_key(path, passphrase.as_deref())?;
             session
                 .authenticate_publickey(&config.username, Arc::new(key))
                 .await
@@ -271,8 +268,7 @@ pub async fn sftp_delete(config: &SshConfig, path: &str, is_dir: bool) -> Result
             .await
             .map_err(|e| format!("Authentication failed: {}", e))?,
         SshAuth::KeyFile { path, passphrase } => {
-            let key = russh_keys::load_secret_key(path, passphrase.as_deref())
-                .map_err(|e| format!("Failed to load key: {}", e))?;
+            let key = load_ssh_key(path, passphrase.as_deref())?;
             session
                 .authenticate_publickey(&config.username, Arc::new(key))
                 .await
@@ -328,8 +324,7 @@ pub async fn sftp_rename(config: &SshConfig, old_path: &str, new_path: &str) -> 
             .await
             .map_err(|e| format!("Authentication failed: {}", e))?,
         SshAuth::KeyFile { path, passphrase } => {
-            let key = russh_keys::load_secret_key(path, passphrase.as_deref())
-                .map_err(|e| format!("Failed to load key: {}", e))?;
+            let key = load_ssh_key(path, passphrase.as_deref())?;
             session
                 .authenticate_publickey(&config.username, Arc::new(key))
                 .await
@@ -379,8 +374,7 @@ pub async fn sftp_mkdir(config: &SshConfig, path: &str) -> Result<(), String> {
             .await
             .map_err(|e| format!("Authentication failed: {}", e))?,
         SshAuth::KeyFile { path, passphrase } => {
-            let key = russh_keys::load_secret_key(path, passphrase.as_deref())
-                .map_err(|e| format!("Failed to load key: {}", e))?;
+            let key = load_ssh_key(path, passphrase.as_deref())?;
             session
                 .authenticate_publickey(&config.username, Arc::new(key))
                 .await
