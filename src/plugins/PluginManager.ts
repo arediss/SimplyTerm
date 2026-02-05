@@ -23,7 +23,10 @@ import type {
   SettingsPanelRegistration,
   ContextMenuItemConfig,
   PromptConfig,
+  StatusBarItemConfig,
+  StatusBarItemHandle,
 } from './types';
+import type { StatusBarItem } from '../components/StatusBar';
 
 // Declare the global window property for plugins
 declare global {
@@ -50,6 +53,10 @@ export class PluginManager {
   public registeredSidebarSections: Map<string, { pluginId: string; section: SidebarSectionRegistration }> = new Map(); // deprecated
   public registeredSettingsPanels: Map<string, { pluginId: string; panel: SettingsPanelRegistration }> = new Map();
   public registeredContextMenuItems: Map<string, { pluginId: string; item: ContextMenuItemConfig }> = new Map();
+
+  // Status bar items
+  public registeredStatusBarItems: Map<string, { pluginId: string; config: StatusBarItemConfig; visible: boolean }> = new Map();
+  public onStatusBarItemsChanged: (items: StatusBarItem[]) => void = () => {};
 
   /**
    * Subscribe to plugin events
@@ -150,6 +157,7 @@ export class PluginManager {
         onSettingsPanelUnregister: this.handleSettingsPanelUnregister.bind(this),
         onContextMenuItemRegister: this.handleContextMenuItemRegister.bind(this),
         onContextMenuItemUnregister: this.handleContextMenuItemUnregister.bind(this),
+        onAddStatusBarItem: this.handleAddStatusBarItem.bind(this),
         getSessions: this.getSessions.bind(this),
         getActiveSession: this.getActiveSession.bind(this),
       });
@@ -307,6 +315,18 @@ export class PluginManager {
       this.registeredContextMenuItems.delete(itemId);
     });
 
+    // Remove registered status bar items for this plugin
+    let statusBarChanged = false;
+    for (const [itemId, entry] of this.registeredStatusBarItems) {
+      if (entry.pluginId === id) {
+        this.registeredStatusBarItems.delete(itemId);
+        statusBarChanged = true;
+      }
+    }
+    if (statusBarChanged) {
+      this.notifyStatusBarChanged();
+    }
+
     // Remove from loaded plugins
     this.plugins.delete(id);
 
@@ -456,6 +476,66 @@ export class PluginManager {
       this.registeredContextMenuItems.delete(itemId);
       this.emit({ type: 'context-menu:unregister', pluginId, itemId });
     }
+  }
+
+  // Status bar item handler
+  handleAddStatusBarItem(pluginId: string, config: StatusBarItemConfig): StatusBarItemHandle {
+    const itemId = `${pluginId}:${config.id}`;
+    this.registeredStatusBarItems.set(itemId, { pluginId, config, visible: true });
+    this.notifyStatusBarChanged();
+    this.emit({ type: 'statusbar:changed' });
+
+    return {
+      setText: (text: string) => {
+        const entry = this.registeredStatusBarItems.get(itemId);
+        if (entry) {
+          entry.config = { ...entry.config, text };
+          this.notifyStatusBarChanged();
+        }
+      },
+      setIcon: (icon: string) => {
+        const entry = this.registeredStatusBarItems.get(itemId);
+        if (entry) {
+          entry.config = { ...entry.config, icon };
+          this.notifyStatusBarChanged();
+        }
+      },
+      setTooltip: (tooltip: string) => {
+        const entry = this.registeredStatusBarItems.get(itemId);
+        if (entry) {
+          entry.config = { ...entry.config, tooltip };
+          this.notifyStatusBarChanged();
+        }
+      },
+      setVisible: (visible: boolean) => {
+        const entry = this.registeredStatusBarItems.get(itemId);
+        if (entry) {
+          entry.visible = visible;
+          this.notifyStatusBarChanged();
+        }
+      },
+      dispose: () => {
+        this.registeredStatusBarItems.delete(itemId);
+        this.notifyStatusBarChanged();
+        this.emit({ type: 'statusbar:changed' });
+      },
+    };
+  }
+
+  private notifyStatusBarChanged() {
+    const items: StatusBarItem[] = [];
+    for (const [itemId, entry] of this.registeredStatusBarItems) {
+      if (!entry.visible) continue;
+      items.push({
+        id: itemId,
+        content: entry.config.text || '',
+        position: (entry.config.position === 'left' || entry.config.position === 'right') ? entry.config.position : 'left',
+        priority: entry.config.order || 0,
+        tooltip: entry.config.tooltip,
+        onClick: entry.config.onClick,
+      });
+    }
+    this.onStatusBarItemsChanged(items);
   }
 
   /**

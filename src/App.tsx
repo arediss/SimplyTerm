@@ -10,7 +10,7 @@ import { SshConnectionConfig } from "./components/ConnectionForm";
 import NewConnectionModal from "./components/NewConnectionModal";
 import SettingsModal from "./components/SettingsModal";
 import { CommandPalette, useCommandPalette, CommandHandlers, CommandContext } from "./components/CommandPalette";
-import { StatusBar } from "./components/StatusBar";
+import { StatusBar, type StatusBarItem } from "./components/StatusBar";
 import { PluginHost, pluginManager, type SessionInfo, type ModalConfig, type NotificationType, type PromptConfig } from "./plugins";
 import PromptModal from "./components/PromptModal";
 import PluginModal from "./components/PluginModal";
@@ -1456,8 +1456,12 @@ function App() {
     };
   }, [activeTab]);
 
-  // Status bar visibility (hidden by default, can be enabled for plugins)
-  const statusBarVisible = appSettings.ui?.statusBarVisible ?? false;
+  // Status bar
+  const [statusBarItems, setStatusBarItems] = useState<StatusBarItem[]>([]);
+  const handleStatusBarItemsChanged = useCallback((items: StatusBarItem[]) => {
+    setStatusBarItems(items);
+  }, []);
+  const statusBarVisible = (appSettings.ui?.statusBarVisible ?? false) || statusBarItems.length > 0;
 
   return (
     <div className="relative h-screen bg-terminal overflow-hidden">
@@ -1700,6 +1704,7 @@ function App() {
         onShowPrompt={handleShowPrompt}
         getSessions={getSessions}
         getActiveSession={getActiveSessionInfo}
+        onStatusBarItemsChanged={handleStatusBarItemsChanged}
       />
 
       {/* Plugin Notification Toast */}
@@ -1756,7 +1761,7 @@ function App() {
       />
 
       {/* Status Bar (hidden by default, for plugin widgets) */}
-      <StatusBar visible={statusBarVisible} />
+      <StatusBar visible={statusBarVisible} items={statusBarItems} />
     </div>
   );
 }

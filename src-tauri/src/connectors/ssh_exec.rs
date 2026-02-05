@@ -121,8 +121,7 @@ pub async fn ssh_exec(config: &SshConfig, command: &str) -> Result<String, Strin
     String::from_utf8(output).map_err(|e| format!("Invalid UTF-8: {}", e))
 }
 
-/// Server statistics (reserved for future plugin use)
-#[allow(dead_code)]
+/// Server statistics exposed to plugins
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub struct ServerStats {
     pub cpu_percent: f32,
@@ -132,19 +131,25 @@ pub struct ServerStats {
     pub disk_percent: f32,
     pub load_avg: String,
     pub uptime: String,
+    pub net_rx_bytes: u64,
+    pub net_tx_bytes: u64,
 }
 
-/// Fetch server stats via SSH (reserved for future plugin use)
-#[allow(dead_code)]
+/// Fetch server stats via SSH (used by ssh-monitor plugin)
 pub async fn get_server_stats(config: &SshConfig) -> Result<ServerStats, String> {
     // Combined command to get all stats at once
+    // CPU uses vmstat with a 1-second sample for accurate real-time usage
+    // (top -bn1 only gives since-boot averages which are near 0%)
     let command = r#"
-        echo "CPU:$(top -bn1 2>/dev/null | grep 'Cpu(s)' | awk '{print $2}' || echo '0')"
+        CPU_VAL=$(vmstat 1 2 2>/dev/null | tail -1 | awk '{print 100-$15}')
+        echo "CPU:${CPU_VAL:-0}"
         echo "MEM_USED:$(free -m 2>/dev/null | awk 'NR==2{print $3}' || echo '0')"
         echo "MEM_TOTAL:$(free -m 2>/dev/null | awk 'NR==2{print $2}' || echo '1')"
         echo "DISK:$(df -h / 2>/dev/null | awk 'NR==2{print $5}' | tr -d '%' || echo '0')"
         echo "LOAD:$(cat /proc/loadavg 2>/dev/null | awk '{print $1, $2, $3}' || echo '0')"
         echo "UPTIME:$(uptime -p 2>/dev/null || uptime | sed 's/.*up //' | sed 's/,.*//' || echo 'unknown')"
+        echo "NET_RX:$(cat /sys/class/net/$(ip route 2>/dev/null | grep default | awk '{print $5}' | head -1)/statistics/rx_bytes 2>/dev/null || echo '0')"
+        echo "NET_TX:$(cat /sys/class/net/$(ip route 2>/dev/null | grep default | awk '{print $5}' | head -1)/statistics/tx_bytes 2>/dev/null || echo '0')"
     "#;
 
     let output = ssh_exec(config, command).await?;
@@ -165,6 +170,10 @@ pub async fn get_server_stats(config: &SshConfig) -> Result<ServerStats, String>
             stats.load_avg = val.trim().to_string();
         } else if let Some(val) = line.strip_prefix("UPTIME:") {
             stats.uptime = val.trim().to_string();
+        } else if let Some(val) = line.strip_prefix("NET_RX:") {
+            stats.net_rx_bytes = val.trim().parse().unwrap_or(0);
+        } else if let Some(val) = line.strip_prefix("NET_TX:") {
+            stats.net_tx_bytes = val.trim().parse().unwrap_or(0);
         }
     }
 

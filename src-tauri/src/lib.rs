@@ -15,7 +15,7 @@ mod storage;
 mod tunnels;
 
 use connectors::{
-    connect_ssh, create_local_session, ssh_exec::ssh_exec, SshAuth, SshConfig, FileEntry, sftp_read_file,
+    connect_ssh, create_local_session, ssh_exec::{ssh_exec, get_server_stats, ServerStats}, SshAuth, SshConfig, FileEntry, sftp_read_file,
     check_host_key_only, HostKeyCheckResult, accept_pending_key, accept_and_update_pending_key, remove_pending_key,
     connect_telnet, connect_serial, list_serial_ports, SerialConfig, SerialPortInfo,
 };
@@ -1346,6 +1346,35 @@ fn plugin_api_vault_delete(
 }
 
 // ============================================================================
+// Plugin API v1 - Server Stats
+// ============================================================================
+
+#[tauri::command]
+async fn plugin_api_get_server_stats(
+    app: AppHandle,
+    plugin_id: String,
+    session_id: String,
+) -> Result<ServerStats, String> {
+    use plugins::manifest::Permission;
+
+    let state = app.state::<AppState>();
+    let plugin = state.plugin_manager.get_plugin(&plugin_id)
+        .map_err(|e| e.message)?
+        .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+
+    if !plugin.granted_permissions.has(Permission::SessionsConnect) {
+        return Err("Permission denied: sessions_connect required".to_string());
+    }
+
+    let config = state
+        .session_manager
+        .get_ssh_config(&session_id)
+        .ok_or_else(|| "SSH session not found or not an SSH session".to_string())?;
+
+    get_server_stats(&config).await
+}
+
+// ============================================================================
 // Point d'entrée
 // ============================================================================
 
@@ -1468,6 +1497,8 @@ pub fn run() {
             plugin_api_vault_store,
             plugin_api_vault_read,
             plugin_api_vault_delete,
+            // Plugin API v1 - Server Stats
+            plugin_api_get_server_stats,
             // Vault
             storage::vault::get_vault_status,
             storage::vault::create_vault,
