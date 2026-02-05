@@ -295,24 +295,28 @@ export class PluginManager {
       this.registeredCommands.delete(commandId);
     });
 
-    // Remove registered sidebar views
+    // Remove registered sidebar views (emit events so UI reacts)
     plugin.sidebarViews.forEach((_, viewId) => {
       this.registeredSidebarViews.delete(viewId);
+      this.emit({ type: 'sidebar-view:unregister', pluginId: id, viewId });
     });
 
     // Remove registered sidebar sections (deprecated)
     plugin.sidebarSections.forEach((_, sectionId) => {
       this.registeredSidebarSections.delete(sectionId);
+      this.emit({ type: 'sidebar:unregister', pluginId: id, sectionId });
     });
 
-    // Remove registered settings panels
+    // Remove registered settings panels (emit events so UI reacts)
     plugin.settingsPanels.forEach((_, panelId) => {
       this.registeredSettingsPanels.delete(panelId);
+      this.emit({ type: 'settings:unregister', pluginId: id, panelId });
     });
 
-    // Remove registered context menu items
+    // Remove registered context menu items (emit events so UI reacts)
     plugin.contextMenuItems.forEach((_, itemId) => {
       this.registeredContextMenuItems.delete(itemId);
+      this.emit({ type: 'context-menu:unregister', pluginId: id, itemId });
     });
 
     // Remove registered status bar items for this plugin

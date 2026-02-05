@@ -108,6 +108,13 @@ function SettingsModal({
       if (event.type === 'settings:register' || event.type === 'settings:unregister') {
         setPluginPanels(new Map(pluginManager.registeredSettingsPanels));
       }
+      // Reset to default section if the active plugin panel was removed
+      if (event.type === 'settings:unregister') {
+        setActiveSection((prev) => {
+          if (prev === `plugin:${event.panelId}`) return 'appearance';
+          return prev;
+        });
+      }
     });
 
     // Initial load

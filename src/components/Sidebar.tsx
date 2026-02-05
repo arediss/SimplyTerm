@@ -82,6 +82,10 @@ function Sidebar({
       if (event.type === 'sidebar-view:register' || event.type === 'sidebar-view:unregister') {
         setPluginViews(new Map(pluginManager.registeredSidebarViews));
       }
+      // Reset to default tab if the active plugin view was removed
+      if (event.type === 'sidebar-view:unregister') {
+        setActiveTab((prev) => prev === event.viewId ? 'all' : prev);
+      }
     });
 
     // Initial load
