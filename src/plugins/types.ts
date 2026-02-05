@@ -202,6 +202,7 @@ export interface SimplyTermPluginAPI {
   // Terminal hooks (requires terminal_read/terminal_write)
   onTerminalOutput(sessionId: string, callback: (data: string) => void): Unsubscribe;
   onTerminalInput(sessionId: string, callback: (data: string) => void): Unsubscribe;
+  onAnyTerminalInput(callback: (sessionId: string, data: string) => void): Unsubscribe;
   writeToTerminal(sessionId: string, data: string): Promise<void>;
 
   // Session events (requires events_subscribe)

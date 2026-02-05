@@ -5,7 +5,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { SearchAddon } from "@xterm/addon-search";
 import { invoke } from "@tauri-apps/api/core";
-import { listen, UnlistenFn } from "@tauri-apps/api/event";
+import { listen, emit, UnlistenFn } from "@tauri-apps/api/event";
 import { X, ChevronUp, ChevronDown, CaseSensitive, Regex } from "lucide-react";
 import "@xterm/xterm/css/xterm.css";
 import { getTerminalTheme } from "../themes";
@@ -152,6 +152,7 @@ function Terminal({ sessionId, type, onExit, isActive = true, appTheme = "dark",
 
     const dataDisposable = xterm.onData((data) => {
       invoke("write_to_pty", { sessionId, data }).catch(console.error);
+      emit("terminal-input", { sessionId, data });
     });
 
     const setupSession = async () => {

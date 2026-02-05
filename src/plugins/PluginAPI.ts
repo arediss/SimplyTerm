@@ -218,6 +218,28 @@ export function createPluginAPI(
       return unsubscribe;
     },
 
+    onAnyTerminalInput(callback: (sessionId: string, data: string) => void): Unsubscribe {
+      if (!hasPermission(permissions, 'terminal_read')) {
+        console.warn(`[Plugin ${pluginId}] Missing permission: terminal_read`);
+        return () => {};
+      }
+
+      let unlisten: (() => void) | null = null;
+
+      listen<{ sessionId: string; data: string }>('terminal-input', (event) => {
+        callback(event.payload.sessionId, event.payload.data);
+      }).then((fn) => {
+        unlisten = fn;
+      });
+
+      const unsubscribe = () => {
+        if (unlisten) unlisten();
+      };
+
+      pluginState.subscriptions.push(unsubscribe);
+      return unsubscribe;
+    },
+
     async writeToTerminal(sessionId: string, data: string): Promise<void> {
       if (!hasPermission(permissions, 'terminal_write')) {
         throw new Error('Missing permission: terminal_write');
