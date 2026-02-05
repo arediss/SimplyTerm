@@ -8,7 +8,6 @@ use std::ptr;
 use windows::{
     core::{HSTRING, PCWSTR},
     Win32::{
-        Foundation::HWND,
         Networking::WindowsWebServices::{
             WebAuthNAuthenticatorGetAssertion, WebAuthNAuthenticatorMakeCredential,
             WebAuthNFreeAssertion, WebAuthNFreeCredentialAttestation,
@@ -41,6 +40,7 @@ pub fn is_available() -> bool {
 }
 
 /// Check if a platform authenticator (Windows Hello) is available
+#[allow(dead_code)]
 pub fn is_platform_authenticator_available() -> bool {
     unsafe {
         match WebAuthNIsUserVerifyingPlatformAuthenticatorAvailable() {
