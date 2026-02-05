@@ -105,6 +105,12 @@
     opacity: 0.4 !important;
   }
 
+  select,
+  select option {
+    background: var(--color-surface-1);
+    color: var(--color-text);
+  }
+
   ::selection {
     background: var(--color-accent);
     color: var(--color-crust);
