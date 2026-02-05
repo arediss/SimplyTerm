@@ -102,24 +102,6 @@ function FloatingTabs({
           {/* Séparateur */}
           <div className="w-px h-5 bg-surface-0/40 mx-1" />
 
-          {/* === Section Shell (Tunnels, Tabs) === */}
-          <button
-            onClick={onToggleTunnelSidebar}
-            className={`
-              relative shrink-0 w-7 h-7 flex items-center justify-center rounded-lg
-              transition-all duration-200 hover:bg-surface-0/50
-              ${isTunnelSidebarOpen ? "text-accent" : "text-text-muted hover:text-text"}
-            `}
-            title={t("header.tunnels")}
-          >
-            <ArrowLeftRight size={14} />
-            {activeTunnelCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] flex items-center justify-center px-1 text-[9px] font-bold bg-accent text-crust rounded-full">
-                {activeTunnelCount}
-              </span>
-            )}
-          </button>
-
           {/* Tabs */}
           <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar max-w-[calc(100vw-200px)]">
             {tabs.map((tab) => (
@@ -214,6 +196,12 @@ function FloatingTabs({
             onNewTab();
             setIsDropdownOpen(false);
           }}
+          onToggleTunnels={() => {
+            onToggleTunnelSidebar();
+            setIsDropdownOpen(false);
+          }}
+          isTunnelSidebarOpen={isTunnelSidebarOpen}
+          activeTunnelCount={activeTunnelCount}
         />,
         document.body
       )}
@@ -284,12 +272,18 @@ interface QuickConnectDropdownProps {
   position: { x: number; y: number };
   onLocalTerminal: () => void;
   onNewConnection: () => void;
+  onToggleTunnels: () => void;
+  isTunnelSidebarOpen: boolean;
+  activeTunnelCount: number;
 }
 
 const QuickConnectDropdown = forwardRef<HTMLDivElement, QuickConnectDropdownProps>(({
   position,
   onLocalTerminal,
   onNewConnection,
+  onToggleTunnels,
+  isTunnelSidebarOpen,
+  activeTunnelCount,
 }, ref) => {
   return (
     <div
@@ -311,6 +305,21 @@ const QuickConnectDropdown = forwardRef<HTMLDivElement, QuickConnectDropdownProp
         >
           <Plus size={14} className="text-accent" />
           <span className="text-sm text-text">Nouvelle connexion</span>
+        </button>
+
+        <div className="h-px bg-surface-0/30 my-1" />
+
+        <button
+          onClick={onToggleTunnels}
+          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-0/50 transition-colors ${isTunnelSidebarOpen ? "text-accent" : ""}`}
+        >
+          <ArrowLeftRight size={14} className={isTunnelSidebarOpen ? "text-accent" : "text-text-muted"} />
+          <span className="text-sm text-text flex-1 text-left">Tunnels</span>
+          {activeTunnelCount > 0 && (
+            <span className="min-w-[18px] h-[18px] flex items-center justify-center px-1 text-[10px] font-bold bg-accent text-crust rounded-full">
+              {activeTunnelCount}
+            </span>
+          )}
         </button>
       </div>
 
