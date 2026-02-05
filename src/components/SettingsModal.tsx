@@ -30,6 +30,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { usePlugins, type PluginManifest, pluginManager } from "../plugins";
+import PermissionApprovalModal from "./PermissionApprovalModal";
 import { useVault } from "../hooks/useVault";
 import { getThemes } from "../themes";
 import { PluginSettingsPanel } from "../plugins/PluginSettingsPanel";
@@ -1318,6 +1319,7 @@ function PluginsSettings() {
   const { plugins, loading, refresh, enablePlugin, disablePlugin } = usePlugins();
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [pluginsDir, setPluginsDir] = useState<string>("");
+  const [pendingPlugin, setPendingPlugin] = useState<PluginManifest | null>(null);
 
   // Fetch plugins directory on mount
   useEffect(() => {
@@ -1325,18 +1327,38 @@ function PluginsSettings() {
   }, []);
 
   const handleTogglePlugin = async (plugin: PluginManifest) => {
-    setActionLoading(plugin.id);
-    try {
-      if (plugin.status === "enabled") {
+    if (plugin.status === "enabled") {
+      // Disable directly, no approval needed
+      setActionLoading(plugin.id);
+      try {
         await disablePlugin(plugin.id);
-      } else {
-        await enablePlugin(plugin.id);
+      } catch (error) {
+        console.error("Failed to disable plugin:", error);
+      } finally {
+        setActionLoading(null);
       }
+    } else {
+      // Enable: show permission approval modal
+      setPendingPlugin(plugin);
+    }
+  };
+
+  const handleApprovePermissions = async () => {
+    if (!pendingPlugin) return;
+    const pluginId = pendingPlugin.id;
+    setPendingPlugin(null);
+    setActionLoading(pluginId);
+    try {
+      await enablePlugin(pluginId);
     } catch (error) {
-      console.error("Failed to toggle plugin:", error);
+      console.error("Failed to enable plugin:", error);
     } finally {
       setActionLoading(null);
     }
+  };
+
+  const handleDenyPermissions = () => {
+    setPendingPlugin(null);
   };
 
   const handleRefresh = async () => {
@@ -1466,6 +1488,15 @@ function PluginsSettings() {
           </p>
         </div>
       </SettingGroup>
+
+      {/* Permission approval modal */}
+      <PermissionApprovalModal
+        isOpen={pendingPlugin !== null}
+        onClose={handleDenyPermissions}
+        onApprove={handleApprovePermissions}
+        pluginName={pendingPlugin?.name ?? ''}
+        permissions={pendingPlugin?.permissions ?? []}
+      />
     </div>
   );
 }
