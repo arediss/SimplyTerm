@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, forwardRef, createElement } from "react";
+import { useState, useEffect, useRef, forwardRef } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Menu, Plus, X, Minus, Square, Copy, ChevronDown, Terminal, ArrowLeftRight } from "lucide-react";
-import * as LucideIcons from "lucide-react";
+import DynamicLucideIcon from "./DynamicLucideIcon";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Tab } from "../types";
 import type { HeaderActionItem } from "../plugins/PluginManager";
@@ -85,29 +85,19 @@ function FloatingTabs({
   const rightActions = headerActions.filter(a => a.position === 'right');
 
   const renderHeaderActions = (actions: HeaderActionItem[]) =>
-    actions.map((action) => {
-      const pascalName = action.icon
-        .split('-')
-        .map((s: string) => s.charAt(0).toUpperCase() + s.slice(1))
-        .join('');
-      const IconComp = (LucideIcons as Record<string, unknown>)[pascalName];
-      return (
-        <button
-          key={action.id}
-          onClick={(e) => {
-            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-            action.onClick({ x: rect.left, y: rect.bottom + 4, right: rect.right });
-          }}
-          className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-text-muted hover:text-text hover:bg-surface-0/50 transition-colors"
-          title={action.tooltip}
-        >
-          {IconComp
-            ? createElement(IconComp as React.ComponentType<{ size?: number }>, { size: 14 })
-            : <span className="text-xs">?</span>
-          }
-        </button>
-      );
-    });
+    actions.map((action) => (
+      <button
+        key={action.id}
+        onClick={(e) => {
+          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          action.onClick({ x: rect.left, y: rect.bottom + 4, right: rect.right });
+        }}
+        className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-text-muted hover:text-text hover:bg-surface-0/50 transition-colors"
+        title={action.tooltip}
+      >
+        <DynamicLucideIcon name={action.icon} size={14} />
+      </button>
+    ));
 
   return (
     <div className="absolute top-0 left-0 right-0 z-20 h-10 bg-mantle/80 backdrop-blur-sm border-b border-surface-0/30">

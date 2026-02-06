@@ -5,7 +5,7 @@ import Sidebar from "./components/Sidebar";
 import FloatingTabs from "./components/FloatingTabs";
 import TerminalPane from "./components/TerminalPane";
 import Modal from "./components/Modal";
-import HostKeyModal, { HostKeyCheckResult } from "./components/HostKeyModal";
+import HostKeyModal from "./components/HostKeyModal";
 import { SshConnectionConfig } from "./components/ConnectionForm";
 import NewConnectionModal from "./components/NewConnectionModal";
 import SettingsModal from "./components/SettingsModal";
@@ -31,13 +31,14 @@ import {
 } from "./components/SplitPane";
 import { SftpBrowser } from "./components/SftpBrowser";
 import { PanePicker, type ActiveConnection } from "./components/PanePicker";
-import { VaultSetupModal, VaultUnlockModal } from "./components/vault";
+import { VaultSetupModal, VaultUnlockModal } from "./components/Vault";
 import TunnelManager from "./components/TunnelManager";
 import TunnelSidebar from "./components/TunnelSidebar";
-import { useSessions, useAppSettings, useVaultFlow } from "./hooks";
+import { useSessions, useAppSettings, useVaultFlow, useHostKeyVerification } from "./hooks";
 import { SavedSession, Tab, TelnetConnectionConfig, SerialConnectionConfig, SshKeyProfile } from "./types";
 import { ConnectionType } from "./components/ConnectionTypeSelector";
-import { generateSessionId, generateTabId, expandHomeDir, isModifierPressed, modifierKey } from "./utils";
+import EmptyState from "./components/EmptyState";
+import { generateSessionId, generateTabId, expandHomeDir, isModifierPressed } from "./utils";
 import { applyTheme } from "./themes";
 
 function App() {
@@ -95,10 +96,21 @@ function App() {
   const isSidebarOpen = openSidebar === "menu";
   const isTunnelSidebarOpen = openSidebar === "tunnel";
 
+  // Host key verification (extracted hook)
+  const {
+    hostKeyResult,
+    isHostKeyModalOpen,
+    hostKeyLoading,
+    checkHostKeyBeforeConnect,
+    handleHostKeyAccept,
+    handleHostKeyReject,
+    setConnectionError,
+    connectionError,
+  } = useHostKeyVerification();
+
   // Modal state
   const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [connectionError, setConnectionError] = useState<string | undefined>();
   const [initialConnectionConfig, setInitialConnectionConfig] = useState<Partial<SshConnectionConfig> | null>(null);
   const [initialTelnetConfig, setInitialTelnetConfig] = useState<Partial<TelnetConnectionConfig> | null>(null);
   const [initialSerialConfig, setInitialSerialConfig] = useState<Partial<SerialConnectionConfig> | null>(null);
@@ -116,12 +128,6 @@ function App() {
 
   // Settings state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-
-  // Host key verification state
-  const [hostKeyResult, setHostKeyResult] = useState<HostKeyCheckResult | null>(null);
-  const [isHostKeyModalOpen, setIsHostKeyModalOpen] = useState(false);
-  const [hostKeyLoading, setHostKeyLoading] = useState(false);
-  const [pendingHostKeyAction, setPendingHostKeyAction] = useState<(() => Promise<void>) | null>(null);
 
   // Tunnel manager state
   const [tunnelManagerTabId, setTunnelManagerTabId] = useState<string | null>(null);
@@ -149,79 +155,6 @@ function App() {
     config: ModalConfig;
     resolve: (value: string | null) => void;
   } | null>(null);
-
-  // Helper to check host key before SSH connection
-  const checkHostKeyBeforeConnect = async (
-    host: string,
-    port: number,
-    onTrusted: () => Promise<void>
-  ): Promise<boolean> => {
-    try {
-      const result = await invoke<HostKeyCheckResult>("check_host_key", { host, port });
-
-      if (result.status === "trusted") {
-        // Host is already trusted, proceed with connection
-        await onTrusted();
-        return true;
-      } else if (result.status === "unknown" || result.status === "mismatch") {
-        // Show modal for user confirmation
-        setHostKeyResult(result);
-        setPendingHostKeyAction(() => onTrusted);
-        setIsHostKeyModalOpen(true);
-        return false; // Connection will proceed after user confirmation
-      } else {
-        // Error checking host key
-        setConnectionError(result.message || "Failed to check host key");
-        return false;
-      }
-    } catch (error) {
-      setConnectionError(`Host key check failed: ${error}`);
-      return false;
-    }
-  };
-
-  // Handle host key acceptance
-  const handleHostKeyAccept = async () => {
-    if (!hostKeyResult || !pendingHostKeyAction) return;
-
-    setHostKeyLoading(true);
-    try {
-      const { host, port, status } = hostKeyResult;
-
-      if (status === "unknown") {
-        await invoke("trust_host_key", { host, port });
-      } else if (status === "mismatch") {
-        await invoke("update_host_key", { host, port });
-      }
-
-      // Close modal and proceed with connection
-      setIsHostKeyModalOpen(false);
-      setHostKeyResult(null);
-
-      // Execute the pending connection action
-      await pendingHostKeyAction();
-    } catch (error) {
-      setConnectionError(`Failed to save host key: ${error}`);
-    } finally {
-      setHostKeyLoading(false);
-      setPendingHostKeyAction(null);
-    }
-  };
-
-  // Handle host key rejection
-  const handleHostKeyReject = async () => {
-    if (hostKeyResult) {
-      try {
-        await invoke("reject_host_key", { host: hostKeyResult.host, port: hostKeyResult.port });
-      } catch {
-        // Ignore errors on rejection
-      }
-    }
-    setIsHostKeyModalOpen(false);
-    setHostKeyResult(null);
-    setPendingHostKeyAction(null);
-    setConnectionError("Connection cancelled: host key not trusted");
-  };
 
   const handleNewLocalTab = () => {
     const ptySessionId = generateSessionId("pty");
@@ -1894,51 +1827,6 @@ function App() {
 
       {/* Status Bar (hidden by default, for plugin widgets) */}
       <StatusBar visible={statusBarVisible} items={statusBarItems} />
-    </div>
-  );
-}
-
-function EmptyState({ onNewConnection }: { onNewConnection: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <div className="h-full flex flex-col items-center justify-center">
-      {/* Subtle gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-accent/[0.02]" />
-
-      <div className="relative flex flex-col items-center gap-8">
-        {/* Logo mark */}
-        <div className="relative">
-          <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-surface-0/40 to-surface-0/20 flex items-center justify-center border border-surface-0/30">
-            <span className="text-4xl text-accent/70">⬡</span>
-          </div>
-          <div className="absolute -inset-4 bg-accent/5 rounded-full blur-2xl -z-10" />
-        </div>
-
-        {/* Text */}
-        <div className="text-center">
-          <h1 className="text-2xl font-semibold text-text tracking-tight mb-2">
-            SimplyTerm
-          </h1>
-          <p className="text-sm text-text-muted max-w-xs">
-            {t('app.tagline')}
-          </p>
-        </div>
-
-        {/* Action buttons */}
-        <div className="flex gap-3">
-          <button
-            onClick={onNewConnection}
-            className="px-5 py-2.5 bg-accent text-crust text-sm font-medium rounded-xl hover:bg-accent-hover transition-colors"
-          >
-            {t('app.newConnection')}
-          </button>
-        </div>
-
-        {/* Keyboard shortcut hint */}
-        <p className="text-xs text-text-muted/60">
-          {t('app.shortcutHint', { modifier: modifierKey })}
-        </p>
-      </div>
     </div>
   );
 }
