@@ -16,6 +16,7 @@ import {
   Clock,
   Folder,
   Tag,
+  Loader2,
 } from "lucide-react";
 import { SavedSession } from "../types";
 import { pluginManager } from "../plugins";
@@ -26,6 +27,7 @@ interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   savedSessions: SavedSession[];
+  connectingSessionId?: string | null;
   onSavedSessionConnect: (session: SavedSession) => void;
   onSavedSessionEdit: (session: SavedSession) => void;
   onSavedSessionDelete: (sessionId: string) => void;
@@ -54,6 +56,7 @@ function Sidebar({
   isOpen,
   onClose,
   savedSessions,
+  connectingSessionId,
   onSavedSessionConnect,
   onSavedSessionEdit,
   onSavedSessionDelete,
@@ -230,6 +233,7 @@ function Sidebar({
             <AllSessionsView
               sessions={filteredSessions}
               searchQuery={searchQuery}
+              connectingSessionId={connectingSessionId}
               onConnect={onSavedSessionConnect}
               onEdit={onSavedSessionEdit}
               onDelete={onSavedSessionDelete}
@@ -316,6 +320,7 @@ function getContextMenuIcon(iconName?: string): React.ReactNode {
 interface AllSessionsViewProps {
   sessions: SavedSession[];
   searchQuery: string;
+  connectingSessionId?: string | null;
   onConnect: (session: SavedSession) => void;
   onEdit: (session: SavedSession) => void;
   onDelete: (sessionId: string) => void;
@@ -326,6 +331,7 @@ interface AllSessionsViewProps {
 function AllSessionsView({
   sessions,
   searchQuery,
+  connectingSessionId,
   onConnect,
   onEdit,
   onDelete,
@@ -350,6 +356,7 @@ function AllSessionsView({
         <SavedSessionItem
           key={session.id}
           session={session}
+          isConnecting={connectingSessionId === session.id}
           onClick={() => onConnect(session)}
           onEdit={() => onEdit(session)}
           onDelete={() => onDelete(session.id)}
@@ -408,6 +415,7 @@ function PluginSidebarView({ pluginId, view }: PluginSidebarViewProps) {
 
 interface SavedSessionItemProps {
   session: SavedSession;
+  isConnecting?: boolean;
   onClick: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -417,6 +425,7 @@ interface SavedSessionItemProps {
 
 function SavedSessionItem({
   session,
+  isConnecting,
   onClick,
   onEdit,
   onDelete,
@@ -493,19 +502,27 @@ function SavedSessionItem({
   return (
     <>
       <div
-        onClick={onClick}
-        onContextMenu={handleContextMenu}
-        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors text-left cursor-pointer"
+        onClick={isConnecting ? undefined : onClick}
+        onContextMenu={isConnecting ? undefined : handleContextMenu}
+        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left ${
+          isConnecting
+            ? "bg-accent/10 cursor-wait"
+            : "hover:bg-white/5 cursor-pointer"
+        }`}
       >
-        <span className="text-accent">
-          <Monitor size={16} />
+        <span className={isConnecting ? "text-accent" : "text-accent"}>
+          {isConnecting ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Monitor size={16} />
+          )}
         </span>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-text truncate">
+          <div className={`text-sm font-medium truncate ${isConnecting ? "text-accent" : "text-text"}`}>
             {session.name}
           </div>
           <div className="text-[11px] text-text-muted truncate">
-            {session.username}@{session.host}:{session.port}
+            {isConnecting ? t('sidebar.connecting') : `${session.username}@${session.host}:${session.port}`}
           </div>
         </div>
       </div>

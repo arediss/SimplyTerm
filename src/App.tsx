@@ -31,7 +31,7 @@ import {
 } from "./components/SplitPane";
 import { SftpBrowser } from "./components/SftpBrowser";
 import { PanePicker, type ActiveConnection } from "./components/PanePicker";
-import { VaultSetupModal, VaultUnlockModal } from "./components/vault";
+import { VaultSetupModal, VaultUnlockModal } from "./components/Vault";
 import TunnelManager from "./components/TunnelManager";
 import TunnelSidebar from "./components/TunnelSidebar";
 import { useSessions, useAppSettings, useVaultFlow, useHostKeyVerification } from "./hooks";
@@ -122,6 +122,9 @@ function App() {
 
   // Edit session state
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+
+  // Connecting session (for sidebar loading indicator)
+  const [connectingSessionId, setConnectingSessionId] = useState<string | null>(null);
 
   // Pending SFTP session (when credentials are needed)
   const [pendingSftpSession, setPendingSftpSession] = useState<SavedSession | null>(null);
@@ -697,11 +700,11 @@ function App() {
 
   // Se connecter à une session sauvegardée
   const handleConnectToSavedSession = async (saved: SavedSession) => {
-    setOpenSidebar("none");
+    setConnectingSessionId(saved.id);
 
     // Helper pour ouvrir le formulaire de connexion
     const openConnectionForm = (message: string) => {
-
+      setConnectingSessionId(null);
       setEditingSessionId(saved.id); // Important: marquer qu'on édite cette session pour sauvegarder les credentials
       setInitialConnectionConfig({
         name: saved.name,
@@ -758,6 +761,7 @@ function App() {
             const resolved = await resolveSshKey(saved.ssh_key_id);
             if (!resolved) {
               setIsConnecting(false);
+              setConnectingSessionId(null);
               return; // User cancelled passphrase prompt
             }
             keyPath = (await expandHomeDir(resolved.keyPath)) || null;
@@ -798,6 +802,8 @@ function App() {
           setTabs((prev) => [...prev, newTab]);
           setActiveTabId(newTab.id);
           setIsConnecting(false);
+          setConnectingSessionId(null);
+          setOpenSidebar("none");
 
           // Notify plugins of session connect
           pluginManager.notifySessionConnect({
@@ -813,6 +819,7 @@ function App() {
           console.error("[SavedSession] SSH connection failed:", error);
           setConnectionError(String(error));
           setIsConnecting(false);
+          setConnectingSessionId(null);
         }
       };
 
@@ -822,6 +829,7 @@ function App() {
       console.error("[SavedSession] SSH connection failed:", error);
       setConnectionError(String(error));
       setIsConnecting(false);
+      setConnectingSessionId(null);
     }
   };
 
@@ -1609,6 +1617,7 @@ function App() {
         isOpen={isSidebarOpen}
         onClose={() => setOpenSidebar("none")}
         savedSessions={savedSessions}
+        connectingSessionId={connectingSessionId}
         onSavedSessionConnect={handleConnectToSavedSession}
         onSavedSessionEdit={handleEditSavedSession}
         onSavedSessionDelete={handleDeleteSavedSession}

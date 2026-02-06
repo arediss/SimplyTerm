@@ -707,6 +707,7 @@ export default {
     timeDaysAgo: "il y a {{count}}j",
     // Bouton et info-bulles du coffre
     vault: "Coffre",
+    connecting: "Connexion en cours...",
     vaultLocked: "Coffre verrouillé - Cliquer pour déverrouiller",
     vaultUnlocked: "Coffre déverrouillé - Cliquer pour verrouiller",
   },

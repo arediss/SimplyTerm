@@ -707,6 +707,7 @@ export default {
     timeDaysAgo: "{{count}}d ago",
     // Vault button and tooltips
     vault: "Vault",
+    connecting: "Connecting...",
     vaultLocked: "Vault locked - Click to unlock",
     vaultUnlocked: "Vault unlocked - Click to lock",
   },
