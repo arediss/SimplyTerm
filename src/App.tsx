@@ -31,7 +31,7 @@ import {
 } from "./components/SplitPane";
 import { SftpBrowser } from "./components/SftpBrowser";
 import { PanePicker, type ActiveConnection } from "./components/PanePicker";
-import { VaultSetupModal, VaultUnlockModal } from "./components/Vault";
+import { VaultSetupModal, VaultUnlockModal } from "./components/vault";
 import TunnelManager from "./components/TunnelManager";
 import TunnelSidebar from "./components/TunnelSidebar";
 import { useSessions, useAppSettings, useVaultFlow, useHostKeyVerification } from "./hooks";

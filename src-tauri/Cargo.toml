@@ -53,14 +53,6 @@ sha2 = "0.10"
 # FIDO2 security keys
 ctap-hid-fido2 = "3.5"
 
-# Windows WebAuthn API (no admin required)
-[target.'cfg(windows)'.dependencies]
-windows = { version = "0.58", features = [
-    "Win32_Foundation",
-    "Win32_Networking_WindowsWebServices",
-    "Win32_UI_WindowsAndMessaging",
-] }
-
 # External file editing
 notify = "6"
 open = "5"
@@ -70,3 +62,11 @@ reqwest = { version = "0.12", features = ["json"] }
 
 # Serial port communication
 serialport = "4.3"
+
+# Windows WebAuthn API (no admin required)
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_Networking_WindowsWebServices",
+    "Win32_UI_WindowsAndMessaging",
+] }
