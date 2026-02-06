@@ -4,7 +4,7 @@
  * Manages plugin loading and provides containers for plugin panels and widgets.
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { pluginManager } from './PluginManager';
 import { PluginPanel } from './PluginPanel';
 import { PluginWidget } from './PluginWidget';
@@ -158,9 +158,13 @@ export function PluginHost({
 export function usePlugins() {
   const [plugins, setPlugins] = useState<PluginManifest[]>([]);
   const [loading, setLoading] = useState(true);
+  const initialLoadDone = useRef(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    // Only show skeleton on initial load, not on manual refresh
+    if (!initialLoadDone.current) {
+      setLoading(true);
+    }
     try {
       // Use refresh() to scan for new plugins, not just list existing ones
       const list = await pluginManager.refresh();
@@ -169,6 +173,7 @@ export function usePlugins() {
       console.error('Failed to refresh plugins:', error);
     } finally {
       setLoading(false);
+      initialLoadDone.current = true;
     }
   }, []);
 

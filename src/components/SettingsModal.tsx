@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
+import { getVersion } from "@tauri-apps/api/app";
 import i18n from "../i18n";
 import {
   X,
@@ -12,7 +13,6 @@ import {
   Monitor,
   MousePointer2,
   Trash2,
-  ExternalLink,
   Github,
   Puzzle,
   RefreshCw,
@@ -28,6 +28,9 @@ import {
   Fingerprint,
   Key,
   ShieldCheck,
+  BookOpen,
+  Heart,
+  Copy,
 } from "lucide-react";
 import { usePlugins, type PluginManifest, pluginManager } from "../plugins";
 import PermissionApprovalModal from "./PermissionApprovalModal";
@@ -195,7 +198,7 @@ function SettingsModal({
       <div className="fixed inset-0 z-50 flex items-center justify-center p-8 pointer-events-none">
         <div
           className="bg-mantle rounded-2xl shadow-2xl overflow-hidden pointer-events-auto animate-scale-in flex"
-          style={{ width: "800px", height: "560px", maxWidth: "90vw", maxHeight: "80vh" }}
+          style={{ width: "900px", height: "640px", maxWidth: "90vw", maxHeight: "85vh" }}
         >
           {/* Sidebar */}
           <div className="w-56 bg-crust flex flex-col border-r border-surface-0/30">
@@ -793,6 +796,35 @@ function SecuritySettings() {
   };
 
   const [securityTab, setSecurityTab] = useState<"vault" | "sshKeys" | "auth">("vault");
+
+  // Skeleton loader while vault status is being fetched
+  if (vault.isLoading) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        {/* Tab bar skeleton */}
+        <div className="flex gap-1 p-1 bg-crust rounded-xl">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex-1 h-9 bg-surface-0/20 rounded-lg" />
+          ))}
+        </div>
+        {/* Content skeleton */}
+        <div className="space-y-4">
+          <div>
+            <div className="h-4 w-32 bg-surface-0/20 rounded" />
+            <div className="h-3 w-56 bg-surface-0/10 rounded mt-1.5" />
+          </div>
+          <div className="h-20 bg-surface-0/15 rounded-lg" />
+        </div>
+        <div className="space-y-4">
+          <div>
+            <div className="h-4 w-24 bg-surface-0/20 rounded" />
+            <div className="h-3 w-44 bg-surface-0/10 rounded mt-1.5" />
+          </div>
+          <div className="h-12 bg-surface-0/15 rounded-lg" />
+        </div>
+      </div>
+    );
+  }
 
   if (!vault.status?.exists) {
     return (
@@ -1478,8 +1510,17 @@ function PluginsSettings() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <RefreshCw size={20} className="animate-spin text-text-muted" />
+          <div className="space-y-2 animate-pulse">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center gap-3 p-3 bg-surface-0/20 rounded-lg">
+                <div className="w-10 h-10 rounded-lg bg-surface-0/30 shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3.5 w-32 bg-surface-0/25 rounded" />
+                  <div className="h-2.5 w-48 bg-surface-0/15 rounded" />
+                </div>
+                <div className="h-7 w-16 bg-surface-0/20 rounded-lg" />
+              </div>
+            ))}
           </div>
         ) : plugins.length === 0 ? (
           <div className="text-center py-8 text-text-muted">
@@ -1590,56 +1631,86 @@ function PluginsSettings() {
 
 function AboutSettings() {
   const { t } = useTranslation();
+  const [appVersion, setAppVersion] = useState<string>("...");
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(() => setAppVersion("?"));
+  }, []);
+
+  const handleCopyVersion = () => {
+    navigator.clipboard.writeText(`SimplyTerm v${appVersion}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
 
   return (
     <div className="space-y-6">
-      {/* App info */}
-      <div className="flex items-center gap-4 p-4 bg-surface-0/20 rounded-xl">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-accent/30 to-accent/10 flex items-center justify-center">
-          <span className="text-3xl">⬡</span>
-        </div>
-        <div>
-          <h3 className="text-lg font-semibold text-text">SimplyTerm</h3>
-          <p className="text-sm text-text-muted">{t("settings.about.version", { version: "0.1.0" })}</p>
-          <p className="text-xs text-text-muted mt-1">
-            {t("settings.about.tagline")}
-          </p>
+      {/* App header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-accent/10 via-surface-0/20 to-surface-0/10 p-6">
+        <div className="absolute -top-8 -right-8 w-32 h-32 bg-accent/5 rounded-full blur-2xl" />
+        <div className="relative flex items-center gap-5">
+          <div className="w-16 h-16 rounded-2xl bg-crust/80 border border-surface-0/30 flex items-center justify-center shadow-lg">
+            <Terminal size={28} className="text-accent" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-text tracking-tight">SimplyTerm</h3>
+            <p className="text-xs text-text-muted mt-0.5">
+              {t("settings.about.tagline")}
+            </p>
+            <button
+              onClick={handleCopyVersion}
+              className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 bg-crust/60 rounded-md text-[11px] text-text-muted hover:text-text transition-colors"
+            >
+              {copied ? <Check size={10} className="text-success" /> : <Copy size={10} />}
+              v{appVersion}
+            </button>
+          </div>
         </div>
       </div>
 
+      {/* Tech stack */}
       <SettingGroup title={t("settings.about.techTitle")} description={t("settings.about.techDesc")}>
         <div className="flex flex-wrap gap-2">
-          {["Tauri", "React", "TypeScript", "Rust", "xterm.js"].map((tech) => (
+          {[
+            { name: "Tauri v2", color: "text-yellow" },
+            { name: "React", color: "text-blue" },
+            { name: "TypeScript", color: "text-blue" },
+            { name: "Rust", color: "text-peach" },
+            { name: "xterm.js", color: "text-green" },
+          ].map((tech) => (
             <span
-              key={tech}
-              className="px-3 py-1.5 bg-surface-0/30 rounded-full text-xs text-text-muted"
+              key={tech.name}
+              className="px-3 py-1.5 bg-surface-0/30 border border-surface-0/20 rounded-lg text-xs text-text-muted"
             >
-              {tech}
+              <span className={tech.color}>&#x2022;</span> {tech.name}
             </span>
           ))}
         </div>
       </SettingGroup>
 
+      {/* Links */}
       <SettingGroup title={t("settings.about.linksTitle")} description={t("settings.about.linksDesc")}>
         <div className="space-y-2">
           <LinkButton
             icon={<Github size={18} />}
             title={t("settings.about.sourceCode")}
             description={t("settings.about.viewOnGithub")}
-            href="https://github.com"
+            href="https://github.com/arediss/SimplyTerm"
           />
           <LinkButton
-            icon={<ExternalLink size={18} />}
+            icon={<BookOpen size={18} />}
             title={t("settings.about.documentation")}
             description={t("settings.about.userGuide")}
-            href="#"
+            href="https://github.com/arediss/SimplyTerm/wiki"
           />
         </div>
       </SettingGroup>
 
+      {/* Footer */}
       <div className="pt-4 border-t border-surface-0/30">
-        <p className="text-xs text-text-muted text-center">
-          {t("settings.about.footer")}
+        <p className="text-xs text-text-muted text-center flex items-center justify-center gap-1.5">
+          {t("settings.about.footer")} <Heart size={10} className="text-red inline" />
         </p>
       </div>
     </div>
