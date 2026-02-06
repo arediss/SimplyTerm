@@ -10,8 +10,7 @@ import {
   Pencil,
   FolderOpen,
   ArrowLeftRight,
-  Lock,
-  LockOpen,
+  KeyRound,
   Trash2,
   List,
   Clock,
@@ -251,26 +250,29 @@ function Sidebar({
         <div className="p-3 border-t border-surface-0/30 flex items-center gap-2">
           <button
             onClick={onOpenSettings}
-            className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-text-muted hover:text-text hover:bg-white/5 transition-colors"
+            className="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-lg text-text-muted hover:text-text hover:bg-white/5 transition-colors"
           >
             <Settings size={16} />
             <span className="text-sm">{t('sidebar.settings')}</span>
           </button>
 
-          {/* Vault button */}
+          {/* Vault status button */}
           {vaultExists && (
-            <button
-              onClick={() => vaultUnlocked ? onVaultLock?.() : onVaultUnlock?.()}
-              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg transition-colors ${
-                vaultUnlocked
-                  ? "text-success hover:bg-success/10"
-                  : "text-text-muted hover:bg-white/5 hover:text-warning"
-              }`}
-              title={vaultUnlocked ? t('sidebar.vaultUnlocked') : t('sidebar.vaultLocked')}
-            >
-              {vaultUnlocked ? <LockOpen size={16} /> : <Lock size={16} />}
-              <span className="text-sm">{t('sidebar.vault')}</span>
-            </button>
+            <div className="relative group">
+              <button
+                onClick={() => vaultUnlocked ? onVaultLock?.() : onVaultUnlock?.()}
+                className="relative p-2.5 rounded-lg text-text-muted hover:text-text hover:bg-white/5 transition-colors"
+              >
+                <KeyRound size={16} />
+                <span className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ${
+                  vaultUnlocked ? "bg-success" : "bg-warning"
+                }`} />
+              </button>
+              {/* Fast tooltip */}
+              <div className="absolute bottom-full right-0 mb-2 px-2.5 py-1.5 bg-crust border border-surface-0/50 rounded-lg shadow-lg text-xs text-text-secondary whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none">
+                {vaultUnlocked ? t('sidebar.vaultUnlocked') : t('sidebar.vaultLocked')}
+              </div>
+            </div>
           )}
         </div>
       </div>
