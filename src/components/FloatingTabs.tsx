@@ -6,6 +6,7 @@ import DynamicLucideIcon from "./DynamicLucideIcon";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Tab } from "../types";
 import type { HeaderActionItem } from "../plugins/PluginManager";
+import { isMac } from "../utils/platform";
 
 interface FloatingTabsProps {
   tabs: Tab[];
@@ -38,6 +39,7 @@ function FloatingTabs({
 }: FloatingTabsProps) {
   const { t } = useTranslation();
   const [isMaximized, setIsMaximized] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState<{ x: number; y: number } | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -58,11 +60,18 @@ function FloatingTabs({
     await getCurrentWindow().close();
   };
 
-  // Check initial maximized state
+  // Track maximized & fullscreen state
   useEffect(() => {
-    getCurrentWindow()
-      .isMaximized()
-      .then(setIsMaximized);
+    const win = getCurrentWindow();
+    win.isMaximized().then(setIsMaximized);
+    win.isFullscreen().then(setIsFullscreen);
+
+    const unlisten = win.onResized(async () => {
+      setIsMaximized(await win.isMaximized());
+      setIsFullscreen(await win.isFullscreen());
+    });
+
+    return () => { unlisten.then(fn => fn()); };
   }, []);
 
   // Close dropdown when clicking outside
@@ -100,14 +109,22 @@ function FloatingTabs({
     ));
 
   return (
-    <div className="absolute top-0 left-0 right-0 z-20 h-10 bg-mantle/80 backdrop-blur-sm border-b border-surface-0/30">
-      {/* Drag region - toute la barre sauf les contrôles */}
-      <div className="absolute inset-0 drag-region" />
-
+    <div
+      className="absolute top-0 left-0 right-0 z-20 h-10 bg-mantle/80 backdrop-blur-sm border-b border-surface-0/30"
+      onMouseDown={(e) => {
+        if (e.buttons === 1 && !(e.target as HTMLElement).closest('.no-drag')) {
+          if (e.detail === 2) {
+            handleMaximize();
+          } else {
+            getCurrentWindow().startDragging();
+          }
+        }
+      }}
+    >
       {/* Container principal */}
       <div className="relative h-full flex items-center justify-between px-2">
-        {/* Partie gauche */}
-        <div className="flex items-center gap-1.5 no-drag">
+        {/* Partie gauche — extra padding on macOS for traffic lights (hidden in fullscreen) */}
+        <div className={`flex items-center gap-1.5 no-drag ${isMac && !isFullscreen ? "ml-[70px]" : ""}`}>
           {/* === Section App (Menu) === */}
           <button
             onClick={onToggleSidebar}
@@ -183,36 +200,41 @@ function FloatingTabs({
           {rightActions.length > 0 && (
             <>
               {renderHeaderActions(rightActions)}
-              <div className="w-px h-5 bg-surface-0/40 mx-0.5" />
+              {!isMac && <div className="w-px h-5 bg-surface-0/40 mx-0.5" />}
             </>
           )}
 
-          {/* Minimize */}
-          <button
-            onClick={handleMinimize}
-            className="w-11 h-10 flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-0/50 transition-colors"
-            title={t("header.minimize")}
-          >
-            <Minus size={14} />
-          </button>
+          {/* Window controls — hidden on macOS (native traffic lights) */}
+          {!isMac && (
+            <>
+              {/* Minimize */}
+              <button
+                onClick={handleMinimize}
+                className="w-11 h-10 flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-0/50 transition-colors"
+                title={t("header.minimize")}
+              >
+                <Minus size={14} />
+              </button>
 
-          {/* Maximize/Restore */}
-          <button
-            onClick={handleMaximize}
-            className="w-11 h-10 flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-0/50 transition-colors"
-            title={isMaximized ? t("header.restore") : t("header.maximize")}
-          >
-            {isMaximized ? <Square size={12} /> : <Copy size={13} className="rotate-90" />}
-          </button>
+              {/* Maximize/Restore */}
+              <button
+                onClick={handleMaximize}
+                className="w-11 h-10 flex items-center justify-center text-text-muted hover:text-text hover:bg-surface-0/50 transition-colors"
+                title={isMaximized ? t("header.restore") : t("header.maximize")}
+              >
+                {isMaximized ? <Square size={12} /> : <Copy size={13} className="rotate-90" />}
+              </button>
 
-          {/* Close */}
-          <button
-            onClick={handleClose}
-            className="w-11 h-10 flex items-center justify-center text-text-muted hover:text-white hover:bg-error transition-colors"
-            title={t("header.close")}
-          >
-            <X size={15} />
-          </button>
+              {/* Close */}
+              <button
+                onClick={handleClose}
+                className="w-11 h-10 flex items-center justify-center text-text-muted hover:text-white hover:bg-error transition-colors"
+                title={t("header.close")}
+              >
+                <X size={15} />
+              </button>
+            </>
+          )}
         </div>
       </div>
 

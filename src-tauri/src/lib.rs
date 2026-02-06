@@ -1617,6 +1617,17 @@ pub fn run() {
             });
             // Also manage vault directly for vault commands
             app.manage(vault);
+
+            // Windows/Linux: disable decorations (we use custom window controls)
+            // macOS keeps decorations with Overlay style (configured in tauri.conf.json)
+            // for native traffic lights
+            #[cfg(not(target_os = "macos"))]
+            {
+                if let Some(window) = app.get_webview_window("main") {
+                    window.set_decorations(false).ok();
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
