@@ -14,6 +14,7 @@ import { StatusBar, type StatusBarItem } from "./components/StatusBar";
 import { PluginHost, pluginManager, type SessionInfo, type ModalConfig, type NotificationType, type PromptConfig } from "./plugins";
 import type { HeaderActionItem } from "./plugins/PluginManager";
 import PromptModal from "./components/PromptModal";
+import PassphrasePromptModal from "./components/PassphrasePromptModal";
 import PluginModal from "./components/PluginModal";
 import {
   SplitPane,
@@ -34,7 +35,7 @@ import { VaultSetupModal, VaultUnlockModal } from "./components/vault";
 import TunnelManager from "./components/TunnelManager";
 import TunnelSidebar from "./components/TunnelSidebar";
 import { useSessions, useAppSettings, useVaultFlow } from "./hooks";
-import { SavedSession, Tab, TelnetConnectionConfig, SerialConnectionConfig } from "./types";
+import { SavedSession, Tab, TelnetConnectionConfig, SerialConnectionConfig, SshKeyProfile } from "./types";
 import { ConnectionType } from "./components/ConnectionTypeSelector";
 import { generateSessionId, generateTabId, expandHomeDir, isModifierPressed, modifierKey } from "./utils";
 import { applyTheme } from "./themes";
@@ -137,6 +138,12 @@ function App() {
     resolve: (value: string | null) => void;
   } | null>(null);
 
+  // Passphrase prompt state (for SSH key management)
+  const [passphrasePrompt, setPassphrasePrompt] = useState<{
+    keyName: string;
+    resolve: (value: string | null) => void;
+  } | null>(null);
+
   // Plugin modal state
   const [pluginModal, setPluginModal] = useState<{
     config: ModalConfig;
@@ -232,6 +239,32 @@ function App() {
     setOpenSidebar("none");
   };
 
+  // Prompt for passphrase (returns a promise)
+  const promptForPassphrase = (keyName: string): Promise<string | null> => {
+    return new Promise((resolve) => {
+      setPassphrasePrompt({ keyName, resolve });
+    });
+  };
+
+  // Resolve SSH key credentials from vault, prompting for passphrase if needed
+  const resolveSshKey = async (sshKeyId: string): Promise<{ keyPath: string; passphrase: string | null } | null> => {
+    try {
+      const keyProfile = await invoke<SshKeyProfile | null>("get_ssh_key_credentials", { id: sshKeyId });
+      if (!keyProfile) return null;
+
+      let passphrase: string | null = keyProfile.passphrase || null;
+      if (keyProfile.require_passphrase_prompt) {
+        passphrase = await promptForPassphrase(keyProfile.name);
+        if (passphrase === null) return null; // User cancelled
+      }
+
+      return { keyPath: keyProfile.key_path, passphrase };
+    } catch (err) {
+      console.error("Failed to resolve SSH key:", err);
+      return null;
+    }
+  };
+
   // Open SFTP tab for a saved session
   const handleOpenSftpTab = async (saved: SavedSession) => {
     setOpenSidebar("none");
@@ -246,6 +279,7 @@ function App() {
         username: saved.username,
         authType: saved.auth_type,
         keyPath: saved.key_path,
+        sshKeyId: saved.ssh_key_id,
       });
       setConnectionError(t('app.enterPasswordSftp'));
       setIsConnectionModalOpen(true);
@@ -275,7 +309,20 @@ function App() {
       // Helper function to perform the SFTP connection
       const performSftpConnection = async () => {
         const sessionId = generateSessionId("sftp");
-        const keyPath = await expandHomeDir(saved.key_path);
+
+        // Resolve SSH key if saved session uses a key profile
+        let keyPath: string | null = null;
+        let keyPassphrase: string | null = null;
+
+        if (saved.ssh_key_id && saved.auth_type === "key") {
+          const resolved = await resolveSshKey(saved.ssh_key_id);
+          if (!resolved) return; // User cancelled
+          keyPath = (await expandHomeDir(resolved.keyPath)) || null;
+          keyPassphrase = resolved.passphrase;
+        } else if (saved.auth_type === "key") {
+          keyPath = (await expandHomeDir(saved.key_path)) || null;
+          keyPassphrase = credentials.key_passphrase;
+        }
 
         // Register the SSH config for SFTP use
         await invoke("register_sftp_session", {
@@ -284,8 +331,8 @@ function App() {
           port: saved.port,
           username: saved.username,
           password: saved.auth_type === "password" ? credentials.password : null,
-          keyPath: saved.auth_type === "key" ? keyPath : null,
-          keyPassphrase: saved.auth_type === "key" ? credentials.key_passphrase : null,
+          keyPath,
+          keyPassphrase,
         });
 
         // Create SFTP tab - no paneTree needed, we render SftpBrowser directly
@@ -344,7 +391,20 @@ function App() {
       // Helper function to perform the tunnel connection
       const performTunnelConnection = async () => {
         const sessionId = generateSessionId("tunnel");
-        const keyPath = await expandHomeDir(saved.key_path);
+
+        // Resolve SSH key if saved session uses a key profile
+        let keyPath: string | null = null;
+        let keyPassphrase: string | null = null;
+
+        if (saved.ssh_key_id && saved.auth_type === "key") {
+          const resolved = await resolveSshKey(saved.ssh_key_id);
+          if (!resolved) return; // User cancelled
+          keyPath = (await expandHomeDir(resolved.keyPath)) || null;
+          keyPassphrase = resolved.passphrase;
+        } else if (saved.auth_type === "key") {
+          keyPath = (await expandHomeDir(saved.key_path)) || null;
+          keyPassphrase = credentials.key_passphrase;
+        }
 
         // Register the SSH config for tunnel use (reuses SFTP registration)
         await invoke("register_sftp_session", {
@@ -353,8 +413,8 @@ function App() {
           port: saved.port,
           username: saved.username,
           password: saved.auth_type === "password" ? credentials.password : null,
-          keyPath: saved.auth_type === "key" ? keyPath : null,
-          keyPassphrase: saved.auth_type === "key" ? credentials.key_passphrase : null,
+          keyPath,
+          keyPassphrase,
         });
 
         // Create Tunnel tab
@@ -438,6 +498,7 @@ function App() {
             keyPath: config.keyPath,
             password: config.password,
             keyPassphrase: config.keyPassphrase,
+            sshKeyId: config.sshKeyId || null,
           });
 
           await loadSavedSessions();
@@ -458,7 +519,21 @@ function App() {
       const ptySessionId = generateSessionId("ssh");
 
       try {
-        const keyPath = await expandHomeDir(config.keyPath);
+        // Resolve SSH key if using a saved key profile
+        let resolvedKeyPath = config.keyPath;
+        let resolvedKeyPassphrase = config.keyPassphrase;
+
+        if (config.sshKeyId) {
+          const resolved = await resolveSshKey(config.sshKeyId);
+          if (!resolved) {
+            setIsConnecting(false);
+            return; // User cancelled passphrase prompt
+          }
+          resolvedKeyPath = resolved.keyPath;
+          resolvedKeyPassphrase = resolved.passphrase || undefined;
+        }
+
+        const keyPath = await expandHomeDir(resolvedKeyPath);
         const jumpKeyPath = config.useJumpHost ? await expandHomeDir(config.jumpKeyPath) : undefined;
 
         await invoke("create_ssh_session", {
@@ -468,7 +543,7 @@ function App() {
           username: config.username,
           password: config.password,
           keyPath,
-          keyPassphrase: config.keyPassphrase,
+          keyPassphrase: resolvedKeyPassphrase,
           // Jump host parameters
           jumpHost: config.useJumpHost ? config.jumpHost : null,
           jumpPort: config.useJumpHost ? config.jumpPort : null,
@@ -518,6 +593,7 @@ function App() {
               keyPath: config.keyPath,
               password: config.password,
               keyPassphrase: config.keyPassphrase,
+              sshKeyId: config.sshKeyId || null,
             });
 
             await loadSavedSessions();
@@ -657,6 +733,7 @@ function App() {
         keyPath: config.keyPath,
         password: config.password,
         keyPassphrase: config.keyPassphrase,
+        sshKeyId: config.sshKeyId || null,
       });
 
       await loadSavedSessions();
@@ -678,6 +755,7 @@ function App() {
       username: saved.username,
       authType: saved.auth_type,
       keyPath: saved.key_path,
+      sshKeyId: saved.ssh_key_id,
     });
     setConnectionError(undefined);
     setIsConnectionModalOpen(true);
@@ -699,6 +777,7 @@ function App() {
         username: saved.username,
         authType: saved.auth_type,
         keyPath: saved.key_path,
+        sshKeyId: saved.ssh_key_id,
       });
       setConnectionError(message);
       setIsConnectionModalOpen(true);
@@ -736,17 +815,33 @@ function App() {
         setConnectionError(undefined);
 
         const ptySessionId = generateSessionId("ssh");
-        const keyPath = await expandHomeDir(saved.key_path);
 
         try {
+          // Resolve SSH key if saved session uses a key profile
+          let keyPath: string | null = null;
+          let keyPassphrase: string | null = null;
+
+          if (saved.ssh_key_id && saved.auth_type === "key") {
+            const resolved = await resolveSshKey(saved.ssh_key_id);
+            if (!resolved) {
+              setIsConnecting(false);
+              return; // User cancelled passphrase prompt
+            }
+            keyPath = (await expandHomeDir(resolved.keyPath)) || null;
+            keyPassphrase = resolved.passphrase;
+          } else if (saved.auth_type === "key") {
+            keyPath = (await expandHomeDir(saved.key_path)) || null;
+            keyPassphrase = credentials.key_passphrase;
+          }
+
           await invoke("create_ssh_session", {
             sessionId: ptySessionId,
             host: saved.host,
             port: saved.port,
             username: saved.username,
             password: saved.auth_type === "password" ? credentials.password : null,
-            keyPath: saved.auth_type === "key" ? keyPath : null,
-            keyPassphrase: saved.auth_type === "key" ? credentials.key_passphrase : null,
+            keyPath,
+            keyPassphrase,
           });
 
           const paneTree = createTerminalNode(ptySessionId);
@@ -1672,6 +1767,20 @@ function App() {
         onAccept={handleHostKeyAccept}
         onReject={handleHostKeyReject}
         isLoading={hostKeyLoading}
+      />
+
+      {/* Passphrase Prompt Modal (for SSH key profiles) */}
+      <PassphrasePromptModal
+        isOpen={!!passphrasePrompt}
+        keyName={passphrasePrompt?.keyName || ""}
+        onConfirm={(passphrase) => {
+          passphrasePrompt?.resolve(passphrase);
+          setPassphrasePrompt(null);
+        }}
+        onCancel={() => {
+          passphrasePrompt?.resolve(null);
+          setPassphrasePrompt(null);
+        }}
       />
 
       {/* Settings Modal */}

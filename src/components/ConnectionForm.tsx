@@ -11,6 +11,8 @@ export interface SshConnectionConfig {
   password?: string;
   keyPath?: string;
   keyPassphrase?: string;
+  // SSH key profile ID (when using a saved key from vault)
+  sshKeyId?: string;
   // Jump host (bastion) configuration
   useJumpHost?: boolean;
   jumpHost?: string;

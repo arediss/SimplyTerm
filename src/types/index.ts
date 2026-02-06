@@ -66,6 +66,28 @@ export interface BastionProfileInfo {
   updatedAt: number;
 }
 
+// SSH key profile info (without sensitive data)
+export interface SshKeyProfileInfo {
+  id: string;
+  name: string;
+  keyPath: string;
+  hasPassphrase: boolean;
+  requirePassphrasePrompt: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+// SSH key profile with credentials (for connection use)
+export interface SshKeyProfile {
+  id: string;
+  name: string;
+  key_path: string;
+  passphrase?: string;
+  require_passphrase_prompt: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
 /**
  * Core saved session (connection info only)
  * Plugin-managed metadata (folders, tags, colors) is stored separately via session metadata API
@@ -78,6 +100,7 @@ export interface SavedSession {
   username: string;
   auth_type: "password" | "key";
   key_path?: string;
+  ssh_key_id?: string;
 }
 
 

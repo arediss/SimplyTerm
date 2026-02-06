@@ -32,6 +32,7 @@ import {
 import { usePlugins, type PluginManifest, pluginManager } from "../plugins";
 import PermissionApprovalModal from "./PermissionApprovalModal";
 import { useVault } from "../hooks/useVault";
+import SshKeyManager from "./SshKeyManager";
 import { getThemes } from "../themes";
 import { PluginSettingsPanel } from "../plugins/PluginSettingsPanel";
 import type { SettingsPanelRegistration } from "../plugins/types";
@@ -791,6 +792,8 @@ function SecuritySettings() {
     }
   };
 
+  const [securityTab, setSecurityTab] = useState<"vault" | "sshKeys" | "auth">("vault");
+
   if (!vault.status?.exists) {
     return (
       <div className="space-y-6">
@@ -861,6 +864,54 @@ function SecuritySettings() {
 
   return (
     <div className="space-y-6">
+      {/* Security sub-tabs */}
+      <div className="flex gap-1 p-1 bg-crust rounded-xl">
+        <button
+          type="button"
+          onClick={() => setSecurityTab("vault")}
+          className={`
+            flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200
+            ${securityTab === "vault"
+              ? "bg-surface-0 text-text shadow-sm"
+              : "text-text-muted hover:text-text hover:bg-surface-0/50"
+            }
+          `}
+        >
+          <Shield size={14} />
+          {t("settings.security.tabVault")}
+        </button>
+        <button
+          type="button"
+          onClick={() => setSecurityTab("sshKeys")}
+          className={`
+            flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200
+            ${securityTab === "sshKeys"
+              ? "bg-surface-0 text-text shadow-sm"
+              : "text-text-muted hover:text-text hover:bg-surface-0/50"
+            }
+          `}
+        >
+          <Key size={14} />
+          {t("settings.security.tabSshKeys")}
+        </button>
+        <button
+          type="button"
+          onClick={() => setSecurityTab("auth")}
+          className={`
+            flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200
+            ${securityTab === "auth"
+              ? "bg-surface-0 text-text shadow-sm"
+              : "text-text-muted hover:text-text hover:bg-surface-0/50"
+            }
+          `}
+        >
+          <KeyRound size={14} />
+          {t("settings.security.tabAuthentication")}
+        </button>
+      </div>
+
+      {/* === Vault Tab === */}
+      {securityTab === "vault" && <>
       {/* Vault Status */}
       <SettingGroup title={t("settings.security.vaultStatusTitle")} description={t("settings.security.vaultStatusDesc")}>
         <div className="flex items-center justify-between p-4 bg-surface-0/20 rounded-lg">
@@ -943,6 +994,56 @@ function SecuritySettings() {
         )}
       </SettingGroup>
 
+      {/* Delete Vault */}
+      <SettingGroup title={t("settings.security.deleteVaultTitle")} description={t("settings.security.deleteVaultDesc")}>
+        {!showDeleteConfirm ? (
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="px-4 py-2.5 bg-error/10 text-error text-sm rounded-lg hover:bg-error/20 transition-colors"
+          >
+            <Trash2 size={16} className="inline mr-2" />
+            {t("settings.security.deleteVault")}
+          </button>
+        ) : (
+          <div className="p-4 bg-error/10 rounded-lg border border-error/30 space-y-4">
+            <p className="text-sm text-error">
+              {t("settings.security.deleteVaultWarning")}
+            </p>
+            <input
+              type="password"
+              placeholder={t("settings.security.deleteVaultPasswordPrompt")}
+              value={deletePassword}
+              onChange={(e) => setDeletePassword(e.target.value)}
+              className="w-full px-4 py-3 bg-surface-0/30 border border-error/30 rounded-xl text-text placeholder-text-muted/50 focus:outline-none focus:ring-2 focus:ring-error"
+            />
+            {deleteError && <p className="text-sm text-error">{deleteError}</p>}
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setShowDeleteConfirm(false); setDeletePassword(''); setDeleteError(null); }}
+                className="flex-1 py-2 bg-surface-0/50 text-text-muted text-sm rounded-lg hover:bg-surface-0 transition-colors"
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                onClick={handleDeleteVault}
+                disabled={!deletePassword}
+                className="flex-1 py-2 bg-error text-white text-sm font-medium rounded-lg hover:bg-error/90 transition-colors disabled:opacity-50"
+              >
+                {t("settings.security.deletePermanently")}
+              </button>
+            </div>
+          </div>
+        )}
+      </SettingGroup>
+      </>}
+
+      {/* === SSH Keys Tab === */}
+      {securityTab === "sshKeys" && <>
+      <SshKeyManager isVaultUnlocked={vault.status?.isUnlocked || false} />
+      </>}
+
+      {/* === Authentication Tab === */}
+      {securityTab === "auth" && <>
       {/* PIN Management */}
       <SettingGroup title={t("settings.security.pinTitle")} description={t("settings.security.pinDesc")}>
         {!showPinSetup ? (
@@ -1295,48 +1396,7 @@ function SecuritySettings() {
           </div>
         )}
       </SettingGroup>
-
-      {/* Delete Vault */}
-      <SettingGroup title={t("settings.security.deleteVaultTitle")} description={t("settings.security.deleteVaultDesc")}>
-        {!showDeleteConfirm ? (
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="px-4 py-2.5 bg-error/10 text-error text-sm rounded-lg hover:bg-error/20 transition-colors"
-          >
-            <Trash2 size={16} className="inline mr-2" />
-            {t("settings.security.deleteVault")}
-          </button>
-        ) : (
-          <div className="p-4 bg-error/10 rounded-lg border border-error/30 space-y-4">
-            <p className="text-sm text-error">
-              {t("settings.security.deleteVaultWarning")}
-            </p>
-            <input
-              type="password"
-              placeholder={t("settings.security.deleteVaultPasswordPrompt")}
-              value={deletePassword}
-              onChange={(e) => setDeletePassword(e.target.value)}
-              className="w-full px-4 py-3 bg-surface-0/30 border border-error/30 rounded-xl text-text placeholder-text-muted/50 focus:outline-none focus:ring-2 focus:ring-error"
-            />
-            {deleteError && <p className="text-sm text-error">{deleteError}</p>}
-            <div className="flex gap-2">
-              <button
-                onClick={() => { setShowDeleteConfirm(false); setDeletePassword(''); setDeleteError(null); }}
-                className="flex-1 py-2 bg-surface-0/50 text-text-muted text-sm rounded-lg hover:bg-surface-0 transition-colors"
-              >
-                {t("common.cancel")}
-              </button>
-              <button
-                onClick={handleDeleteVault}
-                disabled={!deletePassword}
-                className="flex-1 py-2 bg-error text-white text-sm font-medium rounded-lg hover:bg-error/90 transition-colors disabled:opacity-50"
-              >
-                {t("settings.security.deletePermanently")}
-              </button>
-            </div>
-          </div>
-        )}
-      </SettingGroup>
+      </>}
     </div>
   );
 }

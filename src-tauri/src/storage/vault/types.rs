@@ -318,6 +318,95 @@ impl From<&BastionProfile> for BastionProfileInfo {
     }
 }
 
+/// An SSH key profile stored in the vault
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SshKeyProfile {
+    /// Unique identifier (UUID)
+    pub id: String,
+    /// Display name for the profile
+    pub name: String,
+    /// Path to the SSH key file
+    pub key_path: String,
+    /// Passphrase for encrypted key (if stored)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub passphrase: Option<String>,
+    /// Whether to prompt for passphrase on every connection
+    #[serde(default)]
+    pub require_passphrase_prompt: bool,
+    /// Creation timestamp (Unix seconds)
+    pub created_at: u64,
+    /// Last update timestamp (Unix seconds)
+    pub updated_at: u64,
+}
+
+impl SshKeyProfile {
+    pub fn new(
+        name: String,
+        key_path: String,
+        passphrase: Option<String>,
+        require_passphrase_prompt: bool,
+    ) -> Self {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        Self {
+            id: uuid::Uuid::new_v4().to_string(),
+            name,
+            key_path,
+            passphrase,
+            require_passphrase_prompt,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+}
+
+impl Drop for SshKeyProfile {
+    fn drop(&mut self) {
+        if let Some(ref mut passphrase) = self.passphrase {
+            passphrase.zeroize();
+        }
+    }
+}
+
+/// Partial update for SSH key profiles
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SshKeyProfileUpdate {
+    pub name: Option<String>,
+    pub key_path: Option<String>,
+    pub passphrase: Option<String>,
+    pub require_passphrase_prompt: Option<bool>,
+}
+
+/// SSH key profile info for frontend (without sensitive data)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SshKeyProfileInfo {
+    pub id: String,
+    pub name: String,
+    pub key_path: String,
+    pub has_passphrase: bool,
+    pub require_passphrase_prompt: bool,
+    pub created_at: u64,
+    pub updated_at: u64,
+}
+
+impl From<&SshKeyProfile> for SshKeyProfileInfo {
+    fn from(profile: &SshKeyProfile) -> Self {
+        Self {
+            id: profile.id.clone(),
+            name: profile.name.clone(),
+            key_path: profile.key_path.clone(),
+            has_passphrase: profile.passphrase.is_some(),
+            require_passphrase_prompt: profile.require_passphrase_prompt,
+            created_at: profile.created_at,
+            updated_at: profile.updated_at,
+        }
+    }
+}
+
 /// Vault data (stored encrypted in vault.enc)
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct VaultData {
@@ -326,6 +415,9 @@ pub struct VaultData {
     /// Bastion/jump host profiles
     #[serde(default)]
     pub bastions: Vec<BastionProfile>,
+    /// SSH key profiles
+    #[serde(default)]
+    pub ssh_keys: Vec<SshKeyProfile>,
 }
 
 impl Drop for VaultData {
@@ -335,6 +427,7 @@ impl Drop for VaultData {
             cred.value.zeroize();
         }
         // Bastions are zeroized via their own Drop impl
+        // SSH keys are zeroized via their own Drop impl
     }
 }
 
@@ -436,6 +529,56 @@ impl VaultData {
         let len_before = self.bastions.len();
         self.bastions.retain(|b| b.id != id);
         self.bastions.len() < len_before
+    }
+
+    /// Get all SSH key profiles
+    pub fn get_ssh_keys(&self) -> &[SshKeyProfile] {
+        &self.ssh_keys
+    }
+
+    /// Get an SSH key profile by ID
+    pub fn get_ssh_key(&self, id: &str) -> Option<&SshKeyProfile> {
+        self.ssh_keys.iter().find(|k| k.id == id)
+    }
+
+    /// Store a new SSH key profile
+    pub fn store_ssh_key(&mut self, key: SshKeyProfile) {
+        self.ssh_keys.retain(|k| k.id != key.id);
+        self.ssh_keys.push(key);
+    }
+
+    /// Update an existing SSH key profile
+    pub fn update_ssh_key(&mut self, id: &str, updates: SshKeyProfileUpdate) -> bool {
+        if let Some(key) = self.ssh_keys.iter_mut().find(|k| k.id == id) {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+
+            if let Some(name) = updates.name {
+                key.name = name;
+            }
+            if let Some(key_path) = updates.key_path {
+                key.key_path = key_path;
+            }
+            if updates.passphrase.is_some() {
+                key.passphrase = updates.passphrase;
+            }
+            if let Some(require_prompt) = updates.require_passphrase_prompt {
+                key.require_passphrase_prompt = require_prompt;
+            }
+            key.updated_at = now;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Delete an SSH key profile
+    pub fn delete_ssh_key(&mut self, id: &str) -> bool {
+        let len_before = self.ssh_keys.len();
+        self.ssh_keys.retain(|k| k.id != id);
+        self.ssh_keys.len() < len_before
     }
 }
 

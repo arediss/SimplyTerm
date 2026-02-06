@@ -5,6 +5,7 @@ import Modal from "./Modal";
 import { SshConnectionConfig } from "./ConnectionForm";
 import { ConnectionType } from "./ConnectionTypeSelector";
 import { TelnetConnectionConfig, SerialConnectionConfig, SerialPortInfo } from "../types";
+import { useSshKeys } from "../hooks/useSshKeys";
 import {
   Terminal,
   Wifi,
@@ -66,6 +67,10 @@ export function NewConnectionModal({
   const [sshPassword, setSshPassword] = useState("");
   const [sshKeyPath, setSshKeyPath] = useState("");
   const [sshKeyPassphrase, setSshKeyPassphrase] = useState("");
+  const [sshKeyId, setSshKeyId] = useState<string>("");
+
+  // SSH saved keys from vault
+  const { keys: savedSshKeys } = useSshKeys();
 
   // Telnet state
   const [telnetName, setTelnetName] = useState("");
@@ -93,6 +98,7 @@ export function NewConnectionModal({
       setSshUsername(initialSshConfig.username || "");
       setSshAuthType(initialSshConfig.authType || "password");
       setSshKeyPath(initialSshConfig.keyPath || "");
+      setSshKeyId(initialSshConfig.sshKeyId || "");
     }
   }, [initialSshConfig]);
 
@@ -155,8 +161,9 @@ export function NewConnectionModal({
           username: sshUsername,
           authType: sshAuthType,
           password: sshAuthType === "password" ? sshPassword : undefined,
-          keyPath: sshAuthType === "key" ? sshKeyPath : undefined,
-          keyPassphrase: sshAuthType === "key" ? sshKeyPassphrase : undefined,
+          keyPath: sshAuthType === "key" && !sshKeyId ? sshKeyPath : undefined,
+          keyPassphrase: sshAuthType === "key" && !sshKeyId ? sshKeyPassphrase : undefined,
+          sshKeyId: sshAuthType === "key" && sshKeyId ? sshKeyId : undefined,
         });
         break;
       case "telnet":
@@ -260,6 +267,9 @@ export function NewConnectionModal({
                 setKeyPath={setSshKeyPath}
                 keyPassphrase={sshKeyPassphrase}
                 setKeyPassphrase={setSshKeyPassphrase}
+                sshKeyId={sshKeyId}
+                setSshKeyId={setSshKeyId}
+                savedSshKeys={savedSshKeys}
               />
             )}
 
@@ -393,6 +403,9 @@ interface SshFormContentProps {
   setKeyPath: (v: string) => void;
   keyPassphrase: string;
   setKeyPassphrase: (v: string) => void;
+  sshKeyId: string;
+  setSshKeyId: (v: string) => void;
+  savedSshKeys: import("../types").SshKeyProfileInfo[];
 }
 
 function SshFormContent(props: SshFormContentProps) {
@@ -480,26 +493,75 @@ function SshFormContent(props: SshFormContentProps) {
           />
         </FormField>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
-          <FormField label={t("connection.keyPath")}>
-            <input
-              type="text"
-              value={props.keyPath}
-              onChange={(e) => props.setKeyPath(e.target.value)}
-              placeholder="~/.ssh/id_rsa"
-              required
-              className="input-field"
-            />
-          </FormField>
-          <FormField label={t("connection.passphraseOptional")}>
-            <input
-              type="password"
-              value={props.keyPassphrase}
-              onChange={(e) => props.setKeyPassphrase(e.target.value)}
-              className="input-field"
-            />
-          </FormField>
-        </div>
+        <>
+          {/* SSH Key selection: saved keys dropdown or custom */}
+          {props.savedSshKeys.length > 0 && (
+            <FormField label={t("settings.security.sshKeysSelectKey")} icon={<Key size={12} />}>
+              <select
+                value={props.sshKeyId}
+                onChange={(e) => {
+                  props.setSshKeyId(e.target.value);
+                  if (e.target.value) {
+                    // Clear manual key fields when selecting a saved key
+                    props.setKeyPath("");
+                    props.setKeyPassphrase("");
+                  }
+                }}
+                className="input-field"
+              >
+                <option value="">{t("settings.security.sshKeysCustomKey")}</option>
+                {props.savedSshKeys.map((key) => (
+                  <option key={key.id} value={key.id}>
+                    {key.name} ({key.keyPath})
+                  </option>
+                ))}
+              </select>
+            </FormField>
+          )}
+
+          {/* Show manual key path/passphrase only when "Custom key" is selected */}
+          {!props.sshKeyId && (
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label={t("connection.keyPath")}>
+                <input
+                  type="text"
+                  value={props.keyPath}
+                  onChange={(e) => props.setKeyPath(e.target.value)}
+                  placeholder="~/.ssh/id_rsa"
+                  required
+                  className="input-field"
+                />
+              </FormField>
+              <FormField label={t("connection.passphraseOptional")}>
+                <input
+                  type="password"
+                  value={props.keyPassphrase}
+                  onChange={(e) => props.setKeyPassphrase(e.target.value)}
+                  className="input-field"
+                />
+              </FormField>
+            </div>
+          )}
+
+          {/* Show selected key info when a saved key is chosen */}
+          {props.sshKeyId && (() => {
+            const selectedKey = props.savedSshKeys.find(k => k.id === props.sshKeyId);
+            if (!selectedKey) return null;
+            return (
+              <div className="px-3 py-2 bg-surface-0/30 rounded-lg text-xs text-text-muted space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-text-muted">{t("settings.security.sshKeysKeyPath")}:</span>
+                  <span className="text-text">{selectedKey.keyPath}</span>
+                </div>
+                {selectedKey.requirePassphrasePrompt && (
+                  <div className="text-warning text-[10px]">
+                    {t("settings.security.sshKeysAlwaysAskPassphrase")}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </>
       )}
 
     </div>

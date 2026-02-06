@@ -245,6 +245,29 @@ export default {
       autoLock30min: "30 minutes",
       // Option verrouillage auto : 1 heure
       autoLock1hour: "1 heure",
+      // Onglets sécurité
+      tabVault: "Coffre",
+      tabSshKeys: "Clés SSH",
+      tabAuthentication: "Authentification",
+      // Section clés SSH
+      sshKeysTitle: "Clés SSH",
+      sshKeysDesc: "Gérez vos profils de clés SSH stockés dans le vault",
+      sshKeysAddKey: "Ajouter une clé SSH",
+      sshKeysEditKey: "Modifier la clé",
+      sshKeysDeleteKey: "Supprimer la clé",
+      sshKeysName: "Nom",
+      sshKeysKeyPath: "Chemin de la clé",
+      sshKeysPassphrase: "Phrase de passe",
+      sshKeysAlwaysAskPassphrase: "Toujours demander la phrase de passe",
+      sshKeysAlwaysAskPassphraseDesc: "Demander la phrase de passe à chaque connexion au lieu de la stocker",
+      sshKeysNoKeys: "Aucune clé SSH enregistrée",
+      sshKeysConfirmDelete: "Êtes-vous sûr de vouloir supprimer cette clé SSH ?",
+      sshKeysPassphraseRequired: "Phrase de passe requise",
+      sshKeysEnterPassphraseFor: "Entrez la phrase de passe pour",
+      sshKeysCustomKey: "Clé personnalisée...",
+      sshKeysSelectKey: "Sélectionner une clé SSH",
+      sshKeysNamePlaceholder: "Ma clé serveur",
+      sshKeysKeyPathPlaceholder: "~/.ssh/id_rsa",
       // Titre du groupe mode sécurité maximale
       maxSecurityTitle: "Mode sécurité maximale",
       // Description du mode sécurité maximale

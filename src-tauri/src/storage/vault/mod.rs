@@ -24,4 +24,4 @@ mod types;
 // Re-export types for external use
 pub use commands::*;
 pub use state::VaultState;
-pub use types::{VaultBundle, VaultCredentialType, VaultExportResult, SyncMeta};
+pub use types::{SshKeyProfile, SshKeyProfileInfo, VaultBundle, VaultCredentialType, VaultExportResult, SyncMeta};

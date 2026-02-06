@@ -827,6 +827,131 @@ impl VaultState {
         Ok(deleted)
     }
 
+    // ========================================================================
+    // SSH Key Profile Methods
+    // ========================================================================
+
+    /// List all SSH key profiles (info only, no credentials)
+    pub fn list_ssh_keys(&self) -> Result<Vec<super::types::SshKeyProfileInfo>, String> {
+        if !self.is_unlocked() {
+            return Err("Vault is locked".to_string());
+        }
+
+        let data = self.data.read();
+        let data = data.as_ref().ok_or("Vault data not loaded")?;
+
+        Ok(data.get_ssh_keys().iter().map(|k| k.into()).collect())
+    }
+
+    /// Get an SSH key profile info (without sensitive data)
+    pub fn get_ssh_key_info(&self, id: &str) -> Result<Option<super::types::SshKeyProfileInfo>, String> {
+        if !self.is_unlocked() {
+            return Err("Vault is locked".to_string());
+        }
+
+        let data = self.data.read();
+        let data = data.as_ref().ok_or("Vault data not loaded")?;
+
+        Ok(data.get_ssh_key(id).map(|k| k.into()))
+    }
+
+    /// Get an SSH key profile with credentials (for actual connection use)
+    pub fn get_ssh_key_with_credentials(&self, id: &str) -> Result<Option<super::types::SshKeyProfile>, String> {
+        if !self.is_unlocked() {
+            return Err("Vault is locked".to_string());
+        }
+
+        let data = self.data.read();
+        let data = data.as_ref().ok_or("Vault data not loaded")?;
+
+        self.touch();
+        Ok(data.get_ssh_key(id).cloned())
+    }
+
+    /// Create a new SSH key profile
+    pub fn create_ssh_key(
+        &self,
+        name: String,
+        key_path: String,
+        passphrase: Option<String>,
+        require_passphrase_prompt: bool,
+    ) -> Result<super::types::SshKeyProfileInfo, String> {
+        if !self.is_unlocked() {
+            return Err("Vault is locked".to_string());
+        }
+
+        let key = super::types::SshKeyProfile::new(
+            name,
+            key_path,
+            passphrase,
+            require_passphrase_prompt,
+        );
+        let info: super::types::SshKeyProfileInfo = (&key).into();
+
+        {
+            let mut data = self.data.write();
+            let data = data.as_mut().ok_or("Vault data not loaded")?;
+            data.store_ssh_key(key);
+        }
+
+        self.save_data()?;
+        self.touch();
+        Ok(info)
+    }
+
+    /// Update an existing SSH key profile
+    pub fn update_ssh_key(
+        &self,
+        id: &str,
+        name: Option<String>,
+        key_path: Option<String>,
+        passphrase: Option<String>,
+        require_passphrase_prompt: Option<bool>,
+    ) -> Result<bool, String> {
+        if !self.is_unlocked() {
+            return Err("Vault is locked".to_string());
+        }
+
+        let updated = {
+            let mut data = self.data.write();
+            let data = data.as_mut().ok_or("Vault data not loaded")?;
+            data.update_ssh_key(
+                id,
+                super::types::SshKeyProfileUpdate {
+                    name,
+                    key_path,
+                    passphrase,
+                    require_passphrase_prompt,
+                },
+            )
+        };
+
+        if updated {
+            self.save_data()?;
+        }
+        self.touch();
+        Ok(updated)
+    }
+
+    /// Delete an SSH key profile
+    pub fn delete_ssh_key(&self, id: &str) -> Result<bool, String> {
+        if !self.is_unlocked() {
+            return Err("Vault is locked".to_string());
+        }
+
+        let deleted = {
+            let mut data = self.data.write();
+            let data = data.as_mut().ok_or("Vault data not loaded")?;
+            data.delete_ssh_key(id)
+        };
+
+        if deleted {
+            self.save_data()?;
+        }
+        self.touch();
+        Ok(deleted)
+    }
+
     /// Update vault settings
     pub fn update_settings(&self, auto_lock_timeout: u32) -> Result<(), String> {
         if !self.is_unlocked() {

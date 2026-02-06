@@ -23,6 +23,8 @@ pub struct SavedSession {
     pub auth_type: AuthType,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub key_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ssh_key_id: Option<String>,
 }
 
 fn get_config_path() -> Result<PathBuf, String> {
@@ -81,6 +83,7 @@ mod tests {
             username: "user".to_string(),
             auth_type: AuthType::Password,
             key_path: None,
+            ssh_key_id: None,
         };
 
         let json = serde_json::to_string(&session).unwrap();

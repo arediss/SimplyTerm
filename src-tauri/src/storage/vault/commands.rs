@@ -8,7 +8,9 @@ use tauri::State;
 use super::fido2::{self, SecurityKeyInfo};
 use super::state::VaultState;
 use super::types::{
-    BastionAuthType, BastionProfile, BastionProfileInfo, VaultBundle, VaultCredentialType,
+    BastionAuthType, BastionProfile, BastionProfileInfo,
+    SshKeyProfile, SshKeyProfileInfo,
+    VaultBundle, VaultCredentialType,
     VaultExportResult, VaultStatus, SyncMeta,
 };
 
@@ -323,4 +325,57 @@ pub fn update_bastion(
 #[tauri::command]
 pub fn delete_bastion(vault: State<VaultStateHandle>, id: String) -> Result<bool, String> {
     vault.delete_bastion(&id)
+}
+
+// ============================================================================
+// SSH Key Profile Commands
+// ============================================================================
+
+/// List all SSH key profiles (without sensitive data)
+#[tauri::command]
+pub fn list_ssh_keys(vault: State<VaultStateHandle>) -> Result<Vec<SshKeyProfileInfo>, String> {
+    vault.list_ssh_keys()
+}
+
+/// Get an SSH key profile by ID (without sensitive data)
+#[tauri::command]
+pub fn get_ssh_key(vault: State<VaultStateHandle>, id: String) -> Result<Option<SshKeyProfileInfo>, String> {
+    vault.get_ssh_key_info(&id)
+}
+
+/// Get full SSH key profile including passphrase (for connection use)
+#[tauri::command]
+pub fn get_ssh_key_credentials(vault: State<VaultStateHandle>, id: String) -> Result<Option<SshKeyProfile>, String> {
+    vault.get_ssh_key_with_credentials(&id)
+}
+
+/// Create a new SSH key profile
+#[tauri::command]
+pub fn create_ssh_key(
+    vault: State<VaultStateHandle>,
+    name: String,
+    key_path: String,
+    passphrase: Option<String>,
+    require_passphrase_prompt: bool,
+) -> Result<SshKeyProfileInfo, String> {
+    vault.create_ssh_key(name, key_path, passphrase, require_passphrase_prompt)
+}
+
+/// Update an SSH key profile
+#[tauri::command]
+pub fn update_ssh_key(
+    vault: State<VaultStateHandle>,
+    id: String,
+    name: Option<String>,
+    key_path: Option<String>,
+    passphrase: Option<String>,
+    require_passphrase_prompt: Option<bool>,
+) -> Result<bool, String> {
+    vault.update_ssh_key(&id, name, key_path, passphrase, require_passphrase_prompt)
+}
+
+/// Delete an SSH key profile
+#[tauri::command]
+pub fn delete_ssh_key(vault: State<VaultStateHandle>, id: String) -> Result<bool, String> {
+    vault.delete_ssh_key(&id)
 }

@@ -245,6 +245,29 @@ export default {
       autoLock30min: "30 minutes",
       // Auto-lock option: 1 hour
       autoLock1hour: "1 hour",
+      // Security tabs
+      tabVault: "Vault",
+      tabSshKeys: "SSH Keys",
+      tabAuthentication: "Authentication",
+      // SSH Keys section
+      sshKeysTitle: "SSH Keys",
+      sshKeysDesc: "Manage your SSH key profiles stored in the vault",
+      sshKeysAddKey: "Add SSH Key",
+      sshKeysEditKey: "Edit key",
+      sshKeysDeleteKey: "Delete key",
+      sshKeysName: "Name",
+      sshKeysKeyPath: "Key path",
+      sshKeysPassphrase: "Passphrase",
+      sshKeysAlwaysAskPassphrase: "Always ask passphrase",
+      sshKeysAlwaysAskPassphraseDesc: "Prompt for passphrase on every connection instead of storing it",
+      sshKeysNoKeys: "No SSH keys saved yet",
+      sshKeysConfirmDelete: "Are you sure you want to delete this SSH key?",
+      sshKeysPassphraseRequired: "Passphrase required",
+      sshKeysEnterPassphraseFor: "Enter passphrase for",
+      sshKeysCustomKey: "Custom key...",
+      sshKeysSelectKey: "Select an SSH key",
+      sshKeysNamePlaceholder: "My server key",
+      sshKeysKeyPathPlaceholder: "~/.ssh/id_rsa",
       // Maximum security mode group title
       maxSecurityTitle: "Maximum security mode",
       // Maximum security mode description

@@ -36,6 +36,7 @@ pub fn save_session(
         username,
         auth_type: auth,
         key_path,
+        ssh_key_id: None,
     };
 
     sessions.push(session.clone());

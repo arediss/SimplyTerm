@@ -494,6 +494,7 @@ struct SavedSessionResponse {
     username: String,
     auth_type: String,
     key_path: Option<String>,
+    ssh_key_id: Option<String>,
 }
 
 impl From<SavedSession> for SavedSessionResponse {
@@ -509,6 +510,7 @@ impl From<SavedSession> for SavedSessionResponse {
                 AuthType::Key => "key".to_string(),
             },
             key_path: s.key_path,
+            ssh_key_id: s.ssh_key_id,
         }
     }
 }
@@ -533,6 +535,7 @@ fn save_session(
     key_path: Option<String>,
     password: Option<String>,
     key_passphrase: Option<String>,
+    ssh_key_id: Option<String>,
 ) -> Result<(), String> {
     let state = app.state::<AppState>();
 
@@ -552,6 +555,7 @@ fn save_session(
         username,
         auth_type: auth,
         key_path,
+        ssh_key_id,
     };
 
     sessions.push(session);
@@ -1097,6 +1101,7 @@ fn plugin_api_create_session(
         username,
         auth_type: auth,
         key_path,
+        ssh_key_id: None,
     };
 
     let mut sessions = load_sessions()?;
@@ -1733,6 +1738,13 @@ pub fn run() {
             storage::vault::create_bastion,
             storage::vault::update_bastion,
             storage::vault::delete_bastion,
+            // SSH Key Profiles
+            storage::vault::list_ssh_keys,
+            storage::vault::get_ssh_key,
+            storage::vault::get_ssh_key_credentials,
+            storage::vault::create_ssh_key,
+            storage::vault::update_ssh_key,
+            storage::vault::delete_ssh_key,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
