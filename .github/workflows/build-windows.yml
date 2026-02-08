@@ -26,16 +26,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Read version from tauri.conf.json
-        id: version
-        shell: pwsh
-        run: |
-          $conf = Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json
-          $version = $conf.version
-          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
-          echo "TAG=v$version" >> $env:GITHUB_OUTPUT
-          echo "Version: $version"
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -53,33 +43,14 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build Tauri app
-        run: npm run tauri build
+      - name: Build and release Tauri app
+        uses: tauri-apps/tauri-action@v0
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
         with:
-          name: SimplyTerm-${{ steps.version.outputs.TAG }}-windows
-          path: |
-            src-tauri/target/release/bundle/msi/*.msi
-            src-tauri/target/release/bundle/msi/*.msi.sig
-            src-tauri/target/release/bundle/nsis/*.exe
-            src-tauri/target/release/bundle/nsis/*.exe.sig
-          retention-days: 30
-
-      - name: Create Release
-        if: inputs.create_release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.version.outputs.TAG }}
-          name: SimplyTerm ${{ steps.version.outputs.TAG }}
-          draft: ${{ inputs.draft }}
-          files: |
-            src-tauri/target/release/bundle/msi/*.msi
-            src-tauri/target/release/bundle/msi/*.msi.sig
-            src-tauri/target/release/bundle/nsis/*.exe
-            src-tauri/target/release/bundle/nsis/*.exe.sig
-            src-tauri/target/release/bundle/nsis/latest.json
+          tagName: v__VERSION__
+          releaseName: SimplyTerm v__VERSION__
+          releaseDraft: ${{ inputs.draft }}
+          prerelease: false
