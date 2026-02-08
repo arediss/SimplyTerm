@@ -1,6 +1,6 @@
 {
   "name": "simplyterm",
-  "version": "0.3.0-alpha",
+  "version": "0.3.0",
   "description": "A modern, fast, cross-platform terminal",
   "type": "module",
   "scripts": {
@@ -33,7 +33,7 @@
   "homepage": "https://github.com/arediss/SimplyTerm#readme",
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",
-    "@tauri-apps/cli": "^2.9.6",
+    "@tauri-apps/cli": "^2.10.0",
     "@types/dompurify": "^3.0.5",
     "@types/react": "^19.2.9",
     "@types/react-dom": "^19.2.3",
