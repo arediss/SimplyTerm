@@ -5,7 +5,7 @@ use super::manifest::PluginManifest;
 use super::manager::PluginManager;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::io::Cursor;
+use std::io::{Cursor, Read};
 use std::path::PathBuf;
 
 /// Default official registry URL
@@ -336,11 +336,26 @@ pub async fn download_and_install(
     Ok(installed_id)
 }
 
-/// Extracts a zip archive to a target directory
+// Zip bomb protection limits
+const MAX_ZIP_FILES: usize = 100;
+const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024; // 10 MB per file
+const MAX_TOTAL_SIZE: u64 = 50 * 1024 * 1024; // 50 MB total decompressed
+
+/// Extracts a zip archive to a target directory with zip bomb protection
 fn extract_zip(data: &[u8], target_dir: &PathBuf) -> PluginResult<()> {
     let cursor = Cursor::new(data);
     let mut archive = zip::ZipArchive::new(cursor)
         .map_err(|e| PluginError::internal(format!("Failed to open zip: {}", e)))?;
+
+    // Security: limit number of entries
+    if archive.len() > MAX_ZIP_FILES {
+        return Err(PluginError::internal(format!(
+            "Zip contains too many files ({}, max {}). Possible zip bomb.",
+            archive.len(), MAX_ZIP_FILES
+        )));
+    }
+
+    let mut total_size: u64 = 0;
 
     for i in 0..archive.len() {
         let mut file = archive
@@ -354,10 +369,28 @@ fn extract_zip(data: &[u8], target_dir: &PathBuf) -> PluginResult<()> {
             continue;
         }
 
+        // Security: check declared uncompressed size before extracting
+        let file_size = file.size();
+        if file_size > MAX_FILE_SIZE {
+            return Err(PluginError::internal(format!(
+                "File '{}' is too large ({:.1} MB, max {} MB). Possible zip bomb.",
+                name, file_size as f64 / 1_048_576.0, MAX_FILE_SIZE / 1_048_576
+            )));
+        }
+
+        total_size += file_size;
+        if total_size > MAX_TOTAL_SIZE {
+            // Clean up what we've already extracted
+            let _ = fs::remove_dir_all(target_dir);
+            return Err(PluginError::internal(format!(
+                "Total decompressed size exceeds {} MB. Possible zip bomb.",
+                MAX_TOTAL_SIZE / 1_048_576
+            )));
+        }
+
         let out_path = target_dir.join(&name);
 
         // Security: verify resolved path stays inside target_dir
-        // Use normalize (join + components) since canonicalize requires the file to exist
         let normalized = out_path.components().collect::<std::path::PathBuf>();
         let target_normalized = target_dir.components().collect::<std::path::PathBuf>();
         if !normalized.starts_with(&target_normalized) {
@@ -380,9 +413,21 @@ fn extract_zip(data: &[u8], target_dir: &PathBuf) -> PluginResult<()> {
                 PluginError::storage_error(format!("Failed to create file {}: {}", name, e))
             })?;
 
-            std::io::copy(&mut file, &mut outfile).map_err(|e| {
-                PluginError::storage_error(format!("Failed to write file {}: {}", name, e))
-            })?;
+            // Security: use limited copy instead of unbounded copy
+            // This catches zip bombs where declared size is small but actual data is huge
+            let mut limited = (&mut file).take(MAX_FILE_SIZE + 1);
+            let copied = std::io::copy(&mut limited, &mut outfile)
+                .map_err(|e| {
+                    PluginError::storage_error(format!("Failed to write file {}: {}", name, e))
+                })?;
+
+            if copied > MAX_FILE_SIZE {
+                let _ = fs::remove_dir_all(target_dir);
+                return Err(PluginError::internal(format!(
+                    "File '{}' exceeded max size during extraction. Possible zip bomb.",
+                    name
+                )));
+            }
         }
     }
 
