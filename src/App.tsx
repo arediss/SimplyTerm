@@ -72,25 +72,23 @@ function App() {
     lockVault,
   } = useVaultFlow();
 
-  // Apply theme
-  useEffect(() => {
-    const themeId = appSettings.appearance?.theme ?? "dark";
-    applyTheme(themeId);
-  }, [appSettings.appearance?.theme]);
-
-  // Apply window blur effect (separate from theme)
+  // Apply theme and window blur effect together (blur must be set before theme)
   useEffect(() => {
     const effect = appSettings.appearance?.windowEffect ?? "none";
     const hasBlur = effect !== "none";
 
-    // Set data attribute for CSS
+    // Set data attribute BEFORE applying theme (applyTheme reads dataset.blur)
     document.documentElement.dataset.blur = hasBlur ? "true" : "false";
+
+    // Apply theme (checks dataset.blur to decide transparent vs gradient)
+    const themeId = appSettings.appearance?.theme ?? "dark";
+    applyTheme(themeId);
 
     // Apply native window effect
     invoke("set_window_effect", { effect }).catch((err) => {
       console.warn(`Failed to apply window effect "${effect}":`, err);
     });
-  }, [appSettings.appearance?.windowEffect]);
+  }, [appSettings.appearance?.theme, appSettings.appearance?.windowEffect]);
 
   // Sidebar state - un seul sidebar ouvert à la fois
   const [openSidebar, setOpenSidebar] = useState<"none" | "menu" | "tunnel">("none");
