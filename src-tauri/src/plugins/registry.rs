@@ -5,7 +5,7 @@ use super::manifest::PluginManifest;
 use super::manager::PluginManager;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::io::Cursor;
+use std::io::{Cursor, Read};
 use std::path::PathBuf;
 
 /// Default official registry URL
@@ -120,6 +120,9 @@ pub struct PluginUpdate {
     pub latest_version: String,
     /// Download URL for the update
     pub download_url: String,
+    /// SHA256 checksum of the zip
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub checksum: Option<String>,
     /// Changelog/description
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
@@ -229,6 +232,7 @@ pub fn check_updates(
                     current_version: installed_plugin.manifest.version.clone(),
                     latest_version: registry_plugin.version.clone(),
                     download_url: registry_plugin.download_url.clone(),
+                    checksum: registry_plugin.checksum.clone(),
                     description: Some(registry_plugin.description.clone()),
                 });
             }
@@ -278,14 +282,21 @@ pub async fn download_and_install(
         .await
         .map_err(|e| PluginError::internal(format!("Failed to read download: {}", e)))?;
 
-    // Verify checksum if provided
-    if let Some(expected) = &plugin.checksum {
-        let actual = sha256_hex(&bytes);
-        if actual != *expected {
-            return Err(PluginError::internal(format!(
-                "Checksum mismatch: expected {}, got {}",
-                expected, actual
-            )));
+    // Verify checksum (required for registry installs)
+    match &plugin.checksum {
+        Some(expected) => {
+            let actual = sha256_hex(&bytes);
+            if actual != *expected {
+                return Err(PluginError::internal(format!(
+                    "Checksum mismatch: expected {}, got {}. The plugin zip may have been tampered with.",
+                    expected, actual
+                )));
+            }
+        }
+        None => {
+            return Err(PluginError::internal(
+                "Plugin has no checksum. Cannot verify integrity. Aborting install.".to_string(),
+            ));
         }
     }
 
@@ -325,11 +336,26 @@ pub async fn download_and_install(
     Ok(installed_id)
 }
 
-/// Extracts a zip archive to a target directory
+// Zip bomb protection limits
+const MAX_ZIP_FILES: usize = 100;
+const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024; // 10 MB per file
+const MAX_TOTAL_SIZE: u64 = 50 * 1024 * 1024; // 50 MB total decompressed
+
+/// Extracts a zip archive to a target directory with zip bomb protection
 fn extract_zip(data: &[u8], target_dir: &PathBuf) -> PluginResult<()> {
     let cursor = Cursor::new(data);
     let mut archive = zip::ZipArchive::new(cursor)
         .map_err(|e| PluginError::internal(format!("Failed to open zip: {}", e)))?;
+
+    // Security: limit number of entries
+    if archive.len() > MAX_ZIP_FILES {
+        return Err(PluginError::internal(format!(
+            "Zip contains too many files ({}, max {}). Possible zip bomb.",
+            archive.len(), MAX_ZIP_FILES
+        )));
+    }
+
+    let mut total_size: u64 = 0;
 
     for i in 0..archive.len() {
         let mut file = archive
@@ -338,12 +364,38 @@ fn extract_zip(data: &[u8], target_dir: &PathBuf) -> PluginResult<()> {
 
         let name = file.name().to_string();
 
-        // Security: reject path traversal
-        if name.contains("..") {
+        // Security: reject path traversal and absolute paths
+        if name.contains("..") || name.starts_with('/') || name.starts_with('\\') {
             continue;
         }
 
+        // Security: check declared uncompressed size before extracting
+        let file_size = file.size();
+        if file_size > MAX_FILE_SIZE {
+            return Err(PluginError::internal(format!(
+                "File '{}' is too large ({:.1} MB, max {} MB). Possible zip bomb.",
+                name, file_size as f64 / 1_048_576.0, MAX_FILE_SIZE / 1_048_576
+            )));
+        }
+
+        total_size += file_size;
+        if total_size > MAX_TOTAL_SIZE {
+            // Clean up what we've already extracted
+            let _ = fs::remove_dir_all(target_dir);
+            return Err(PluginError::internal(format!(
+                "Total decompressed size exceeds {} MB. Possible zip bomb.",
+                MAX_TOTAL_SIZE / 1_048_576
+            )));
+        }
+
         let out_path = target_dir.join(&name);
+
+        // Security: verify resolved path stays inside target_dir
+        let normalized = out_path.components().collect::<std::path::PathBuf>();
+        let target_normalized = target_dir.components().collect::<std::path::PathBuf>();
+        if !normalized.starts_with(&target_normalized) {
+            continue;
+        }
 
         if file.is_dir() {
             fs::create_dir_all(&out_path).map_err(|e| {
@@ -361,9 +413,21 @@ fn extract_zip(data: &[u8], target_dir: &PathBuf) -> PluginResult<()> {
                 PluginError::storage_error(format!("Failed to create file {}: {}", name, e))
             })?;
 
-            std::io::copy(&mut file, &mut outfile).map_err(|e| {
-                PluginError::storage_error(format!("Failed to write file {}: {}", name, e))
-            })?;
+            // Security: use limited copy instead of unbounded copy
+            // This catches zip bombs where declared size is small but actual data is huge
+            let mut limited = (&mut file).take(MAX_FILE_SIZE + 1);
+            let copied = std::io::copy(&mut limited, &mut outfile)
+                .map_err(|e| {
+                    PluginError::storage_error(format!("Failed to write file {}: {}", name, e))
+                })?;
+
+            if copied > MAX_FILE_SIZE {
+                let _ = fs::remove_dir_all(target_dir);
+                return Err(PluginError::internal(format!(
+                    "File '{}' exceeded max size during extraction. Possible zip bomb.",
+                    name
+                )));
+            }
         }
     }
 

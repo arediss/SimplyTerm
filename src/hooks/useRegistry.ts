@@ -29,6 +29,7 @@ export interface PluginUpdate {
   currentVersion: string;
   latestVersion: string;
   downloadUrl: string;
+  checksum?: string;
   description?: string;
 }
 
