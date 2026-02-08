@@ -450,6 +450,22 @@ export default {
       userGuide: "User guide",
       // Footer text
       footer: "Made with passion. Open source under MIT license.",
+      // Update section
+      updateTitle: "Updates",
+      updateDesc: "Check for new versions",
+      upToDate: "You're up to date",
+      latestVersion: "latest",
+      checking: "Checking for updates...",
+      updateAvailable: "Update available!",
+      downloading: "Downloading...",
+      installing: "Installing update...",
+      readyToInstall: "Update ready",
+      checkNow: "Check now",
+      updateAndRestart: "Update & Restart",
+      later: "Later",
+      updateError: "Update check failed",
+      retry: "Retry",
+      releaseNotes: "Release notes",
     },
   },
 

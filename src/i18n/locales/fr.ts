@@ -450,6 +450,22 @@ export default {
       userGuide: "Guide d'utilisation",
       // Texte du pied de page
       footer: "Fait avec passion. Open source sous licence MIT.",
+      // Section mise à jour
+      updateTitle: "Mises à jour",
+      updateDesc: "Vérifier les nouvelles versions",
+      upToDate: "Vous êtes à jour",
+      latestVersion: "dernière version",
+      checking: "Recherche de mises à jour...",
+      updateAvailable: "Mise à jour disponible !",
+      downloading: "Téléchargement...",
+      installing: "Installation de la mise à jour...",
+      readyToInstall: "Mise à jour prête",
+      checkNow: "Vérifier",
+      updateAndRestart: "Mettre à jour et redémarrer",
+      later: "Plus tard",
+      updateError: "Échec de la vérification",
+      retry: "Réessayer",
+      releaseNotes: "Notes de version",
     },
   },
 

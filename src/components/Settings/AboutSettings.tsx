@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { getVersion } from "@tauri-apps/api/app";
+import { check, type Update } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 import {
   Terminal,
   Github,
@@ -8,13 +10,36 @@ import {
   Heart,
   Copy,
   Check,
+  ArrowUpCircle,
+  CheckCircle2,
+  RefreshCw,
+  AlertCircle,
+  Download,
+  Loader2,
 } from "lucide-react";
 import { SettingGroup, LinkButton } from "./SettingsUIComponents";
+
+type UpdateStatus =
+  | "idle"
+  | "checking"
+  | "up-to-date"
+  | "available"
+  | "downloading"
+  | "installing"
+  | "ready"
+  | "error";
 
 export default function AboutSettings() {
   const { t } = useTranslation();
   const [appVersion, setAppVersion] = useState<string>("...");
   const [copied, setCopied] = useState(false);
+
+  // Update state
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
+  const [updateInfo, setUpdateInfo] = useState<Update | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadTotal, setDownloadTotal] = useState(0);
+  const [updateError, setUpdateError] = useState<string>("");
 
   useEffect(() => {
     getVersion().then(setAppVersion).catch(() => setAppVersion("?"));
@@ -24,6 +49,66 @@ export default function AboutSettings() {
     navigator.clipboard.writeText(`SimplyTerm v${appVersion}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  };
+
+  const handleCheckUpdate = useCallback(async () => {
+    setUpdateStatus("checking");
+    setUpdateError("");
+    setDownloadProgress(0);
+    setDownloadTotal(0);
+
+    try {
+      const update = await check();
+      if (update) {
+        setUpdateInfo(update);
+        setUpdateStatus("available");
+      } else {
+        setUpdateInfo(null);
+        setUpdateStatus("up-to-date");
+      }
+    } catch (err) {
+      setUpdateError(err instanceof Error ? err.message : String(err));
+      setUpdateStatus("error");
+    }
+  }, []);
+
+  const handleDownloadAndInstall = useCallback(async () => {
+    if (!updateInfo) return;
+
+    setUpdateStatus("downloading");
+    setDownloadProgress(0);
+
+    try {
+      await updateInfo.downloadAndInstall((event) => {
+        if (event.event === "Started") {
+          setDownloadTotal(event.data.contentLength ?? 0);
+        } else if (event.event === "Progress") {
+          setDownloadProgress((prev) => prev + (event.data.chunkLength ?? 0));
+        } else if (event.event === "Finished") {
+          setUpdateStatus("ready");
+        }
+      });
+
+      setUpdateStatus("ready");
+    } catch (err) {
+      setUpdateError(err instanceof Error ? err.message : String(err));
+      setUpdateStatus("error");
+    }
+  }, [updateInfo]);
+
+  const handleRelaunch = useCallback(async () => {
+    await relaunch();
+  }, []);
+
+  const progressPercent =
+    downloadTotal > 0 ? Math.round((downloadProgress / downloadTotal) * 100) : 0;
+
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
   };
 
   return (
@@ -50,6 +135,209 @@ export default function AboutSettings() {
           </div>
         </div>
       </div>
+
+      {/* Updates */}
+      <SettingGroup
+        title={t("settings.about.updateTitle")}
+        description={t("settings.about.updateDesc")}
+      >
+        <div className="rounded-xl bg-surface-0/20 border border-surface-0/20 overflow-hidden">
+          {/* Idle state */}
+          {updateStatus === "idle" && (
+            <div className="flex items-center justify-between p-4">
+              <div className="flex items-center gap-3">
+                <ArrowUpCircle size={20} className="text-text-muted" />
+                <div>
+                  <div className="text-sm text-text">v{appVersion}</div>
+                  <div className="text-xs text-text-muted">
+                    {t("settings.about.updateDesc")}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={handleCheckUpdate}
+                className="px-3 py-1.5 text-xs font-medium bg-accent/15 text-accent hover:bg-accent/25 rounded-lg transition-colors"
+              >
+                {t("settings.about.checkNow")}
+              </button>
+            </div>
+          )}
+
+          {/* Checking */}
+          {updateStatus === "checking" && (
+            <div className="flex items-center gap-3 p-4">
+              <Loader2 size={20} className="text-accent animate-spin" />
+              <div className="text-sm text-text-muted">
+                {t("settings.about.checking")}
+              </div>
+            </div>
+          )}
+
+          {/* Up to date */}
+          {updateStatus === "up-to-date" && (
+            <div className="flex items-center justify-between p-4">
+              <div className="flex items-center gap-3">
+                <CheckCircle2 size={20} className="text-green" />
+                <div>
+                  <div className="text-sm text-text">
+                    {t("settings.about.upToDate")}
+                  </div>
+                  <div className="text-xs text-text-muted">
+                    v{appVersion} ({t("settings.about.latestVersion")})
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={handleCheckUpdate}
+                className="p-1.5 text-text-muted hover:text-text rounded-lg hover:bg-surface-0/30 transition-colors"
+                title={t("settings.about.checkNow")}
+              >
+                <RefreshCw size={14} />
+              </button>
+            </div>
+          )}
+
+          {/* Update available */}
+          {updateStatus === "available" && updateInfo && (
+            <div className="p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <ArrowUpCircle size={20} className="text-accent mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-text">
+                      {t("settings.about.updateAvailable")}
+                    </span>
+                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-accent/15 text-accent rounded-md">
+                      v{updateInfo.version}
+                    </span>
+                  </div>
+                  {updateInfo.date && (
+                    <div className="text-xs text-text-muted mt-0.5">
+                      {new Date(updateInfo.date).toLocaleDateString()}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Release notes */}
+              {updateInfo.body && (
+                <div className="ml-8">
+                  <div className="text-[11px] font-medium text-text-muted uppercase tracking-wider mb-1">
+                    {t("settings.about.releaseNotes")}
+                  </div>
+                  <div className="text-xs text-text-muted bg-crust/50 rounded-lg p-3 max-h-32 overflow-y-auto leading-relaxed whitespace-pre-wrap">
+                    {updateInfo.body}
+                  </div>
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div className="flex items-center gap-2 ml-8">
+                <button
+                  onClick={handleDownloadAndInstall}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-accent text-crust hover:bg-accent/90 rounded-lg transition-colors"
+                >
+                  <Download size={12} />
+                  {t("settings.about.updateAndRestart")}
+                </button>
+                <button
+                  onClick={() => setUpdateStatus("idle")}
+                  className="px-3 py-1.5 text-xs text-text-muted hover:text-text hover:bg-surface-0/30 rounded-lg transition-colors"
+                >
+                  {t("settings.about.later")}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Downloading */}
+          {updateStatus === "downloading" && (
+            <div className="p-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <Loader2 size={20} className="text-accent animate-spin" />
+                <div className="flex-1">
+                  <div className="text-sm text-text">
+                    {t("settings.about.downloading")}
+                  </div>
+                  {downloadTotal > 0 && (
+                    <div className="text-xs text-text-muted">
+                      {formatBytes(downloadProgress)} / {formatBytes(downloadTotal)}
+                    </div>
+                  )}
+                </div>
+                {downloadTotal > 0 && (
+                  <span className="text-xs font-medium text-accent">{progressPercent}%</span>
+                )}
+              </div>
+              {/* Progress bar */}
+              <div className="h-1.5 bg-crust/60 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-accent rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${downloadTotal > 0 ? progressPercent : 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Installing */}
+          {updateStatus === "installing" && (
+            <div className="flex items-center gap-3 p-4">
+              <Loader2 size={20} className="text-accent animate-spin" />
+              <div className="text-sm text-text-muted">
+                {t("settings.about.installing")}
+              </div>
+            </div>
+          )}
+
+          {/* Ready to restart */}
+          {updateStatus === "ready" && (
+            <div className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 size={20} className="text-green" />
+                  <div className="text-sm text-text">
+                    {t("settings.about.readyToInstall")}
+                  </div>
+                </div>
+                <button
+                  onClick={handleRelaunch}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-accent text-crust hover:bg-accent/90 rounded-lg transition-colors"
+                >
+                  <RefreshCw size={12} />
+                  {t("settings.about.updateAndRestart")}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Error */}
+          {updateStatus === "error" && (
+            <div className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <AlertCircle size={20} className="text-red" />
+                  <div>
+                    <div className="text-sm text-text">
+                      {t("settings.about.updateError")}
+                    </div>
+                    {updateError && (
+                      <div className="text-xs text-text-muted mt-0.5 max-w-xs truncate">
+                        {updateError}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={handleCheckUpdate}
+                  className="px-3 py-1.5 text-xs font-medium bg-accent/15 text-accent hover:bg-accent/25 rounded-lg transition-colors"
+                >
+                  {t("settings.about.retry")}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </SettingGroup>
 
       {/* Tech stack */}
       <SettingGroup title={t("settings.about.techTitle")} description={t("settings.about.techDesc")}>

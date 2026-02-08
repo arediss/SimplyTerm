@@ -11,6 +11,8 @@
     "core:window:allow-close",
     "core:window:allow-start-dragging",
     "shell:allow-open",
-    "core:window:allow-set-title-bar-style"
+    "core:window:allow-set-title-bar-style",
+    "updater:default",
+    "process:allow-restart"
   ]
 }

@@ -12,6 +12,7 @@ import SettingsModal from "./components/SettingsModal";
 import { CommandPalette, useCommandPalette, CommandHandlers, CommandContext } from "./components/CommandPalette";
 import { StatusBar, type StatusBarItem } from "./components/StatusBar";
 import { PluginHost, pluginManager, type SessionInfo, type ModalConfig, type NotificationType, type PromptConfig } from "./plugins";
+import { check as checkUpdate } from "@tauri-apps/plugin-updater";
 import type { HeaderActionItem } from "./plugins/PluginManager";
 import PromptModal from "./components/PromptModal";
 import PassphrasePromptModal from "./components/PassphrasePromptModal";
@@ -952,44 +953,40 @@ function App() {
 
   const handleFocusPane = useCallback(
     (paneId: string) => {
-      setTabs(
-        tabs.map((t) =>
+      setTabs((prev) =>
+        prev.map((t) =>
           t.id === activeTabId ? { ...t, focusedPaneId: paneId } : t
         )
       );
     },
-    [tabs, activeTabId]
+    [activeTabId]
   );
 
   const handlePaneTreeChange = useCallback(
     (newTree: PaneNode) => {
-      setTabs(
-        tabs.map((t) =>
+      setTabs((prev) =>
+        prev.map((t) =>
           t.id === activeTabId ? { ...t, paneTree: newTree } : t
         )
       );
     },
-    [tabs, activeTabId]
+    [activeTabId]
   );
 
   // Handler to convert a pending pane to a local terminal
   const handlePendingSelectLocal = useCallback(
     (pendingPaneId: string) => {
-      const activeTab = tabs.find((t) => t.id === activeTabId);
-      if (!activeTab) return;
-
       const newPtySessionId = generateSessionId("pty");
-      const newPaneTree = replacePendingWithTerminal(activeTab.paneTree, pendingPaneId, newPtySessionId);
 
-      setTabs(
-        tabs.map((t) =>
-          t.id === activeTabId
-            ? { ...t, paneTree: newPaneTree }
-            : t
-        )
+      setTabs((prev) =>
+        prev.map((t) => {
+          if (t.id !== activeTabId) return t;
+          const newPaneTree = replacePendingWithTerminal(t.paneTree, pendingPaneId, newPtySessionId);
+          return { ...t, paneTree: newPaneTree, focusedPaneId: pendingPaneId };
+        })
       );
     },
-    [tabs, activeTabId]
+    [activeTabId]
   );
 
   // Handler to duplicate the current SSH session in a pending pane
@@ -1426,6 +1423,26 @@ function App() {
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, [commandPalette.toggle]);
+
+  // Auto-check for updates on startup (silent, non-intrusive)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      checkUpdate()
+        .then((update) => {
+          if (update) {
+            setNotification({
+              message: t("settings.about.updateAvailable") + ` v${update.version}`,
+              type: "info",
+            });
+            setTimeout(() => setNotification(null), 5000);
+          }
+        })
+        .catch(() => {
+          // Silent fail - don't bother the user if check fails
+        });
+    }, 3000); // Delay 3s after app start
+    return () => clearTimeout(timer);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Plugin callbacks
   const handleShowNotification = useCallback((message: string, type: NotificationType) => {

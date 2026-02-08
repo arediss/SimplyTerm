@@ -504,13 +504,13 @@ function SavedSessionItem({
       <div
         onClick={isConnecting ? undefined : onClick}
         onContextMenu={isConnecting ? undefined : handleContextMenu}
-        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left ${
+        className={`group/session w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left ${
           isConnecting
             ? "bg-accent/10 cursor-wait"
             : "hover:bg-white/5 cursor-pointer"
         }`}
       >
-        <span className={isConnecting ? "text-accent" : "text-accent"}>
+        <span className="text-accent">
           {isConnecting ? (
             <Loader2 size={16} className="animate-spin" />
           ) : (
@@ -525,6 +525,18 @@ function SavedSessionItem({
             {isConnecting ? t('sidebar.connecting') : `${session.username}@${session.host}:${session.port}`}
           </div>
         </div>
+        {!isConnecting && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onSftp();
+            }}
+            className="shrink-0 p-1.5 rounded-md text-text-muted opacity-0 group-hover/session:opacity-100 hover:!text-accent hover:bg-white/10 transition-all"
+            title={t('sidebar.openSftp')}
+          >
+            <FolderOpen size={14} />
+          </button>
+        )}
       </div>
 
       {/* Context Menu - rendered via Portal to escape transform context */}
