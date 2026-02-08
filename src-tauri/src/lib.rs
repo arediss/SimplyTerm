@@ -1094,10 +1094,7 @@ async fn registry_check_updates(app: AppHandle) -> Result<Vec<PluginUpdate>, Str
 async fn registry_update_plugin(app: AppHandle, update: PluginUpdate) -> Result<PluginResponse, String> {
     let state = app.state::<AppState>();
 
-    // First, uninstall the old version
-    state.plugin_manager.uninstall_plugin(&update.id).map_err(|e| e.message)?;
-
-    // Download and install the new version
+    // Build registry plugin with checksum for integrity verification
     let registry_plugin = RegistryPlugin {
         id: update.id.clone(),
         name: String::new(),
@@ -1112,16 +1109,18 @@ async fn registry_update_plugin(app: AppHandle, update: PluginUpdate) -> Result<
         keywords: vec![],
         permissions: vec![],
         download_url: update.download_url,
-        checksum: None,
+        checksum: update.checksum,
         downloads: 0,
         registry: None,
     };
 
-    plugins::registry::download_and_install(&registry_plugin, &state.plugin_manager)
+    // Download and verify BEFORE uninstalling the old version (atomic update)
+    // This way if the download or checksum fails, the user keeps the old plugin
+    let installed_id = plugins::registry::download_and_install(&registry_plugin, &state.plugin_manager)
         .await
         .map_err(|e| e.message)?;
 
-    let installed = state.plugin_manager.get_plugin(&update.id)
+    let installed = state.plugin_manager.get_plugin(&installed_id)
         .map_err(|e| e.message)?
         .ok_or_else(|| "Plugin updated but not found".to_string())?;
     Ok(installed.into())

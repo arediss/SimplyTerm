@@ -120,6 +120,9 @@ pub struct PluginUpdate {
     pub latest_version: String,
     /// Download URL for the update
     pub download_url: String,
+    /// SHA256 checksum of the zip
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub checksum: Option<String>,
     /// Changelog/description
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
@@ -229,6 +232,7 @@ pub fn check_updates(
                     current_version: installed_plugin.manifest.version.clone(),
                     latest_version: registry_plugin.version.clone(),
                     download_url: registry_plugin.download_url.clone(),
+                    checksum: registry_plugin.checksum.clone(),
                     description: Some(registry_plugin.description.clone()),
                 });
             }
@@ -278,14 +282,21 @@ pub async fn download_and_install(
         .await
         .map_err(|e| PluginError::internal(format!("Failed to read download: {}", e)))?;
 
-    // Verify checksum if provided
-    if let Some(expected) = &plugin.checksum {
-        let actual = sha256_hex(&bytes);
-        if actual != *expected {
-            return Err(PluginError::internal(format!(
-                "Checksum mismatch: expected {}, got {}",
-                expected, actual
-            )));
+    // Verify checksum (required for registry installs)
+    match &plugin.checksum {
+        Some(expected) => {
+            let actual = sha256_hex(&bytes);
+            if actual != *expected {
+                return Err(PluginError::internal(format!(
+                    "Checksum mismatch: expected {}, got {}. The plugin zip may have been tampered with.",
+                    expected, actual
+                )));
+            }
+        }
+        None => {
+            return Err(PluginError::internal(
+                "Plugin has no checksum. Cannot verify integrity. Aborting install.".to_string(),
+            ));
         }
     }
 
@@ -338,12 +349,20 @@ fn extract_zip(data: &[u8], target_dir: &PathBuf) -> PluginResult<()> {
 
         let name = file.name().to_string();
 
-        // Security: reject path traversal
-        if name.contains("..") {
+        // Security: reject path traversal and absolute paths
+        if name.contains("..") || name.starts_with('/') || name.starts_with('\\') {
             continue;
         }
 
         let out_path = target_dir.join(&name);
+
+        // Security: verify resolved path stays inside target_dir
+        // Use normalize (join + components) since canonicalize requires the file to exist
+        let normalized = out_path.components().collect::<std::path::PathBuf>();
+        let target_normalized = target_dir.components().collect::<std::path::PathBuf>();
+        if !normalized.starts_with(&target_normalized) {
+            continue;
+        }
 
         if file.is_dir() {
             fs::create_dir_all(&out_path).map_err(|e| {
