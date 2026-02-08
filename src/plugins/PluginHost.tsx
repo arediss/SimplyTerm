@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { pluginManager } from './PluginManager';
 import { PluginPanel } from './PluginPanel';
 import { PluginWidget } from './PluginWidget';
@@ -191,12 +192,20 @@ export function usePlugins() {
     await refresh();
   }, [refresh]);
 
+  const uninstallPlugin = useCallback(async (id: string) => {
+    // Unload from runtime first, then uninstall from backend
+    pluginManager.unloadPlugin(id);
+    await invoke("uninstall_plugin", { id });
+    await refresh();
+  }, [refresh]);
+
   return {
     plugins,
     loading,
     refresh,
     enablePlugin,
     disablePlugin,
+    uninstallPlugin,
     registeredPanels: pluginManager.registeredPanels,
     registeredCommands: pluginManager.registeredCommands,
     executeCommand: pluginManager.executeCommand.bind(pluginManager),

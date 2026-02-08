@@ -24,6 +24,10 @@ export interface PluginManifest {
   author: string;
   description: string;
   homepage?: string;
+  repository?: string;
+  license?: string;
+  category?: string;
+  keywords?: string[];
   main: string;
   icon?: string;
   permissions: string[];

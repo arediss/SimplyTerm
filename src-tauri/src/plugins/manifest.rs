@@ -21,6 +21,18 @@ pub struct PluginManifest {
     /// Homepage or repository URL
     #[serde(skip_serializing_if = "Option::is_none")]
     pub homepage: Option<String>,
+    /// Source code repository URL (e.g., GitHub)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub repository: Option<String>,
+    /// License identifier (e.g., "MIT", "GPL-3.0")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub license: Option<String>,
+    /// Plugin category (e.g., "productivity", "themes", "security", "devops")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+    /// Search keywords
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub keywords: Vec<String>,
     /// Required permissions
     pub permissions: Vec<Permission>,
     /// Plugin entry point (relative path to main JS/TS file)

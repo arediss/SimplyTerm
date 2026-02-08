@@ -1,6 +1,6 @@
 [package]
 name = "simplyterm"
-version = "0.3.1"
+version = "0.4.0"
 description = "A modern, fast, cross-platform terminal"
 authors = ["SimplyTerm"]
 edition = "2021"
@@ -55,12 +55,15 @@ sha2 = "0.10"
 # FIDO2 security keys
 ctap-hid-fido2 = "3.5"
 
+# Zip extraction (plugin registry downloads)
+zip = "2"
+
 # External file editing
 notify = "6"
 open = "5"
 
 # HTTP client (for plugin network requests, bypasses CORS)
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "native-tls"] }
 
 # Serial port communication
 serialport = "4.3"

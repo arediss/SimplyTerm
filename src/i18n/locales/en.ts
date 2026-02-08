@@ -424,6 +424,44 @@ export default {
       indexFile: "Plugin code",
       // Installation step 3
       installStep3: "Refresh the list and enable the plugin",
+      // Tabs
+      tabInstalled: "Installed",
+      tabBrowse: "Browse",
+      tabUpdates: "Updates",
+      // Browse tab
+      searchPlaceholder: "Search plugins...",
+      browseDesc: "Discover and install plugins from the registry",
+      featured: "Available",
+      noResults: "No plugins found",
+      noResultsHint: "Try a different search term or check your registry configuration",
+      install: "Install",
+      installing: "Installing...",
+      installed: "Installed",
+      // Updates tab
+      updatesDesc: "Keep your plugins up to date",
+      updatesAvailable_one: "{{count}} update available",
+      updatesAvailable_other: "{{count}} updates available",
+      noUpdates: "All plugins are up to date",
+      updateAll: "Update all",
+      update: "Update",
+      updating: "Updating...",
+      updateTo: "v{{version}} available",
+      // Categories
+      categoryAll: "All",
+      categoryThemes: "Themes",
+      categoryProductivity: "Productivity",
+      categorySecurity: "Security",
+      categoryDevops: "DevOps",
+      categoryTools: "Tools",
+      // Errors
+      registryError: "Failed to connect to plugin registry",
+      installError: "Failed to install plugin",
+      updateError: "Failed to update plugin",
+      // Uninstall
+      uninstall: "Uninstall",
+      uninstalling: "Uninstalling...",
+      uninstallConfirm: "Are you sure you want to uninstall \"{{name}}\"?",
+      uninstallError: "Failed to uninstall plugin",
     },
 
     // --- About section ---

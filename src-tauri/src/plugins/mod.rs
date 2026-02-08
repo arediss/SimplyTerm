@@ -34,9 +34,11 @@ pub mod error;
 pub mod manager;
 pub mod manifest;
 pub mod permissions;
+pub mod registry;
 
 // Re-exports for convenience
 pub use error::{PluginError, PluginErrorCode, PluginResult};
 pub use manager::{InstalledPlugin, PluginManager, PluginState};
 pub use manifest::{GrantedPermissions, Permission, PermissionRisk, PluginManifest, API_VERSION};
 pub use permissions::{require_permission, require_all_permissions, require_any_permission, PermissionGuard};
+pub use registry::{RegistrySource, RegistryPlugin, PluginUpdate};

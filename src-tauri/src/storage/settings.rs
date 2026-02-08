@@ -58,6 +58,16 @@ impl Default for SecuritySettings {
     }
 }
 
+/// A configured plugin registry source (persisted in settings)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RegistrySourceConfig {
+    pub name: String,
+    pub url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+}
+
 /// Full app settings
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
@@ -67,6 +77,9 @@ pub struct AppSettings {
     pub ui: UiSettings,
     #[serde(default)]
     pub security: SecuritySettings,
+    /// Plugin registry sources (optional, defaults to official registry)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plugin_registries: Option<Vec<RegistrySourceConfig>>,
 }
 
 impl Default for AppSettings {
@@ -86,6 +99,7 @@ impl Default for AppSettings {
             },
             ui: UiSettings::default(),
             security: SecuritySettings::default(),
+            plugin_registries: None,
         }
     }
 }

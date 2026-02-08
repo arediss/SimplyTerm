@@ -19,7 +19,7 @@ use connectors::{
     check_host_key_only, HostKeyCheckResult, accept_pending_key, accept_and_update_pending_key, remove_pending_key,
     connect_telnet, connect_serial, list_serial_ports, SerialConfig, SerialPortInfo,
 };
-use plugins::{PluginManager, InstalledPlugin, PluginState};
+use plugins::{PluginManager, InstalledPlugin, PluginState, RegistrySource, RegistryPlugin, PluginUpdate};
 use session::SessionManager;
 use storage::{
     load_sessions, save_sessions, SavedSession, AuthType,
@@ -812,6 +812,14 @@ struct PluginResponse {
     description: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     homepage: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    repository: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    license: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    category: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    keywords: Vec<String>,
     main: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     icon: Option<String>,
@@ -831,6 +839,10 @@ impl From<InstalledPlugin> for PluginResponse {
             author: plugin.manifest.author,
             description: plugin.manifest.description,
             homepage: plugin.manifest.homepage,
+            repository: plugin.manifest.repository,
+            license: plugin.manifest.license,
+            category: plugin.manifest.category,
+            keywords: plugin.manifest.keywords,
             main: plugin.manifest.main,
             icon: plugin.manifest.icon,
             status: match plugin.state {
@@ -1023,6 +1035,121 @@ fn refresh_plugins(app: AppHandle) -> Result<Vec<PluginResponse>, String> {
 fn get_plugins_dir(app: AppHandle) -> Result<String, String> {
     let state = app.state::<AppState>();
     Ok(state.plugin_manager.plugins_dir().to_string_lossy().to_string())
+}
+
+// ============================================================================
+// Plugin Registry Commands
+// ============================================================================
+
+/// Fetch all plugins from configured registries
+#[tauri::command]
+async fn registry_fetch_plugins(app: AppHandle) -> Result<Vec<RegistryPlugin>, String> {
+    let registries = get_registry_sources(&app);
+    plugins::registry::fetch_all_registries(&registries)
+        .await
+        .map_err(|e| e.message)
+}
+
+/// Search plugins in registries
+#[tauri::command]
+async fn registry_search_plugins(app: AppHandle, query: String) -> Result<Vec<RegistryPlugin>, String> {
+    let registries = get_registry_sources(&app);
+    let all = plugins::registry::fetch_all_registries(&registries)
+        .await
+        .map_err(|e| e.message)?;
+    Ok(plugins::registry::search_plugins(&all, &query))
+}
+
+/// Install a plugin from registry
+#[tauri::command]
+async fn registry_install_plugin(app: AppHandle, plugin: RegistryPlugin) -> Result<PluginResponse, String> {
+    let state = app.state::<AppState>();
+    let installed_id = plugins::registry::download_and_install(&plugin, &state.plugin_manager)
+        .await
+        .map_err(|e| e.message)?;
+
+    // Return the freshly installed plugin (use manifest ID, may differ from registry ID)
+    let installed = state.plugin_manager.get_plugin(&installed_id)
+        .map_err(|e| e.message)?
+        .ok_or_else(|| format!("Plugin installed but not found: {}", installed_id))?;
+    Ok(installed.into())
+}
+
+/// Check for plugin updates
+#[tauri::command]
+async fn registry_check_updates(app: AppHandle) -> Result<Vec<PluginUpdate>, String> {
+    let state = app.state::<AppState>();
+    let registries = get_registry_sources(&app);
+
+    let installed = state.plugin_manager.list_plugins().map_err(|e| e.message)?;
+    let registry_plugins = plugins::registry::fetch_all_registries(&registries)
+        .await
+        .map_err(|e| e.message)?;
+
+    Ok(plugins::registry::check_updates(&installed, &registry_plugins))
+}
+
+/// Update a specific plugin from registry
+#[tauri::command]
+async fn registry_update_plugin(app: AppHandle, update: PluginUpdate) -> Result<PluginResponse, String> {
+    let state = app.state::<AppState>();
+
+    // First, uninstall the old version
+    state.plugin_manager.uninstall_plugin(&update.id).map_err(|e| e.message)?;
+
+    // Download and install the new version
+    let registry_plugin = RegistryPlugin {
+        id: update.id.clone(),
+        name: String::new(),
+        version: update.latest_version,
+        api_version: String::new(),
+        description: update.description.unwrap_or_default(),
+        author: String::new(),
+        homepage: None,
+        repository: None,
+        license: None,
+        category: None,
+        keywords: vec![],
+        permissions: vec![],
+        download_url: update.download_url,
+        checksum: None,
+        downloads: 0,
+        registry: None,
+    };
+
+    plugins::registry::download_and_install(&registry_plugin, &state.plugin_manager)
+        .await
+        .map_err(|e| e.message)?;
+
+    let installed = state.plugin_manager.get_plugin(&update.id)
+        .map_err(|e| e.message)?
+        .ok_or_else(|| "Plugin updated but not found".to_string())?;
+    Ok(installed.into())
+}
+
+/// Get configured registry sources
+#[tauri::command]
+fn registry_get_sources(app: AppHandle) -> Result<Vec<RegistrySource>, String> {
+    Ok(get_registry_sources(&app))
+}
+
+/// Helper: load registry sources from app settings
+fn get_registry_sources(_app: &AppHandle) -> Vec<RegistrySource> {
+    match load_app_settings() {
+        Ok(settings) => {
+            if let Some(registries) = settings.plugin_registries {
+                if !registries.is_empty() {
+                    return registries.into_iter().map(|r| RegistrySource {
+                        name: r.name,
+                        url: r.url,
+                        enabled: r.enabled.unwrap_or(true),
+                    }).collect();
+                }
+            }
+            vec![RegistrySource::default()]
+        }
+        Err(_) => vec![RegistrySource::default()],
+    }
 }
 
 // ============================================================================
@@ -1684,6 +1811,13 @@ pub fn run() {
             disable_plugin,
             grant_plugin_permissions,
             uninstall_plugin,
+            // Plugin Registry
+            registry_fetch_plugins,
+            registry_search_plugins,
+            registry_install_plugin,
+            registry_check_updates,
+            registry_update_plugin,
+            registry_get_sources,
             plugin_storage_read,
             plugin_storage_write,
             plugin_storage_delete,
