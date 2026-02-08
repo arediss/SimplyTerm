@@ -6,11 +6,12 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Version tag (ex: v0.1.0)'
-        required: true
       create_release:
-        description: 'Create a release'
+        description: 'Create a GitHub release'
+        type: boolean
+        default: true
+      draft:
+        description: 'Create as draft release'
         type: boolean
         default: true
 
@@ -24,6 +25,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Read version from tauri.conf.json
+        id: version
+        shell: pwsh
+        run: |
+          $conf = Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json
+          $version = $conf.version
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          echo "TAG=v$version" >> $env:GITHUB_OUTPUT
+          echo "Version: $version"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -51,7 +62,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: SimplyTerm-${{ inputs.version }}-windows
+          name: SimplyTerm-${{ steps.version.outputs.TAG }}-windows
           path: |
             src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/msi/*.msi.sig
@@ -63,9 +74,9 @@ jobs:
         if: inputs.create_release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.version }}
-          name: SimplyTerm ${{ inputs.version }}
-          draft: true
+          tag_name: ${{ steps.version.outputs.TAG }}
+          name: SimplyTerm ${{ steps.version.outputs.TAG }}
+          draft: ${{ inputs.draft }}
           files: |
             src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/msi/*.msi.sig
