@@ -195,8 +195,71 @@ impl PluginManager {
         Ok(discovered)
     }
 
+    /// Re-reads manifests from disk for all dev plugins and auto-grants new permissions.
+    /// This ensures dev plugin changes (permissions, metadata) are picked up without manual re-scan.
+    pub fn refresh_dev_manifests(&self) -> PluginResult<()> {
+        let mut plugins = self.plugins.write()
+            .map_err(|_| PluginError::internal("Failed to acquire lock"))?;
+
+        let dev_ids: Vec<String> = plugins.iter()
+            .filter(|(_, p)| p.is_dev)
+            .map(|(id, _)| id.clone())
+            .collect();
+
+        let mut changed = false;
+
+        for id in dev_ids {
+            let plugin = match plugins.get(&id) {
+                Some(p) => p,
+                None => continue,
+            };
+
+            let manifest_path = plugin.install_path.join("manifest.json");
+            if !manifest_path.exists() {
+                continue;
+            }
+
+            let content = match fs::read_to_string(&manifest_path) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+
+            let manifest: PluginManifest = match serde_json::from_str(&content) {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+
+            let plugin = plugins.get_mut(&id).unwrap();
+
+            // Update manifest from disk
+            if plugin.manifest.permissions != manifest.permissions
+                || plugin.manifest.version != manifest.version
+                || plugin.manifest.description != manifest.description
+                || plugin.manifest.name != manifest.name
+            {
+                plugin.manifest = manifest;
+                // Auto-grant all permissions for dev plugins
+                plugin.granted_permissions = GrantedPermissions::from_manifest(&plugin.manifest);
+                changed = true;
+            }
+        }
+
+        drop(plugins);
+
+        if changed {
+            self.save_registry()?;
+        }
+
+        Ok(())
+    }
+
     /// Lists all installed plugins
     pub fn list_plugins(&self) -> PluginResult<Vec<InstalledPlugin>> {
+        // Refresh dev plugin manifests from disk before listing
+        if let Err(e) = self.refresh_dev_manifests() {
+            eprintln!("[PluginManager] Failed to refresh dev manifests: {}", e.message);
+        }
+
         let plugins = self.plugins.read()
             .map_err(|_| PluginError::internal("Failed to acquire lock"))?;
         Ok(plugins.values().cloned().collect())
@@ -204,6 +267,11 @@ impl PluginManager {
 
     /// Gets a specific plugin by ID
     pub fn get_plugin(&self, id: &str) -> PluginResult<Option<InstalledPlugin>> {
+        // Refresh dev manifests to ensure fresh data
+        if let Err(e) = self.refresh_dev_manifests() {
+            eprintln!("[PluginManager] Failed to refresh dev manifests: {}", e.message);
+        }
+
         let plugins = self.plugins.read()
             .map_err(|_| PluginError::internal("Failed to acquire lock"))?;
         Ok(plugins.get(id).cloned())

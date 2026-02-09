@@ -269,6 +269,35 @@ export interface HeaderActionHandle {
 }
 
 // ============================================================================
+// QuickConnect Section Extension Types
+// ============================================================================
+
+/**
+ * Configuration for a quick-connect section registered by a plugin.
+ * Rendered inside the QuickConnect dropdown (the "+" arrow menu).
+ */
+export interface QuickConnectSectionConfig {
+  /** Unique section identifier */
+  id: string;
+  /** Sort order (lower = higher in dropdown) */
+  order?: number;
+}
+
+/**
+ * Registration object for a quick-connect section
+ */
+export interface QuickConnectSectionRegistration {
+  /** Section configuration */
+  config: QuickConnectSectionConfig;
+  /**
+   * Render function called when the dropdown is shown
+   * @param container - DOM element to render into
+   * @returns Optional cleanup function called when dropdown is hidden
+   */
+  render: (container: HTMLElement) => void | (() => void);
+}
+
+// ============================================================================
 // Toolbar Extension Types
 // ============================================================================
 

@@ -1,11 +1,13 @@
-import { useState, useEffect, useRef, forwardRef } from "react";
+import { useState, useEffect, useRef, useCallback, forwardRef } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Menu, Plus, X, Minus, Square, Copy, ChevronDown, Terminal, ArrowLeftRight } from "lucide-react";
 import DynamicLucideIcon from "./DynamicLucideIcon";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Tab } from "../types";
+import { pluginManager } from "../plugins";
 import type { HeaderActionItem } from "../plugins/PluginManager";
+import type { QuickConnectSectionRegistration } from "../plugins/types";
 import { isMac } from "../utils/platform";
 
 interface FloatingTabsProps {
@@ -340,6 +342,50 @@ const QuickConnectDropdown = forwardRef<HTMLDivElement, QuickConnectDropdownProp
   isTunnelSidebarOpen,
   activeTunnelCount,
 }, ref) => {
+  const pluginContainerRef = useRef<HTMLDivElement>(null);
+  const cleanupsRef = useRef<Array<() => void>>([]);
+
+  // Get registered quick-connect sections sorted by order
+  const getSections = useCallback((): Array<{ id: string; section: QuickConnectSectionRegistration }> => {
+    return Array.from(pluginManager.registeredQuickConnectSections.entries())
+      .sort(([, a], [, b]) => (a.section.config.order ?? 100) - (b.section.config.order ?? 100))
+      .map(([id, { section }]) => ({ id, section }));
+  }, []);
+
+  // Render plugin sections when mounted
+  useEffect(() => {
+    const container = pluginContainerRef.current;
+    if (!container) return;
+
+    const sections = getSections();
+    if (sections.length === 0) return;
+
+    for (const { id, section } of sections) {
+      // Add divider before each plugin section
+      const divider = document.createElement('div');
+      divider.className = 'h-px bg-surface-0/30 mx-1.5';
+      container.appendChild(divider);
+
+      // Create container for this section
+      const sectionEl = document.createElement('div');
+      sectionEl.className = 'p-1.5';
+      sectionEl.dataset.quickConnectSection = id;
+      container.appendChild(sectionEl);
+
+      // Call plugin render
+      const cleanup = section.render(sectionEl);
+      if (typeof cleanup === 'function') {
+        cleanupsRef.current.push(cleanup);
+      }
+    }
+
+    return () => {
+      cleanupsRef.current.forEach(fn => { try { fn(); } catch {} });
+      cleanupsRef.current = [];
+      container.innerHTML = '';
+    };
+  }, [getSections]);
+
   return (
     <div
       ref={ref}
@@ -378,8 +424,8 @@ const QuickConnectDropdown = forwardRef<HTMLDivElement, QuickConnectDropdownProp
         </button>
       </div>
 
-      {/* Plugin extension point for quick connect items */}
-      <div id="quick-connect-plugin-items" />
+      {/* Plugin extension point for quick connect sections */}
+      <div ref={pluginContainerRef} />
     </div>
   );
 });

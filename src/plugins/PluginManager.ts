@@ -27,6 +27,7 @@ import type {
   StatusBarItemHandle,
   HeaderActionConfig,
   HeaderActionHandle,
+  QuickConnectSectionRegistration,
 } from './types';
 import type { StatusBarItem } from '../components/StatusBar';
 
@@ -58,6 +59,7 @@ export class PluginManager {
   public onShowPrompt: (config: PromptConfig) => Promise<string | null> = async () => null;
   public getSessions: () => SessionInfo[] = () => [];
   public getActiveSession: () => SessionInfo | null = () => null;
+  public onConnectSsh: (config: { host: string; port: number; username: string; name?: string }) => void = () => {};
 
   // Panel and command registrations (observable by UI)
   public registeredPanels: Map<string, { pluginId: string; panel: PanelRegistration; position: string }> = new Map();
@@ -66,6 +68,7 @@ export class PluginManager {
   public registeredSidebarSections: Map<string, { pluginId: string; section: SidebarSectionRegistration }> = new Map(); // deprecated
   public registeredSettingsPanels: Map<string, { pluginId: string; panel: SettingsPanelRegistration }> = new Map();
   public registeredContextMenuItems: Map<string, { pluginId: string; item: ContextMenuItemConfig }> = new Map();
+  public registeredQuickConnectSections: Map<string, { pluginId: string; section: QuickConnectSectionRegistration }> = new Map();
 
   // Status bar items
   public registeredStatusBarItems: Map<string, { pluginId: string; config: StatusBarItemConfig; visible: boolean }> = new Map();
@@ -154,14 +157,17 @@ export class PluginManager {
         sidebarSections: new Map(),
         settingsPanels: new Map(),
         contextMenuItems: new Map(),
+        quickConnectSections: new Map(),
         subscriptions: [],
       };
 
       // Create API for this plugin
       const api = createPluginAPI(manifest, pluginState, {
-        onShowNotification: this.onShowNotification.bind(this),
-        onShowModal: this.onShowModal.bind(this),
-        onShowPrompt: this.onShowPrompt.bind(this),
+        // Arrow functions for property-based callbacks (late-binding: reads current value at call time)
+        onShowNotification: (msg, type) => this.onShowNotification(msg, type),
+        onShowModal: (config) => this.onShowModal(config),
+        onShowPrompt: (config) => this.onShowPrompt(config),
+        // .bind(this) for class methods (stable references, just needs correct `this`)
         onPanelRegister: this.handlePanelRegister.bind(this),
         onCommandRegister: this.handleCommandRegister.bind(this),
         onPanelShow: this.handlePanelShow.bind(this),
@@ -174,10 +180,14 @@ export class PluginManager {
         onSettingsPanelUnregister: this.handleSettingsPanelUnregister.bind(this),
         onContextMenuItemRegister: this.handleContextMenuItemRegister.bind(this),
         onContextMenuItemUnregister: this.handleContextMenuItemUnregister.bind(this),
+        onQuickConnectSectionRegister: this.handleQuickConnectSectionRegister.bind(this),
+        onQuickConnectSectionUnregister: this.handleQuickConnectSectionUnregister.bind(this),
         onAddStatusBarItem: this.handleAddStatusBarItem.bind(this),
         onAddHeaderAction: this.handleAddHeaderAction.bind(this),
-        getSessions: this.getSessions.bind(this),
-        getActiveSession: this.getActiveSession.bind(this),
+        // Arrow functions for property-based callbacks
+        getSessions: () => this.getSessions(),
+        getActiveSession: () => this.getActiveSession(),
+        onConnectSsh: (config) => this.onConnectSsh(config),
       });
 
       pluginState.api = api;
@@ -335,6 +345,12 @@ export class PluginManager {
     plugin.contextMenuItems.forEach((_, itemId) => {
       this.registeredContextMenuItems.delete(itemId);
       this.emit({ type: 'context-menu:unregister', pluginId: id, itemId });
+    });
+
+    // Remove registered quick-connect sections
+    plugin.quickConnectSections.forEach((_, sectionId) => {
+      this.registeredQuickConnectSections.delete(sectionId);
+      this.emit({ type: 'quick-connect:unregister', pluginId: id, sectionId });
     });
 
     // Remove registered status bar items for this plugin
@@ -509,6 +525,25 @@ export class PluginManager {
       plugin.contextMenuItems.delete(itemId);
       this.registeredContextMenuItems.delete(itemId);
       this.emit({ type: 'context-menu:unregister', pluginId, itemId });
+    }
+  }
+
+  // QuickConnect section registration handlers
+  private handleQuickConnectSectionRegister(pluginId: string, section: QuickConnectSectionRegistration): void {
+    const plugin = this.plugins.get(pluginId);
+    if (plugin) {
+      plugin.quickConnectSections.set(section.config.id, section);
+      this.registeredQuickConnectSections.set(section.config.id, { pluginId, section });
+      this.emit({ type: 'quick-connect:register', pluginId, sectionId: section.config.id });
+    }
+  }
+
+  private handleQuickConnectSectionUnregister(pluginId: string, sectionId: string): void {
+    const plugin = this.plugins.get(pluginId);
+    if (plugin) {
+      plugin.quickConnectSections.delete(sectionId);
+      this.registeredQuickConnectSections.delete(sectionId);
+      this.emit({ type: 'quick-connect:unregister', pluginId, sectionId });
     }
   }
 

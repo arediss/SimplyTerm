@@ -4,10 +4,10 @@
  * API v1 - Unified types for backend and frontend plugin system
  */
 
-import type { SidebarSectionRegistration, SidebarViewRegistration, SettingsPanelRegistration, ContextMenuItemConfig, StatusBarItemConfig, StatusBarItemHandle, HeaderActionConfig, HeaderActionHandle } from './extensionTypes';
+import type { SidebarSectionRegistration, SidebarViewRegistration, SettingsPanelRegistration, ContextMenuItemConfig, StatusBarItemConfig, StatusBarItemHandle, HeaderActionConfig, HeaderActionHandle, QuickConnectSectionRegistration } from './extensionTypes';
 
 // Re-export extension types
-export type { SidebarSectionRegistration, SidebarViewRegistration, SettingsPanelRegistration, ContextMenuItemConfig, StatusBarItemConfig, StatusBarItemHandle, HeaderActionConfig, HeaderActionHandle } from './extensionTypes';
+export type { SidebarSectionRegistration, SidebarViewRegistration, SettingsPanelRegistration, ContextMenuItemConfig, StatusBarItemConfig, StatusBarItemHandle, HeaderActionConfig, HeaderActionHandle, QuickConnectSectionRegistration } from './extensionTypes';
 export type { ContextMenuContext } from './extensionTypes';
 
 // ============================================================================
@@ -74,6 +74,7 @@ export type Permission =
   | 'ui_modals'
   | 'ui_sidebar'
   | 'ui_context_menu'
+  | 'ui_quick_connect'
   // Terminal
   | 'terminal_read'
   | 'terminal_write'
@@ -200,6 +201,10 @@ export interface SimplyTermPluginAPI {
   registerContextMenuItem(config: ContextMenuItemConfig): void;
   unregisterContextMenuItem(itemId: string): void;
 
+  // QuickConnect sections (requires ui_quick_connect)
+  registerQuickConnectSection(config: QuickConnectSectionRegistration): void;
+  unregisterQuickConnectSection(sectionId: string): void;
+
   // Commands (requires ui_commands)
   registerCommand(config: CommandRegistration): void;
   executeCommand(commandId: string): void;
@@ -243,6 +248,9 @@ export interface SimplyTermPluginAPI {
 
   // Header actions (requires ui_notifications)
   addHeaderAction(config: HeaderActionConfig): HeaderActionHandle;
+
+  // SSH connection (requires sessions_connect)
+  connectSsh(config: { host: string; port: number; username: string; name?: string }): void;
 
   // UI utilities (requires ui_notifications/ui_modals)
   showNotification(message: string, type?: NotificationType): void;
@@ -288,6 +296,7 @@ export interface LoadedPlugin {
   sidebarSections: Map<string, SidebarSectionRegistration>; // deprecated
   settingsPanels: Map<string, SettingsPanelRegistration>;
   contextMenuItems: Map<string, ContextMenuItemConfig>;
+  quickConnectSections: Map<string, QuickConnectSectionRegistration>;
   subscriptions: Unsubscribe[];
   onLoadCallback?: () => void;
   onUnloadCallback?: () => void;
@@ -318,6 +327,8 @@ export type PluginEvent =
   | { type: 'settings:unregister'; pluginId: string; panelId: string }
   | { type: 'context-menu:register'; pluginId: string; itemId: string }
   | { type: 'context-menu:unregister'; pluginId: string; itemId: string }
+  | { type: 'quick-connect:register'; pluginId: string; sectionId: string }
+  | { type: 'quick-connect:unregister'; pluginId: string; sectionId: string }
   | { type: 'statusbar:changed' }
   | { type: 'headeractions:changed' };
 

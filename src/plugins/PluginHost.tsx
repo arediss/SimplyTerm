@@ -28,6 +28,7 @@ interface PluginHostProps {
   getActiveSession: () => SessionInfo | null;
   onStatusBarItemsChanged: (items: StatusBarItem[]) => void;
   onHeaderActionsChanged: (items: HeaderActionItem[]) => void;
+  onConnectSsh: (config: { host: string; port: number; username: string; name?: string }) => void;
 }
 
 export function PluginHost({
@@ -38,6 +39,7 @@ export function PluginHost({
   getActiveSession,
   onStatusBarItemsChanged,
   onHeaderActionsChanged,
+  onConnectSsh,
 }: PluginHostProps) {
   const [panels, setPanels] = useState<Map<string, PanelEntry>>(new Map());
   const [visiblePanels, setVisiblePanels] = useState<Set<string>>(new Set());
@@ -51,7 +53,8 @@ export function PluginHost({
     pluginManager.getActiveSession = getActiveSession;
     pluginManager.onStatusBarItemsChanged = onStatusBarItemsChanged;
     pluginManager.onHeaderActionsChanged = onHeaderActionsChanged;
-  }, [onShowNotification, onShowModal, onShowPrompt, getSessions, getActiveSession, onStatusBarItemsChanged, onHeaderActionsChanged]);
+    pluginManager.onConnectSsh = onConnectSsh;
+  }, [onShowNotification, onShowModal, onShowPrompt, getSessions, getActiveSession, onStatusBarItemsChanged, onHeaderActionsChanged, onConnectSsh]);
 
   // Subscribe to plugin events
   useEffect(() => {

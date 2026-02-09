@@ -832,6 +832,28 @@ function App() {
     }
   };
 
+  // Handle plugin connectSsh requests - match against saved sessions
+  const handlePluginConnectSsh = useCallback((config: { host: string; port: number; username: string; name?: string }) => {
+    const saved = savedSessions.find(
+      s => s.host === config.host && s.port === config.port && s.username === config.username
+    );
+    if (saved) {
+      handleConnectToSavedSession(saved);
+    } else {
+      // No saved session found - open connection modal pre-filled
+      setInitialConnectionConfig({
+        name: config.name || `${config.username}@${config.host}`,
+        host: config.host,
+        port: config.port,
+        username: config.username,
+        authType: 'password',
+      });
+      setConnectionError(undefined);
+      setIsConnectionModalOpen(true);
+      setOpenSidebar("none");
+    }
+  }, [savedSessions, handleConnectToSavedSession]);
+
   const handleCloseTab = (tabId: string) => {
     const tabToClose = tabs.find((t) => t.id === tabId);
     if (tabToClose) {
@@ -1794,6 +1816,7 @@ function App() {
         getActiveSession={getActiveSessionInfo}
         onStatusBarItemsChanged={handleStatusBarItemsChanged}
         onHeaderActionsChanged={handleHeaderActionsChanged}
+        onConnectSsh={handlePluginConnectSsh}
       />
 
       {/* Plugin Notification Toast */}
