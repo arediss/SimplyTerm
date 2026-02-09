@@ -68,6 +68,24 @@ pub struct RegistrySourceConfig {
     pub enabled: Option<bool>,
 }
 
+/// Developer settings
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeveloperSettings {
+    pub enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dev_plugins_path: Option<String>,
+}
+
+impl Default for DeveloperSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            dev_plugins_path: None,
+        }
+    }
+}
+
 /// Full app settings
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
@@ -80,6 +98,8 @@ pub struct AppSettings {
     /// Plugin registry sources (optional, defaults to official registry)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub plugin_registries: Option<Vec<RegistrySourceConfig>>,
+    #[serde(default)]
+    pub developer: DeveloperSettings,
 }
 
 impl Default for AppSettings {
@@ -100,6 +120,7 @@ impl Default for AppSettings {
             ui: UiSettings::default(),
             security: SecuritySettings::default(),
             plugin_registries: None,
+            developer: DeveloperSettings::default(),
         }
     }
 }

@@ -462,6 +462,16 @@ export default {
       uninstalling: "Uninstalling...",
       uninstallConfirm: "Are you sure you want to uninstall \"{{name}}\"?",
       uninstallError: "Failed to uninstall plugin",
+      // Developer Mode
+      devModeTitle: "Developer Mode",
+      devModeDesc: "Load plugins directly from a local folder for development",
+      devPathLabel: "Dev plugins path",
+      devPathPlaceholder: "Path to dev plugins folder...",
+      devScan: "Scan",
+      devBadge: "DEV",
+      devNoPath: "Set a dev plugins path to get started",
+      devNoPlugins: "No dev plugins found. Click Scan after setting the path.",
+      tabDev: "Dev",
     },
 
     // --- About section ---

@@ -33,6 +33,7 @@ export interface PluginManifest {
   permissions: string[];
   status: PluginStatus;
   errorMessage?: string;
+  isDev?: boolean;
 }
 
 // ============================================================================
