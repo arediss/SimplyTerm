@@ -1,5 +1,43 @@
 import { ChevronRight } from "lucide-react";
 
+export function SubTabs<T extends string>({
+  tabs,
+  activeTab,
+  onChange,
+}: {
+  tabs: { id: T; label: string; icon?: React.ReactNode; variant?: "default" | "warning" }[];
+  activeTab: T;
+  onChange: (tab: T) => void;
+}) {
+  return (
+    <div className="flex gap-1 border-b border-surface-0/20">
+      {tabs.map((tab) => {
+        const isActive = activeTab === tab.id;
+        const isWarning = tab.variant === "warning";
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => onChange(tab.id)}
+            className={`
+              flex items-center gap-1.5 px-3 pb-2 text-xs font-medium transition-all duration-200 border-b-2 -mb-px
+              ${isActive
+                ? isWarning
+                  ? "border-orange-400 text-orange-400"
+                  : "border-accent text-text"
+                : "border-transparent text-text-muted hover:text-text/80"
+              }
+            `}
+          >
+            {tab.icon}
+            {tab.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function SettingGroup({
   title,
   description,

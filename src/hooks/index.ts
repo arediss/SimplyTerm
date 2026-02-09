@@ -4,4 +4,7 @@ export { useVaultFlow } from "./useVaultFlow";
 export { useVault } from "./useVault";
 export { useSshKeys } from "./useSshKeys";
 export { useHostKeyVerification } from "./useHostKeyVerification";
+export type { SshConnectionResult } from "./useHostKeyVerification";
 export { useRegistry } from "./useRegistry";
+export { useWorkspace } from "./useWorkspace";
+export type { UseWorkspaceReturn } from "./useWorkspace";

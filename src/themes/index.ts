@@ -90,6 +90,7 @@ export function themeToCssVars(colors: ThemeColors): Record<string, string> {
     "--color-glass-border": colors.glassBorder,
     "--color-glass-hover": colors.glassHover,
     "--color-glass-subtle": colors.glassSubtle,
+    "--color-panel": colors.panel,
   };
 }
 
@@ -111,10 +112,9 @@ export function applyTheme(themeId: string): void {
     root.style.setProperty(property, value);
   }
 
-  // Apply background gradient to body (only if blur is not enabled)
-  // When blur is enabled, CSS handles transparency
+  // Body background: transparent when blur is enabled, otherwise solid color
   if (root.dataset.blur !== "true") {
-    document.body.style.background = theme.colors.backgroundGradient;
+    document.body.style.background = theme.colors.crust;
   } else {
     document.body.style.background = "transparent";
   }

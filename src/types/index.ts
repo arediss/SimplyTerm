@@ -1,14 +1,9 @@
-import { SshConnectionConfig } from "../components/ConnectionForm";
-import { PaneNode } from "../components/SplitPane";
+// Re-export workspace types
+export type { WorkspaceNode, PaneGroup, PaneGroupTab } from "./workspace";
 
-export interface Session {
-  id: string;
-  name: string;
-  type: "ssh" | "local" | "sftp" | "telnet" | "serial";
-  host?: string;
-  user?: string;
-  status: "connected" | "disconnected" | "connecting";
-}
+// Re-export settings types
+export type { AppSettings } from "./settings";
+export { defaultSettings } from "./settings";
 
 // Telnet connection configuration
 export interface TelnetConnectionConfig {
@@ -103,18 +98,6 @@ export interface SavedSession {
   ssh_key_id?: string;
 }
 
-
-export interface Tab {
-  id: string;
-  sessionId: string;
-  paneTree: PaneNode;
-  title: string;
-  type: "local" | "ssh" | "sftp" | "tunnel" | "telnet" | "serial";
-  sshConfig?: SshConnectionConfig;
-  telnetConfig?: TelnetConnectionConfig;
-  serialConfig?: SerialConnectionConfig;
-  focusedPaneId: string | null;
-}
 
 export interface SessionCredentials {
   password: string | null;

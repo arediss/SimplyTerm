@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useVault } from "../../hooks/useVault";
 import SshKeyManager from "../SshKeyManager";
-import { SettingGroup, Toggle } from "./SettingsUIComponents";
+import { SettingGroup, Toggle, SubTabs } from "./SettingsUIComponents";
 
 export default function SecuritySettings() {
   const { t } = useTranslation();
@@ -343,50 +343,15 @@ export default function SecuritySettings() {
   return (
     <div className="space-y-6">
       {/* Security sub-tabs */}
-      <div className="flex gap-1 p-1 bg-crust rounded-xl">
-        <button
-          type="button"
-          onClick={() => setSecurityTab("vault")}
-          className={`
-            flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200
-            ${securityTab === "vault"
-              ? "bg-surface-0 text-text shadow-sm"
-              : "text-text-muted hover:text-text hover:bg-surface-0/50"
-            }
-          `}
-        >
-          <Shield size={14} />
-          {t("settings.security.tabVault")}
-        </button>
-        <button
-          type="button"
-          onClick={() => setSecurityTab("sshKeys")}
-          className={`
-            flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200
-            ${securityTab === "sshKeys"
-              ? "bg-surface-0 text-text shadow-sm"
-              : "text-text-muted hover:text-text hover:bg-surface-0/50"
-            }
-          `}
-        >
-          <Key size={14} />
-          {t("settings.security.tabSshKeys")}
-        </button>
-        <button
-          type="button"
-          onClick={() => setSecurityTab("auth")}
-          className={`
-            flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200
-            ${securityTab === "auth"
-              ? "bg-surface-0 text-text shadow-sm"
-              : "text-text-muted hover:text-text hover:bg-surface-0/50"
-            }
-          `}
-        >
-          <KeyRound size={14} />
-          {t("settings.security.tabAuthentication")}
-        </button>
-      </div>
+      <SubTabs
+        tabs={[
+          { id: "vault" as const, label: t("settings.security.tabVault"), icon: <Shield size={14} /> },
+          { id: "sshKeys" as const, label: t("settings.security.tabSshKeys"), icon: <Key size={14} /> },
+          { id: "auth" as const, label: t("settings.security.tabAuthentication"), icon: <KeyRound size={14} /> },
+        ]}
+        activeTab={securityTab}
+        onChange={setSecurityTab}
+      />
 
       {/* === Vault Tab === */}
       {securityTab === "vault" && <>

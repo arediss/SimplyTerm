@@ -2,13 +2,12 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import Sidebar from "./components/Sidebar";
-import FloatingTabs from "./components/FloatingTabs";
+import HeaderBar from "./components/HeaderBar";
 import TerminalPane from "./components/TerminalPane";
 import Modal from "./components/Modal";
 import HostKeyModal from "./components/HostKeyModal";
 import { SshConnectionConfig } from "./components/ConnectionForm";
 import NewConnectionModal from "./components/NewConnectionModal";
-import SettingsModal from "./components/SettingsModal";
 import { CommandPalette, useCommandPalette, CommandHandlers, CommandContext } from "./components/CommandPalette";
 import { StatusBar, type StatusBarItem } from "./components/StatusBar";
 import { PluginHost, pluginManager, type SessionInfo, type ModalConfig, type NotificationType, type PromptConfig } from "./plugins";
@@ -17,35 +16,28 @@ import type { HeaderActionItem } from "./plugins/PluginManager";
 import PromptModal from "./components/PromptModal";
 import PassphrasePromptModal from "./components/PassphrasePromptModal";
 import PluginModal from "./components/PluginModal";
-import {
-  SplitPane,
-  type PaneNode,
-  createTerminalNode,
-  splitPaneWithPending,
-  replacePendingWithTerminal,
-  replacePendingWithSftp,
-  closePane,
-  getAllTerminalPaneIds,
-  getAllPtySessionIds,
-  getAllPendingPaneIds,
-  getAllSftpPaneIds,
-} from "./components/SplitPane";
 import { SftpBrowser } from "./components/SftpBrowser";
-import { PanePicker, type ActiveConnection } from "./components/PanePicker";
 import { VaultSetupModal, VaultUnlockModal } from "./components/Vault";
 import TunnelManager from "./components/TunnelManager";
 import TunnelSidebar from "./components/TunnelSidebar";
-import { useSessions, useAppSettings, useVaultFlow, useHostKeyVerification } from "./hooks";
-import { SavedSession, Tab, TelnetConnectionConfig, SerialConnectionConfig, SshKeyProfile } from "./types";
+import { WorkspaceSplit } from "./components/WorkspaceSplit";
+import SettingsTab from "./components/Settings/SettingsTab";
+import EmptyPaneSessions from "./components/EmptyPaneSessions";
+import { useSessions, useAppSettings, useVaultFlow, useHostKeyVerification, useWorkspace } from "./hooks";
+import type { SshConnectionResult } from "./hooks";
+import { SavedSession, TelnetConnectionConfig, SerialConnectionConfig, SshKeyProfile } from "./types";
+import type { PaneGroupTab } from "./types/workspace";
 import { ConnectionType } from "./components/ConnectionTypeSelector";
-import EmptyState from "./components/EmptyState";
-import { generateSessionId, generateTabId, expandHomeDir, isModifierPressed } from "./utils";
+import { generateSessionId, expandHomeDir, isModifierPressed } from "./utils";
 import { applyTheme } from "./themes";
 
 function App() {
   const { t } = useTranslation();
-  const [tabs, setTabs] = useState<Tab[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+
+  // ============================================================================
+  // Workspace (replaces old tabs/activeTabId state)
+  // ============================================================================
+  const workspace = useWorkspace();
 
   // Use extracted hooks
   const {
@@ -77,29 +69,40 @@ function App() {
     const effect = appSettings.appearance?.windowEffect ?? "none";
     const hasBlur = effect !== "none";
 
-    // Set data attribute BEFORE applying theme (applyTheme reads dataset.blur)
     document.documentElement.dataset.blur = hasBlur ? "true" : "false";
 
-    // Apply theme (checks dataset.blur to decide transparent vs gradient)
     const themeId = appSettings.appearance?.theme ?? "dark";
     applyTheme(themeId);
 
-    // Apply native window effect
     invoke("set_window_effect", { effect }).catch((err) => {
       console.warn(`Failed to apply window effect "${effect}":`, err);
     });
   }, [appSettings.appearance?.theme, appSettings.appearance?.windowEffect]);
 
-  // Sidebar state - un seul sidebar ouvert à la fois
+  // Sidebar state
   const [openSidebar, setOpenSidebar] = useState<"none" | "menu" | "tunnel">("none");
-  const isSidebarOpen = openSidebar === "menu";
+  const sidebarPinned = appSettings.ui?.sidebarPinned ?? false;
+  const isSidebarOpen = sidebarPinned || openSidebar === "menu";
   const isTunnelSidebarOpen = openSidebar === "tunnel";
 
-  // Host key verification (extracted hook)
+  const handleToggleSidebarPin = useCallback(() => {
+    const newPinned = !sidebarPinned;
+    handleSettingsChange({
+      ...appSettings,
+      ui: { ...appSettings.ui, sidebarPinned: newPinned },
+    });
+    // When pinning, ensure sidebar is shown; when unpinning, close overlay
+    if (!newPinned) {
+      setOpenSidebar("none");
+    }
+  }, [sidebarPinned, appSettings, handleSettingsChange]);
+
+  // Host key verification
   const {
     hostKeyResult,
     isHostKeyModalOpen,
     hostKeyLoading,
+    handleSshConnectionResult,
     checkHostKeyBeforeConnect,
     handleHostKeyAccept,
     handleHostKeyReject,
@@ -119,20 +122,10 @@ function App() {
   const [pendingSaveConfig, setPendingSaveConfig] = useState<SshConnectionConfig | null>(null);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
 
-  // Edit session state
+  // Edit/connecting session state
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
-
-  // Connecting session (for sidebar loading indicator)
   const [connectingSessionId, setConnectingSessionId] = useState<string | null>(null);
-
-  // Pending SFTP session (when credentials are needed)
   const [pendingSftpSession, setPendingSftpSession] = useState<SavedSession | null>(null);
-
-  // Settings state
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-
-  // Tunnel manager state
-  const [tunnelManagerTabId, setTunnelManagerTabId] = useState<string | null>(null);
 
   // Tunnel count for badge
   const [activeTunnelCount, setActiveTunnelCount] = useState(0);
@@ -158,21 +151,20 @@ function App() {
     resolve: (value: string | null) => void;
   } | null>(null);
 
-  const handleNewLocalTab = () => {
+  // ============================================================================
+  // Tab creation helpers (workspace.addTabToFocusedGroup)
+  // ============================================================================
+
+  const handleNewLocalTab = useCallback(() => {
     const ptySessionId = generateSessionId("pty");
-    const paneTree = createTerminalNode(ptySessionId);
-    const newTab: Tab = {
-      id: generateTabId(),
-      sessionId: "local",
-      paneTree,
-      title: "Terminal",
+    workspace.addTabToFocusedGroup({
       type: "local",
-      focusedPaneId: paneTree.id,
-    };
-    setTabs([...tabs, newTab]);
-    setActiveTabId(newTab.id);
+      title: "Terminal",
+      sessionId: "local",
+      ptySessionId,
+    });
     setOpenSidebar("none");
-  };
+  }, [workspace]);
 
   // Prompt for passphrase (returns a promise)
   const promptForPassphrase = (keyName: string): Promise<string | null> => {
@@ -190,7 +182,7 @@ function App() {
       let passphrase: string | null = keyProfile.passphrase || null;
       if (keyProfile.require_passphrase_prompt) {
         passphrase = await promptForPassphrase(keyProfile.name);
-        if (passphrase === null) return null; // User cancelled
+        if (passphrase === null) return null;
       }
 
       return { keyPath: keyProfile.key_path, passphrase };
@@ -200,11 +192,14 @@ function App() {
     }
   };
 
+  // ============================================================================
+  // Connection handlers
+  // ============================================================================
+
   // Open SFTP tab for a saved session
   const handleOpenSftpTab = async (saved: SavedSession) => {
     setOpenSidebar("none");
 
-    // Helper pour ouvrir le formulaire de connexion SFTP
     const openSftpConnectionForm = () => {
       setPendingSftpSession(saved);
       setInitialConnectionConfig({
@@ -221,16 +216,13 @@ function App() {
     };
 
     try {
-      // Get credentials for this saved session
       let credentials: { password: string | null; key_passphrase: string | null };
       try {
         credentials = await invoke<{ password: string | null; key_passphrase: string | null }>(
           "get_session_credentials",
           { id: saved.id }
         );
-      } catch (err) {
-        // Vault probablement verrouillé - ouvrir le formulaire
-
+      } catch {
         openSftpConnectionForm();
         return;
       }
@@ -241,17 +233,15 @@ function App() {
         return;
       }
 
-      // Helper function to perform the SFTP connection
       const performSftpConnection = async () => {
         const sessionId = generateSessionId("sftp");
 
-        // Resolve SSH key if saved session uses a key profile
         let keyPath: string | null = null;
         let keyPassphrase: string | null = null;
 
         if (saved.ssh_key_id && saved.auth_type === "key") {
           const resolved = await resolveSshKey(saved.ssh_key_id);
-          if (!resolved) return; // User cancelled
+          if (!resolved) return;
           keyPath = (await expandHomeDir(resolved.keyPath)) || null;
           keyPassphrase = resolved.passphrase;
         } else if (saved.auth_type === "key") {
@@ -259,7 +249,6 @@ function App() {
           keyPassphrase = credentials.key_passphrase;
         }
 
-        // Register the SSH config for SFTP use
         await invoke("register_sftp_session", {
           sessionId,
           host: saved.host,
@@ -270,13 +259,10 @@ function App() {
           keyPassphrase,
         });
 
-        // Create SFTP tab - no paneTree needed, we render SftpBrowser directly
-        const newTab: Tab = {
-          id: generateTabId(),
-          sessionId,
-          paneTree: createTerminalNode(sessionId), // Placeholder, not used for SFTP
-          title: `SFTP - ${saved.name}`,
+        workspace.addTabToFocusedGroup({
           type: "sftp",
+          title: `SFTP - ${saved.name}`,
+          sessionId,
           sshConfig: {
             name: saved.name,
             host: saved.host,
@@ -285,14 +271,9 @@ function App() {
             authType: saved.auth_type,
             keyPath: saved.key_path,
           },
-          focusedPaneId: null,
-        };
-
-        setTabs((prev) => [...prev, newTab]);
-        setActiveTabId(newTab.id);
+        });
       };
 
-      // Check host key before connecting
       await checkHostKeyBeforeConnect(saved.host, saved.port, performSftpConnection);
     } catch (error) {
       console.error("Failed to open SFTP tab:", error);
@@ -304,36 +285,28 @@ function App() {
     setOpenSidebar("none");
 
     try {
-      // Get credentials for this saved session
       let credentials: { password: string | null; key_passphrase: string | null };
       try {
         credentials = await invoke<{ password: string | null; key_passphrase: string | null }>(
           "get_session_credentials",
           { id: saved.id }
         );
-      } catch (err) {
-
-        // For now, show an error. In the future, we could open a credential prompt.
+      } catch {
         return;
       }
 
       const needsPassword = saved.auth_type === "password" && !credentials.password;
-      if (needsPassword) {
+      if (needsPassword) return;
 
-        return;
-      }
-
-      // Helper function to perform the tunnel connection
       const performTunnelConnection = async () => {
         const sessionId = generateSessionId("tunnel");
 
-        // Resolve SSH key if saved session uses a key profile
         let keyPath: string | null = null;
         let keyPassphrase: string | null = null;
 
         if (saved.ssh_key_id && saved.auth_type === "key") {
           const resolved = await resolveSshKey(saved.ssh_key_id);
-          if (!resolved) return; // User cancelled
+          if (!resolved) return;
           keyPath = (await expandHomeDir(resolved.keyPath)) || null;
           keyPassphrase = resolved.passphrase;
         } else if (saved.auth_type === "key") {
@@ -341,7 +314,6 @@ function App() {
           keyPassphrase = credentials.key_passphrase;
         }
 
-        // Register the SSH config for tunnel use (reuses SFTP registration)
         await invoke("register_sftp_session", {
           sessionId,
           host: saved.host,
@@ -352,13 +324,10 @@ function App() {
           keyPassphrase,
         });
 
-        // Create Tunnel tab
-        const newTab: Tab = {
-          id: generateTabId(),
-          sessionId,
-          paneTree: createTerminalNode(sessionId), // Placeholder, not used for tunnel
-          title: `Tunnels - ${saved.name}`,
+        workspace.addTabToFocusedGroup({
           type: "tunnel",
+          title: `Tunnels - ${saved.name}`,
+          sessionId,
           sshConfig: {
             name: saved.name,
             host: saved.host,
@@ -367,14 +336,9 @@ function App() {
             authType: saved.auth_type,
             keyPath: saved.key_path,
           },
-          focusedPaneId: null,
-        };
-
-        setTabs((prev) => [...prev, newTab]);
-        setActiveTabId(newTab.id);
+        });
       };
 
-      // Check host key before connecting
       await checkHostKeyBeforeConnect(saved.host, saved.port, performTunnelConnection);
     } catch (error) {
       console.error("Failed to open Tunnel tab:", error);
@@ -404,24 +368,18 @@ function App() {
           keyPassphrase: config.authType === "key" ? config.keyPassphrase : null,
         });
 
-        const newTab: Tab = {
-          id: generateTabId(),
-          sessionId,
-          paneTree: createTerminalNode(sessionId),
-          title: `SFTP - ${saved.name}`,
+        workspace.addTabToFocusedGroup({
           type: "sftp",
+          title: `SFTP - ${saved.name}`,
+          sessionId,
           sshConfig: config,
-          focusedPaneId: null,
-        };
+        });
 
-        setTabs((prev) => [...prev, newTab]);
-        setActiveTabId(newTab.id);
         setIsConnectionModalOpen(false);
         setOpenSidebar("none");
         setIsConnecting(false);
         setInitialConnectionConfig(null);
 
-        // Sauvegarder les credentials pour la session SFTP existante
         try {
           await invoke("save_session", {
             id: saved.id,
@@ -435,7 +393,6 @@ function App() {
             keyPassphrase: config.keyPassphrase,
             sshKeyId: config.sshKeyId || null,
           });
-
           await loadSavedSessions();
         } catch (err) {
           console.error("[SFTP] Failed to save credentials:", err);
@@ -449,12 +406,11 @@ function App() {
       }
     }
 
-    // Helper function to perform the actual connection
-    const performSshConnection = async () => {
+    // Normal SSH connection — single TCP connection (host key check built-in)
+    {
       const ptySessionId = generateSessionId("ssh");
 
       try {
-        // Resolve SSH key if using a saved key profile
         let resolvedKeyPath = config.keyPath;
         let resolvedKeyPassphrase = config.keyPassphrase;
 
@@ -462,7 +418,7 @@ function App() {
           const resolved = await resolveSshKey(config.sshKeyId);
           if (!resolved) {
             setIsConnecting(false);
-            return; // User cancelled passphrase prompt
+            return;
           }
           resolvedKeyPath = resolved.keyPath;
           resolvedKeyPassphrase = resolved.passphrase || undefined;
@@ -471,7 +427,7 @@ function App() {
         const keyPath = await expandHomeDir(resolvedKeyPath);
         const jumpKeyPath = config.useJumpHost ? await expandHomeDir(config.jumpKeyPath) : undefined;
 
-        await invoke("create_ssh_session", {
+        const result = await invoke<SshConnectionResult>("create_ssh_session", {
           sessionId: ptySessionId,
           host: config.host,
           port: config.port,
@@ -479,7 +435,6 @@ function App() {
           password: config.password,
           keyPath,
           keyPassphrase: resolvedKeyPassphrase,
-          // Jump host parameters
           jumpHost: config.useJumpHost ? config.jumpHost : null,
           jumpPort: config.useJumpHost ? config.jumpPort : null,
           jumpUsername: config.useJumpHost ? (config.jumpUsername || config.username) : null,
@@ -488,76 +443,69 @@ function App() {
           jumpKeyPassphrase: config.useJumpHost && config.jumpAuthType === "key" ? config.jumpKeyPassphrase : null,
         });
 
-        const paneTree = createTerminalNode(ptySessionId);
-        const newTab: Tab = {
-          id: generateTabId(),
-          sessionId: `ssh-${config.host}`,
-          paneTree,
-          title: config.name,
-          type: "ssh",
-          sshConfig: config,
-          focusedPaneId: paneTree.id,
+        const onConnected = () => {
+          workspace.addTabToFocusedGroup({
+            type: "ssh",
+            title: config.name,
+            sessionId: `ssh-${config.host}`,
+            ptySessionId,
+            sshConfig: config,
+          });
+
+          setIsConnectionModalOpen(false);
+          setOpenSidebar("none");
+          setIsConnecting(false);
+
+          pluginManager.notifySessionConnect({
+            id: ptySessionId,
+            type: 'ssh',
+            host: config.host,
+            port: config.port,
+            username: config.username,
+            status: 'connected',
+          });
+
+          if (editingSessionId) {
+            (async () => {
+              try {
+                await invoke("save_session", {
+                  id: editingSessionId,
+                  name: config.name,
+                  host: config.host,
+                  port: config.port,
+                  username: config.username,
+                  authType: config.authType,
+                  keyPath: config.keyPath,
+                  password: config.password,
+                  keyPassphrase: config.keyPassphrase,
+                  sshKeyId: config.sshKeyId || null,
+                });
+                await loadSavedSessions();
+              } catch (err) {
+                console.error("[SavedSession] Failed to save credentials:", err);
+              }
+            })();
+            setEditingSessionId(null);
+          } else {
+            const isAlreadySaved = savedSessions.some(
+              (s) => s.host === config.host && s.username === config.username && s.port === config.port
+            );
+            if (!isAlreadySaved) {
+              setPendingSaveConfig(config);
+              setIsSaveModalOpen(true);
+            }
+          }
         };
 
-        setTabs((prev) => [...prev, newTab]);
-        setActiveTabId(newTab.id);
-        setIsConnectionModalOpen(false);
-        setOpenSidebar("none");
-        setIsConnecting(false);
-
-        // Notify plugins of session connect (use ptySessionId for backend commands)
-        pluginManager.notifySessionConnect({
-          id: ptySessionId,
-          type: 'ssh',
-          host: config.host,
-          port: config.port,
-          username: config.username,
-          status: 'connected',
-        });
-
-        // Si on était en mode édition (reconnexion à une session existante), sauvegarder directement les credentials
-        if (editingSessionId) {
-          try {
-            await invoke("save_session", {
-              id: editingSessionId,
-              name: config.name,
-              host: config.host,
-              port: config.port,
-              username: config.username,
-              authType: config.authType,
-              keyPath: config.keyPath,
-              password: config.password,
-              keyPassphrase: config.keyPassphrase,
-              sshKeyId: config.sshKeyId || null,
-            });
-
-            await loadSavedSessions();
-          } catch (err) {
-            console.error("[SavedSession] Failed to save credentials:", err);
-          }
-          setEditingSessionId(null);
-        } else {
-          // Proposer de sauvegarder si pas déjà sauvegardée
-          const isAlreadySaved = savedSessions.some(
-            (s) => s.host === config.host && s.username === config.username && s.port === config.port
-          );
-          if (!isAlreadySaved) {
-            setPendingSaveConfig(config);
-            setIsSaveModalOpen(true);
-          }
-        }
+        handleSshConnectionResult(result, onConnected, ptySessionId);
       } catch (error) {
         console.error("SSH connection failed:", error);
         setConnectionError(String(error));
         setIsConnecting(false);
       }
-    };
-
-    // Check host key before connecting
-    await checkHostKeyBeforeConnect(config.host, config.port, performSshConnection);
+    }
   };
 
-  // Handler Telnet connection
   const handleTelnetConnect = async (config: TelnetConnectionConfig) => {
     setIsConnecting(true);
     setConnectionError(undefined);
@@ -571,26 +519,21 @@ function App() {
         port: config.port,
       });
 
-      const paneTree = createTerminalNode(ptySessionId);
-      const newTab: Tab = {
-        id: generateTabId(),
-        sessionId: `telnet-${config.host}`,
-        paneTree,
-        title: config.name,
+      workspace.addTabToFocusedGroup({
         type: "telnet",
+        title: config.name,
+        sessionId: `telnet-${config.host}`,
+        ptySessionId,
         telnetConfig: config,
-        focusedPaneId: paneTree.id,
-      };
+      });
 
-      setTabs((prev) => [...prev, newTab]);
-      setActiveTabId(newTab.id);
       setIsConnectionModalOpen(false);
       setOpenSidebar("none");
       setIsConnecting(false);
 
       pluginManager.notifySessionConnect({
         id: ptySessionId,
-        type: "ssh", // Plugins treat it as SSH-like
+        type: "ssh",
         host: config.host,
         port: config.port,
         status: "connected",
@@ -602,7 +545,6 @@ function App() {
     }
   };
 
-  // Handler Serial connection
   const handleSerialConnect = async (config: SerialConnectionConfig) => {
     setIsConnecting(true);
     setConnectionError(undefined);
@@ -620,26 +562,21 @@ function App() {
         flowControl: config.flowControl,
       });
 
-      const paneTree = createTerminalNode(ptySessionId);
-      const newTab: Tab = {
-        id: generateTabId(),
-        sessionId: `serial-${config.port}`,
-        paneTree,
-        title: config.name,
+      workspace.addTabToFocusedGroup({
         type: "serial",
+        title: config.name,
+        sessionId: `serial-${config.port}`,
+        ptySessionId,
         serialConfig: config,
-        focusedPaneId: paneTree.id,
-      };
+      });
 
-      setTabs((prev) => [...prev, newTab]);
-      setActiveTabId(newTab.id);
       setIsConnectionModalOpen(false);
       setOpenSidebar("none");
       setIsConnecting(false);
 
       pluginManager.notifySessionConnect({
         id: ptySessionId,
-        type: "local", // Serial is like a local connection
+        type: "local",
         status: "connected",
       });
     } catch (error) {
@@ -649,12 +586,11 @@ function App() {
     }
   };
 
-  // Sauvegarder une session
+  // Save session
   const handleSaveSession = async () => {
     if (!pendingSaveConfig) return;
 
     const config = pendingSaveConfig;
-    // Utiliser l'ID existant si on édite, sinon en générer un nouveau
     const sessionId = editingSessionId || generateSessionId("saved");
 
     try {
@@ -680,7 +616,7 @@ function App() {
     }
   };
 
-  // Éditer une session sauvegardée
+  // Edit saved session
   const handleEditSavedSession = (saved: SavedSession) => {
     setEditingSessionId(saved.id);
     setInitialConnectionConfig({
@@ -697,14 +633,13 @@ function App() {
     setOpenSidebar("none");
   };
 
-  // Se connecter à une session sauvegardée
+  // Connect to saved session
   const handleConnectToSavedSession = async (saved: SavedSession) => {
     setConnectingSessionId(saved.id);
 
-    // Helper pour ouvrir le formulaire de connexion
     const openConnectionForm = (message: string) => {
       setConnectingSessionId(null);
-      setEditingSessionId(saved.id); // Important: marquer qu'on édite cette session pour sauvegarder les credentials
+      setEditingSessionId(saved.id);
       setInitialConnectionConfig({
         name: saved.name,
         host: saved.host,
@@ -719,111 +654,86 @@ function App() {
     };
 
     try {
-      // Récupérer les credentials (peut échouer si vault verrouillé)
       let credentials: { password: string | null; key_passphrase: string | null };
       try {
         credentials = await invoke<{ password: string | null; key_passphrase: string | null }>(
           "get_session_credentials",
           { id: saved.id }
         );
-      } catch (err) {
-        // Vault probablement verrouillé ou non configuré - ouvrir le formulaire
-
+      } catch {
         openConnectionForm(t('app.enterPasswordConnect'));
         return;
       }
 
-      // Vérifier si on a les credentials nécessaires
-      // Pour password auth: on a besoin du password
-      // Pour key auth: la passphrase est optionnelle (certaines clés n'en ont pas)
       const needsPassword = saved.auth_type === "password" && !credentials.password;
-
-      // Si password manquant, ouvrir le formulaire pré-rempli
       if (needsPassword) {
         openConnectionForm(t('app.pleaseEnterPassword'));
         return;
       }
 
-      // Helper function to perform the actual connection
-      const performSavedSessionConnection = async () => {
-        setIsConnecting(true);
-        setConnectionError(undefined);
+      setIsConnecting(true);
+      setConnectionError(undefined);
 
-        const ptySessionId = generateSessionId("ssh");
+      const ptySessionId = generateSessionId("ssh");
 
-        try {
-          // Resolve SSH key if saved session uses a key profile
-          let keyPath: string | null = null;
-          let keyPassphrase: string | null = null;
+      let keyPath: string | null = null;
+      let keyPassphrase: string | null = null;
 
-          if (saved.ssh_key_id && saved.auth_type === "key") {
-            const resolved = await resolveSshKey(saved.ssh_key_id);
-            if (!resolved) {
-              setIsConnecting(false);
-              setConnectingSessionId(null);
-              return; // User cancelled passphrase prompt
-            }
-            keyPath = (await expandHomeDir(resolved.keyPath)) || null;
-            keyPassphrase = resolved.passphrase;
-          } else if (saved.auth_type === "key") {
-            keyPath = (await expandHomeDir(saved.key_path)) || null;
-            keyPassphrase = credentials.key_passphrase;
-          }
-
-          await invoke("create_ssh_session", {
-            sessionId: ptySessionId,
-            host: saved.host,
-            port: saved.port,
-            username: saved.username,
-            password: saved.auth_type === "password" ? credentials.password : null,
-            keyPath,
-            keyPassphrase,
-          });
-
-          const paneTree = createTerminalNode(ptySessionId);
-          const newTab: Tab = {
-            id: generateTabId(),
-            sessionId: `ssh-${saved.host}`,
-            paneTree,
-            title: saved.name,
-            type: "ssh",
-            sshConfig: {
-              name: saved.name,
-              host: saved.host,
-              port: saved.port,
-              username: saved.username,
-              authType: saved.auth_type,
-              keyPath: saved.key_path,
-            },
-            focusedPaneId: paneTree.id,
-          };
-
-          setTabs((prev) => [...prev, newTab]);
-          setActiveTabId(newTab.id);
+      if (saved.ssh_key_id && saved.auth_type === "key") {
+        const resolved = await resolveSshKey(saved.ssh_key_id);
+        if (!resolved) {
           setIsConnecting(false);
           setConnectingSessionId(null);
-          setOpenSidebar("none");
-
-          // Notify plugins of session connect
-          pluginManager.notifySessionConnect({
-            id: ptySessionId,
-            type: 'ssh',
-            host: saved.host,
-            port: saved.port,
-            username: saved.username,
-            status: 'connected',
-          });
-
-        } catch (error) {
-          console.error("[SavedSession] SSH connection failed:", error);
-          setConnectionError(String(error));
-          setIsConnecting(false);
-          setConnectingSessionId(null);
+          return;
         }
+        keyPath = (await expandHomeDir(resolved.keyPath)) || null;
+        keyPassphrase = resolved.passphrase;
+      } else if (saved.auth_type === "key") {
+        keyPath = (await expandHomeDir(saved.key_path)) || null;
+        keyPassphrase = credentials.key_passphrase;
+      }
+
+      const result = await invoke<SshConnectionResult>("create_ssh_session", {
+        sessionId: ptySessionId,
+        host: saved.host,
+        port: saved.port,
+        username: saved.username,
+        password: saved.auth_type === "password" ? credentials.password : null,
+        keyPath,
+        keyPassphrase,
+      });
+
+      const onConnected = () => {
+        workspace.addTabToFocusedGroup({
+          type: "ssh",
+          title: saved.name,
+          sessionId: `ssh-${saved.host}`,
+          ptySessionId,
+          sshConfig: {
+            name: saved.name,
+            host: saved.host,
+            port: saved.port,
+            username: saved.username,
+            authType: saved.auth_type,
+            keyPath: saved.key_path,
+          },
+        });
+
+        setIsConnecting(false);
+        setConnectingSessionId(null);
+        setOpenSidebar("none");
+
+        pluginManager.notifySessionConnect({
+          id: ptySessionId,
+          type: 'ssh',
+          host: saved.host,
+          port: saved.port,
+          username: saved.username,
+          status: 'connected',
+        });
       };
 
-      // Check host key before connecting
-      await checkHostKeyBeforeConnect(saved.host, saved.port, performSavedSessionConnection);
+      handleSshConnectionResult(result, onConnected, ptySessionId);
     } catch (error) {
       console.error("[SavedSession] SSH connection failed:", error);
       setConnectionError(String(error));
@@ -832,7 +742,7 @@ function App() {
     }
   };
 
-  // Handle plugin connectSsh requests - match against saved sessions
+  // Plugin connectSsh
   const handlePluginConnectSsh = useCallback((config: { host: string; port: number; username: string; name?: string }) => {
     const saved = savedSessions.find(
       s => s.host === config.host && s.port === config.port && s.username === config.username
@@ -840,7 +750,6 @@ function App() {
     if (saved) {
       handleConnectToSavedSession(saved);
     } else {
-      // No saved session found - open connection modal pre-filled
       setInitialConnectionConfig({
         name: config.name || `${config.username}@${config.host}`,
         host: config.host,
@@ -854,399 +763,28 @@ function App() {
     }
   }, [savedSessions, handleConnectToSavedSession]);
 
-  const handleCloseTab = (tabId: string) => {
-    const tabToClose = tabs.find((t) => t.id === tabId);
-    if (tabToClose) {
-      // Close all PTY sessions in the pane tree
-      const ptySessionIds = getAllPtySessionIds(tabToClose.paneTree);
-      ptySessionIds.forEach((ptySessionId) => {
-        invoke("close_pty_session", { sessionId: ptySessionId }).catch(console.error);
-        pluginManager.notifySessionDisconnect(ptySessionId);
-      });
+  // ============================================================================
+  // Tab close handler
+  // ============================================================================
+
+  const handleCloseTab = useCallback((tabId: string) => {
+    const closedTab = workspace.closeTab(tabId);
+    if (closedTab && closedTab.ptySessionId) {
+      invoke("close_pty_session", { sessionId: closedTab.ptySessionId }).catch(console.error);
+      pluginManager.notifySessionDisconnect(closedTab.ptySessionId);
     }
-    const newTabs = tabs.filter((t) => t.id !== tabId);
-    setTabs(newTabs);
-    if (activeTabId === tabId) {
-      setActiveTabId(newTabs.length > 0 ? newTabs[newTabs.length - 1].id : null);
-    }
-  };
+  }, [workspace]);
 
-  // Split pane handlers
-  const handleSplitPane = useCallback(
-    (direction: "horizontal" | "vertical") => {
-      const activeTab = tabs.find((t) => t.id === activeTabId);
-      if (!activeTab || !activeTab.focusedPaneId) return;
-
-      // Create a pending pane that will show the picker
-      const { tree: newPaneTree, pendingPaneId } = splitPaneWithPending(
-        activeTab.paneTree,
-        activeTab.focusedPaneId,
-        direction
-      );
-
-      setTabs(
-        tabs.map((t) =>
-          t.id === activeTabId
-            ? { ...t, paneTree: newPaneTree, focusedPaneId: pendingPaneId }
-            : t
-        )
-      );
-    },
-    [tabs, activeTabId]
-  );
-
-  // Split a specific pane by ID (used by toolbar buttons)
-  const handleSplitPaneById = useCallback(
-    (paneId: string, direction: "horizontal" | "vertical") => {
-      const activeTab = tabs.find((t) => t.id === activeTabId);
-      if (!activeTab) return;
-
-      const { tree: newPaneTree, pendingPaneId } = splitPaneWithPending(
-        activeTab.paneTree,
-        paneId,
-        direction
-      );
-
-      setTabs(
-        tabs.map((t) =>
-          t.id === activeTabId
-            ? { ...t, paneTree: newPaneTree, focusedPaneId: pendingPaneId }
-            : t
-        )
-      );
-    },
-    [tabs, activeTabId]
-  );
-
-  const handleClosePane = useCallback(
-    (paneId: string) => {
-      const activeTab = tabs.find((t) => t.id === activeTabId);
-      if (!activeTab) return;
-
-      // Count all leaf panes (terminal, sftp, and pending)
-      const terminalPaneIds = getAllTerminalPaneIds(activeTab.paneTree);
-      const sftpPaneIds = getAllSftpPaneIds(activeTab.paneTree);
-      const pendingPaneIds = getAllPendingPaneIds(activeTab.paneTree);
-      const totalLeafPanes = terminalPaneIds.length + sftpPaneIds.length + pendingPaneIds.length;
-
-      if (totalLeafPanes <= 1) {
-        // Last pane - close the whole tab instead
-        handleCloseTab(activeTabId!);
-        return;
-      }
-
-      const newPaneTree = closePane(activeTab.paneTree, paneId);
-      if (!newPaneTree) {
-        handleCloseTab(activeTabId!);
-        return;
-      }
-
-      // Close the PTY session for this pane
-      // We need to find which pty was removed
-      const oldPtyIds = getAllPtySessionIds(activeTab.paneTree);
-      const newPtyIds = getAllPtySessionIds(newPaneTree);
-      const removedPtyIds = oldPtyIds.filter((id) => !newPtyIds.includes(id));
-      removedPtyIds.forEach((ptyId) => {
-        invoke("close_pty_session", { sessionId: ptyId }).catch(console.error);
-        pluginManager.notifySessionDisconnect(ptyId);
-      });
-
-      // Update focus if needed - prefer terminal panes, then sftp, then pending
-      const remainingTerminalIds = getAllTerminalPaneIds(newPaneTree);
-      const remainingSftpIds = getAllSftpPaneIds(newPaneTree);
-      const remainingPendingIds = getAllPendingPaneIds(newPaneTree);
-      const newFocusedPaneId =
-        activeTab.focusedPaneId === paneId
-          ? (remainingTerminalIds[0] || remainingSftpIds[0] || remainingPendingIds[0])
-          : activeTab.focusedPaneId;
-
-      setTabs(
-        tabs.map((t) =>
-          t.id === activeTabId
-            ? { ...t, paneTree: newPaneTree, focusedPaneId: newFocusedPaneId }
-            : t
-        )
-      );
-    },
-    [tabs, activeTabId, handleCloseTab]
-  );
-
-  const handleFocusPane = useCallback(
-    (paneId: string) => {
-      setTabs((prev) =>
-        prev.map((t) =>
-          t.id === activeTabId ? { ...t, focusedPaneId: paneId } : t
-        )
-      );
-    },
-    [activeTabId]
-  );
-
-  const handlePaneTreeChange = useCallback(
-    (newTree: PaneNode) => {
-      setTabs((prev) =>
-        prev.map((t) =>
-          t.id === activeTabId ? { ...t, paneTree: newTree } : t
-        )
-      );
-    },
-    [activeTabId]
-  );
-
-  // Handler to convert a pending pane to a local terminal
-  const handlePendingSelectLocal = useCallback(
-    (pendingPaneId: string) => {
-      const newPtySessionId = generateSessionId("pty");
-
-      setTabs((prev) =>
-        prev.map((t) => {
-          if (t.id !== activeTabId) return t;
-          const newPaneTree = replacePendingWithTerminal(t.paneTree, pendingPaneId, newPtySessionId);
-          return { ...t, paneTree: newPaneTree, focusedPaneId: pendingPaneId };
-        })
-      );
-    },
-    [activeTabId]
-  );
-
-  // Handler to duplicate the current SSH session in a pending pane
-  const handlePendingSelectDuplicate = useCallback(
-    async (pendingPaneId: string) => {
-      const activeTab = tabs.find((t) => t.id === activeTabId);
-      if (!activeTab || !activeTab.sshConfig) return;
-
-      const config = activeTab.sshConfig;
-      const ptySessionId = generateSessionId("ssh");
-
-      try {
-        const keyPath = await expandHomeDir(config.keyPath);
-
-        await invoke("create_ssh_session", {
-          sessionId: ptySessionId,
-          host: config.host,
-          port: config.port,
-          username: config.username,
-          password: config.password,
-          keyPath,
-          keyPassphrase: config.keyPassphrase,
-        });
-
-        const newPaneTree = replacePendingWithTerminal(activeTab.paneTree, pendingPaneId, ptySessionId);
-
-        setTabs(
-          tabs.map((t) =>
-            t.id === activeTabId
-              ? { ...t, paneTree: newPaneTree }
-              : t
-          )
-        );
-
-        pluginManager.notifySessionConnect({
-          id: ptySessionId,
-          type: 'ssh',
-          host: config.host,
-          port: config.port,
-          username: config.username,
-          status: 'connected',
-        });
-      } catch (error) {
-        console.error("Failed to duplicate SSH session:", error);
-        // On error, close the pending pane
-        handleClosePane(pendingPaneId);
-      }
-    },
-    [tabs, activeTabId, handleClosePane]
-  );
-
-  // Handler for selecting a saved session in a pending pane
-  const handlePendingSelectSaved = useCallback(
-    async (pendingPaneId: string, saved: SavedSession) => {
-      const activeTab = tabs.find((t) => t.id === activeTabId);
-      if (!activeTab) return;
-
-      // Helper pour ouvrir le formulaire
-      const openFormForCredentials = () => {
-        handleClosePane(pendingPaneId);
-        setEditingSessionId(saved.id);
-        setInitialConnectionConfig({
-          name: saved.name,
-          host: saved.host,
-          port: saved.port,
-          username: saved.username,
-          authType: saved.auth_type,
-          keyPath: saved.key_path,
-        });
-        setConnectionError(t('app.pleaseEnterPassword'));
-        setIsConnectionModalOpen(true);
-      };
-
-      try {
-        // Essayer de récupérer les credentials
-        let credentials: { password: string | null; key_passphrase: string | null };
-        try {
-          credentials = await invoke<{ password: string | null; key_passphrase: string | null }>(
-            "get_session_credentials",
-            { id: saved.id }
-          );
-        } catch (err) {
-          // Vault verrouillé - ouvrir le formulaire
-
-          openFormForCredentials();
-          return;
-        }
-
-        const needsPassword = saved.auth_type === "password" && !credentials.password;
-        if (needsPassword) {
-          openFormForCredentials();
-          return;
-        }
-
-        const ptySessionId = generateSessionId("ssh");
-        const keyPath = await expandHomeDir(saved.key_path);
-
-        await invoke("create_ssh_session", {
-          sessionId: ptySessionId,
-          host: saved.host,
-          port: saved.port,
-          username: saved.username,
-          password: saved.auth_type === "password" ? credentials.password : null,
-          keyPath: saved.auth_type === "key" ? keyPath : null,
-          keyPassphrase: saved.auth_type === "key" ? credentials.key_passphrase : null,
-        });
-
-        const newPaneTree = replacePendingWithTerminal(activeTab.paneTree, pendingPaneId, ptySessionId);
-
-        setTabs(
-          tabs.map((t) =>
-            t.id === activeTabId
-              ? { ...t, paneTree: newPaneTree }
-              : t
-          )
-        );
-
-        pluginManager.notifySessionConnect({
-          id: ptySessionId,
-          type: 'ssh',
-          host: saved.host,
-          port: saved.port,
-          username: saved.username,
-          status: 'connected',
-        });
-      } catch (error) {
-        console.error("Failed to connect to saved session:", error);
-        handleClosePane(pendingPaneId);
-      }
-    },
-    [tabs, activeTabId, handleClosePane]
-  );
-
-  // Handler for selecting SFTP for an active SSH connection in a pending pane
-  const handlePendingSelectSftp = useCallback(
-    async (pendingPaneId: string, _sessionId: string, ptySessionId: string) => {
-      const activeTab = tabs.find((t) => t.id === activeTabId);
-      if (!activeTab) return;
-
-      // Create a new SFTP session ID
-      const sftpSessionId = generateSessionId("sftp-pane");
-
-      // Find the tab that has this ptySessionId to get SSH config
-      const sourceTab = tabs.find(t => {
-        const ptyIds = getAllPtySessionIds(t.paneTree);
-        return ptyIds.includes(ptySessionId);
-      });
-
-      if (!sourceTab?.sshConfig) {
-        console.error("Could not find SSH config for session");
-        return;
-      }
-
-      const config = sourceTab.sshConfig;
-
-      try {
-        // Get credentials if available
-        let password: string | null = null;
-        let keyPassphrase: string | null = null;
-
-        // Try to get stored credentials
-        try {
-          // Find saved session with matching host/username
-          const matchingSaved = savedSessions.find(
-            s => s.host === config.host && s.username === config.username
-          );
-          if (matchingSaved) {
-            const credentials = await invoke<{ password: string | null; key_passphrase: string | null }>(
-              "get_session_credentials",
-              { id: matchingSaved.id }
-            );
-            password = credentials.password;
-            keyPassphrase = credentials.key_passphrase;
-          }
-        } catch (err) {
-
-        }
-
-        // Expand ~ in key path
-        const keyPath = await expandHomeDir(config.keyPath);
-
-        // Register SFTP session
-        await invoke("register_sftp_session", {
-          sessionId: sftpSessionId,
-          host: config.host,
-          port: config.port,
-          username: config.username,
-          password: config.authType === "password" ? (password || config.password) : null,
-          keyPath: config.authType === "key" ? keyPath : null,
-          keyPassphrase: config.authType === "key" ? (keyPassphrase || config.keyPassphrase) : null,
-        });
-
-        // Replace pending with SFTP pane
-        const newPaneTree = replacePendingWithSftp(activeTab.paneTree, pendingPaneId, sftpSessionId, "/");
-
-        setTabs(
-          tabs.map((t) =>
-            t.id === activeTabId
-              ? { ...t, paneTree: newPaneTree }
-              : t
-          )
-        );
-      } catch (error) {
-        console.error("Failed to open SFTP pane:", error);
-        handleClosePane(pendingPaneId);
-      }
-    },
-    [tabs, activeTabId, savedSessions, handleClosePane]
-  );
-
-  // Build active connections list for PanePicker
-  const activeConnections: ActiveConnection[] = tabs
-    .filter(t => t.type === "ssh")
-    .flatMap(t => {
-      const ptyIds = getAllPtySessionIds(t.paneTree);
-      // Return one connection per SSH tab (use first ptyId)
-      if (ptyIds.length > 0) {
-        return [{
-          tabId: t.id,
-          sessionId: t.sessionId,
-          ptySessionId: ptyIds[0],
-          type: "ssh" as const,
-          title: t.title,
-          host: t.sshConfig?.host,
-          username: t.sshConfig?.username,
-        }];
-      }
-      return [];
-    });
-
+  // ============================================================================
   // Keyboard shortcuts
+  // ============================================================================
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Skip if user is typing in an input/textarea (except terminal)
       const target = e.target as HTMLElement;
       const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA";
-
       const mod = isModifierPressed(e);
 
-      // --- Tab management ---
       // Mod+T: New local terminal
       if (mod && !e.shiftKey && e.key === "t") {
         e.preventDefault();
@@ -1260,66 +798,51 @@ function App() {
         handleOpenConnectionModal();
         return;
       }
-      // Mod+W: Close active tab
+      // Mod+W: Close active tab in focused group
       if (mod && !e.shiftKey && e.key === "w") {
         e.preventDefault();
-        if (activeTabId) handleCloseTab(activeTabId);
-        return;
-      }
-      // Mod+ArrowLeft: Previous tab
-      if (mod && !e.shiftKey && e.key === "ArrowLeft") {
-        e.preventDefault();
-        if (tabs.length > 1) {
-          const currentIndex = tabs.findIndex((t) => t.id === activeTabId);
-          const prevIndex = currentIndex <= 0 ? tabs.length - 1 : currentIndex - 1;
-          setActiveTabId(tabs[prevIndex].id);
+        const focusedGroup = workspace.groups.get(workspace.focusedGroupId);
+        if (focusedGroup?.activeTabId) {
+          handleCloseTab(focusedGroup.activeTabId);
         }
         return;
       }
-      // Mod+ArrowRight: Next tab
-      if (mod && !e.shiftKey && e.key === "ArrowRight") {
+      // Ctrl+Tab: Next tab in focused group
+      if (e.ctrlKey && !e.shiftKey && e.key === "Tab") {
         e.preventDefault();
-        if (tabs.length > 1) {
-          const currentIndex = tabs.findIndex((t) => t.id === activeTabId);
-          const nextIndex = (currentIndex + 1) % tabs.length;
-          setActiveTabId(tabs[nextIndex].id);
-        }
+        workspace.cycleFocusedGroupTab("next");
+        return;
+      }
+      // Ctrl+Shift+Tab: Previous tab in focused group
+      if (e.ctrlKey && e.shiftKey && e.key === "Tab") {
+        e.preventDefault();
+        workspace.cycleFocusedGroupTab("prev");
         return;
       }
       // Mod+,: Open settings
       if (mod && !e.shiftKey && e.key === ",") {
         e.preventDefault();
-        setIsSettingsOpen(true);
+        workspace.openSettings();
         return;
       }
 
-      // --- Pane management (Mod+Shift) ---
-      // Mod+Shift+D: Split vertical
+      // Mod+Shift+D: Split focused group vertical
       if (mod && e.shiftKey && e.key === "D") {
         e.preventDefault();
-        handleSplitPane("vertical");
+        workspace.splitFocusedGroup("vertical");
         return;
       }
-      // Mod+Shift+E: Split horizontal
+      // Mod+Shift+E: Split focused group horizontal
       if (mod && e.shiftKey && e.key === "E") {
         e.preventDefault();
-        handleSplitPane("horizontal");
-        return;
-      }
-      // Mod+Shift+W: Close current pane
-      if (mod && e.shiftKey && e.key === "W") {
-        e.preventDefault();
-        const tab = tabs.find((t) => t.id === activeTabId);
-        if (tab?.focusedPaneId) {
-          handleClosePane(tab.focusedPaneId);
-        }
+        workspace.splitFocusedGroup("horizontal");
         return;
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleSplitPane, handleClosePane, handleNewLocalTab, handleCloseTab, tabs, activeTabId]);
+  }, [workspace, handleNewLocalTab, handleCloseTab]);
 
   const handleOpenConnectionModal = () => {
     setConnectionError(undefined);
@@ -1332,65 +855,46 @@ function App() {
     setOpenSidebar("none");
   };
 
-  const activeTab = tabs.find((t) => t.id === activeTabId);
+  // ============================================================================
+  // Command Palette
+  // ============================================================================
 
-  // Command Palette handlers and context
+  const focusedGroup = workspace.groups.get(workspace.focusedGroupId);
+  const activeTab = focusedGroup?.tabs.find((t) => t.id === focusedGroup.activeTabId);
+  const allTabs = workspace.getAllTabs();
+
   const commandHandlers: CommandHandlers = useMemo(
     () => ({
       newSshConnection: handleOpenConnectionModal,
       closeTab: () => {
-        if (activeTabId) handleCloseTab(activeTabId);
+        if (activeTab) handleCloseTab(activeTab.id);
       },
       duplicateTab: () => {
         if (activeTab?.sshConfig) {
-          // Trigger a new SSH connection with the same config
           setInitialConnectionConfig(activeTab.sshConfig);
           setIsConnectionModalOpen(true);
         }
       },
       renameTab: () => {
-        if (activeTabId) {
-          const newName = window.prompt("Enter new tab name:", activeTab?.title);
+        if (activeTab) {
+          const newName = window.prompt("Enter new tab name:", activeTab.title);
           if (newName && newName.trim()) {
-            setTabs(tabs.map((t) =>
-              t.id === activeTabId ? { ...t, title: newName.trim() } : t
-            ));
+            workspace.renameTab(activeTab.id, newName.trim());
           }
         }
       },
-      splitPane: () => handleSplitPane("vertical"),
+      splitPane: () => workspace.splitFocusedGroup("vertical"),
       focusNextPane: () => {
-        if (!activeTab) return;
-        const paneIds = getAllTerminalPaneIds(activeTab.paneTree);
-        if (paneIds.length <= 1) return;
-        const currentIndex = paneIds.indexOf(activeTab.focusedPaneId || "");
-        const nextIndex = (currentIndex + 1) % paneIds.length;
-        handleFocusPane(paneIds[nextIndex]);
+        workspace.cycleFocusedPaneGroup("next");
       },
       focusPrevPane: () => {
-        if (!activeTab) return;
-        const paneIds = getAllTerminalPaneIds(activeTab.paneTree);
-        if (paneIds.length <= 1) return;
-        const currentIndex = paneIds.indexOf(activeTab.focusedPaneId || "");
-        const prevIndex = currentIndex <= 0 ? paneIds.length - 1 : currentIndex - 1;
-        handleFocusPane(paneIds[prevIndex]);
+        workspace.cycleFocusedPaneGroup("prev");
       },
-      nextTab: () => {
-        if (tabs.length <= 1) return;
-        const currentIndex = tabs.findIndex((t) => t.id === activeTabId);
-        const nextIndex = (currentIndex + 1) % tabs.length;
-        setActiveTabId(tabs[nextIndex].id);
-      },
-      prevTab: () => {
-        if (tabs.length <= 1) return;
-        const currentIndex = tabs.findIndex((t) => t.id === activeTabId);
-        const prevIndex = currentIndex <= 0 ? tabs.length - 1 : currentIndex - 1;
-        setActiveTabId(tabs[prevIndex].id);
-      },
-      openSettings: () => setIsSettingsOpen(true),
+      nextTab: () => workspace.cycleFocusedGroupTab("next"),
+      prevTab: () => workspace.cycleFocusedGroupTab("prev"),
+      openSettings: () => workspace.openSettings(),
       openSftp: () => {
         if (activeTab?.type === "ssh" && activeTab.sshConfig) {
-          // Find matching saved session to open SFTP
           const matchingSaved = savedSessions.find(
             (s) =>
               s.host === activeTab.sshConfig?.host &&
@@ -1402,28 +906,17 @@ function App() {
         }
       },
     }),
-    [
-      activeTabId,
-      activeTab,
-      tabs,
-      savedSessions,
-      handleCloseTab,
-      handleSplitPane,
-      handleFocusPane,
-      handleOpenSftpTab,
-    ]
+    [activeTab, allTabs.length, savedSessions, handleCloseTab, workspace, handleOpenSftpTab]
   );
 
   const commandContext: CommandContext = useMemo(
     () => ({
       hasActiveTab: !!activeTab,
-      hasMultipleTabs: tabs.length > 1,
-      hasMultiplePanes: activeTab
-        ? getAllTerminalPaneIds(activeTab.paneTree).length > 1
-        : false,
+      hasMultipleTabs: allTabs.length > 1,
+      hasMultiplePanes: workspace.groups.size > 1,
       isActiveTabSsh: activeTab?.type === "ssh",
     }),
-    [activeTab, tabs.length]
+    [activeTab, allTabs.length, workspace.groups.size]
   );
 
   const commandPalette = useCommandPalette({
@@ -1444,7 +937,7 @@ function App() {
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, [commandPalette.toggle]);
 
-  // Auto-check for updates on startup (silent, non-intrusive)
+  // Auto-check for updates on startup
   useEffect(() => {
     const timer = setTimeout(() => {
       checkUpdate()
@@ -1457,14 +950,15 @@ function App() {
             setTimeout(() => setNotification(null), 5000);
           }
         })
-        .catch(() => {
-          // Silent fail - don't bother the user if check fails
-        });
-    }, 3000); // Delay 3s after app start
+        .catch(() => {});
+    }, 3000);
     return () => clearTimeout(timer);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ============================================================================
   // Plugin callbacks
+  // ============================================================================
+
   const handleShowNotification = useCallback((message: string, type: NotificationType) => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3000);
@@ -1518,24 +1012,22 @@ function App() {
   }, [promptModal]);
 
   const getSessions = useCallback((): SessionInfo[] => {
-    return tabs.map(tab => {
-      const ptyIds = getAllPtySessionIds(tab.paneTree);
-      return {
-        id: ptyIds[0] || tab.sessionId,
-        type: tab.type === "local" ? "local" : "ssh",
+    return allTabs
+      .filter((tab): tab is PaneGroupTab & { ptySessionId: string } => !!tab.ptySessionId)
+      .map((tab) => ({
+        id: tab.ptySessionId,
+        type: tab.type === "local" ? "local" as const : "ssh" as const,
         host: tab.sshConfig?.host,
         port: tab.sshConfig?.port,
         username: tab.sshConfig?.username,
         status: "connected" as const,
-      };
-    });
-  }, [tabs]);
+      }));
+  }, [allTabs]);
 
   const getActiveSessionInfo = useCallback((): SessionInfo | null => {
-    if (!activeTab) return null;
-    const ptyIds = getAllPtySessionIds(activeTab.paneTree);
+    if (!activeTab || !activeTab.ptySessionId) return null;
     return {
-      id: ptyIds[0] || activeTab.sessionId,
+      id: activeTab.ptySessionId,
       type: activeTab.type === "local" ? "local" : "ssh",
       host: activeTab.sshConfig?.host,
       port: activeTab.sshConfig?.port,
@@ -1557,115 +1049,137 @@ function App() {
     setHeaderActions(items);
   }, []);
 
+  // ============================================================================
+  // Render
+  // ============================================================================
+
   return (
     <div className="relative h-screen bg-terminal overflow-hidden">
-      {/* Terminal area - sous la titlebar, au dessus de la status bar */}
-      <div className={`absolute inset-x-0 bottom-0 ${statusBarVisible ? "top-[72px]" : "top-10"}`}>
-        {tabs.length === 0 ? (
-          <EmptyState onNewConnection={handleOpenConnectionModal} />
-        ) : (
-          /* Render ALL tabs, hide inactive ones to preserve state */
-          tabs.map((tab) => (
-            <div
-              key={tab.id}
-              className={`absolute inset-0 ${
-                tab.id === activeTabId ? "visible" : "invisible"
-              }`}
-            >
-              {/* SFTP tabs render SftpBrowser directly */}
-              {tab.type === "sftp" ? (
-                <SftpBrowser sessionId={tab.sessionId} initialPath="/" />
-              ) : tab.type === "tunnel" ? (
-                /* Tunnel tabs render TunnelManager directly (embedded, not modal) */
+      {/* Header bar (simplified, no tab pills) */}
+      <HeaderBar
+        onToggleSidebar={() => {
+          if (sidebarPinned) {
+            handleToggleSidebarPin(); // Unpin
+          } else {
+            setOpenSidebar(openSidebar === "menu" ? "none" : "menu");
+          }
+        }}
+        isSidebarOpen={isSidebarOpen}
+        onOpenSettings={() => workspace.openSettings()}
+        headerActions={headerActions}
+        vaultExists={vault.status?.exists}
+        vaultUnlocked={vault.status?.isUnlocked}
+        onVaultToggle={() => vault.status?.isUnlocked ? lockVault() : openVaultUnlock()}
+      />
+
+      {/* Main area: pinned sidebar + workspace */}
+      <div className={`absolute inset-x-0 bottom-0 flex ${statusBarVisible ? "top-[72px]" : "top-10"}`}>
+        {/* Pinned sidebar (rendered as flex child) */}
+        {sidebarPinned && (
+          <Sidebar
+            isOpen={true}
+            onClose={() => {}}
+            mode="pinned"
+            onTogglePin={handleToggleSidebarPin}
+            savedSessions={savedSessions}
+            connectingSessionId={connectingSessionId}
+            onSavedSessionConnect={handleConnectToSavedSession}
+            onSavedSessionEdit={handleEditSavedSession}
+            onSavedSessionDelete={handleDeleteSavedSession}
+            onSavedSessionSftp={handleOpenSftpTab}
+            onSavedSessionTunnel={handleOpenTunnelTab}
+          />
+        )}
+
+        {/* Workspace area */}
+        <div className="flex-1 overflow-hidden m-1.5 mt-0 rounded-xl">
+            <WorkspaceSplit
+              node={workspace.tree}
+              groups={workspace.groups}
+              focusedGroupId={workspace.focusedGroupId}
+              onTabSelect={(groupId, tabId) => workspace.selectTab(groupId, tabId)}
+              onTabClose={handleCloseTab}
+              onFocusGroup={(groupId) => workspace.focusGroup(groupId)}
+              onResizeSplit={(splitId, sizes) => workspace.resizeSplitNode(splitId, sizes)}
+              onNewConnection={handleOpenConnectionModal}
+              onLocalTerminal={handleNewLocalTab}
+              onToggleTunnelSidebar={() => setOpenSidebar(openSidebar === "tunnel" ? "none" : "tunnel")}
+              isTunnelSidebarOpen={isTunnelSidebarOpen}
+              activeTunnelCount={activeTunnelCount}
+              onSplitVertical={() => workspace.splitFocusedGroup("vertical")}
+              onSplitHorizontal={() => workspace.splitFocusedGroup("horizontal")}
+              onClosePane={(groupId) => {
+                const closedTabs = workspace.closeGroup(groupId);
+                for (const tab of closedTabs) {
+                  if (tab.ptySessionId) {
+                    invoke("close_pty_session", { sessionId: tab.ptySessionId }).catch(console.error);
+                    pluginManager.notifySessionDisconnect(tab.ptySessionId);
+                  }
+                }
+              }}
+              renderTerminal={(ptySessionId, isActive, type) => (
+                <TerminalPane
+                  key={ptySessionId}
+                  sessionId={ptySessionId}
+                  type={type === "ssh" ? "ssh" : "local"}
+                  isActive={isActive}
+                  appTheme={appSettings.appearance?.theme ?? "dark"}
+                  terminalSettings={appSettings.terminal}
+                />
+              )}
+              renderSftp={(sessionId) => (
+                <SftpBrowser key={sessionId} sessionId={sessionId} initialPath="/" />
+              )}
+              renderTunnel={(sessionId, sessionName) => (
                 <div className="w-full h-full flex items-center justify-center bg-base p-6">
                   <div className="w-full max-w-2xl h-full">
                     <TunnelManager
                       isOpen={true}
-                      onClose={() => {}} // No-op, can't close embedded view
-                      sessionId={tab.sessionId}
-                      sessionName={tab.title.replace("Tunnels - ", "")}
+                      onClose={() => {}}
+                      sessionId={sessionId}
+                      sessionName={sessionName}
                       embedded={true}
                     />
                   </div>
                 </div>
-              ) : (
-                <SplitPane
-                  node={tab.paneTree}
-                  onNodeChange={handlePaneTreeChange}
-                  focusedPaneId={tab.focusedPaneId}
-                  onFocusPane={handleFocusPane}
-                  onClosePane={handleClosePane}
-                  onSplitPane={handleSplitPaneById}
-                  sessionType={tab.type as "local" | "ssh"}
-                  onOpenTunnels={tab.type === "ssh" ? () => setTunnelManagerTabId(tab.id) : undefined}
-                  renderTerminal={(_paneId, ptySessionId, isFocused) => (
-                    <TerminalPane
-                      key={ptySessionId}
-                      sessionId={ptySessionId}
-                      type={tab.type as "local" | "ssh"}
-                      isActive={tab.id === activeTabId && isFocused}
-                      appTheme={appSettings.appearance?.theme ?? "dark"}
-                      terminalSettings={appSettings.terminal}
-                    />
-                  )}
-                  renderSftp={(_paneId, sessionId, initialPath) => (
-                    <SftpBrowser
-                      key={sessionId}
-                      sessionId={sessionId}
-                      initialPath={initialPath}
-                    />
-                  )}
-                  renderPending={(paneId) => (
-                    <PanePicker
-                      onSelectLocal={() => handlePendingSelectLocal(paneId)}
-                      onSelectDuplicate={() => handlePendingSelectDuplicate(paneId)}
-                      onSelectSaved={(session) => handlePendingSelectSaved(paneId, session)}
-                      onSelectSftpForConnection={(sessionId, ptySessionId) => handlePendingSelectSftp(paneId, sessionId, ptySessionId)}
-                      currentSessionConfig={tab.sshConfig}
-                      savedSessions={savedSessions}
-                      activeConnections={activeConnections}
-                    />
-                  )}
+              )}
+              renderSettings={() => (
+                <SettingsTab
+                  settings={appSettings}
+                  onSettingsChange={handleSettingsChange}
+                  savedSessionsCount={savedSessions.length}
+                  onClearAllSessions={clearAllSavedSessions}
                 />
               )}
-            </div>
-          ))
-        )}
+              renderEmpty={() => (
+                <EmptyPaneSessions
+                  savedSessions={savedSessions}
+                  connectingSessionId={connectingSessionId}
+                  onConnect={handleConnectToSavedSession}
+                  onNewConnection={handleOpenConnectionModal}
+                  onLocalTerminal={handleNewLocalTab}
+                />
+              )}
+            />
+        </div>
       </div>
 
-      {/* Floating tabs overlay */}
-      <FloatingTabs
-        tabs={tabs}
-        activeTabId={activeTabId}
-        onTabSelect={setActiveTabId}
-        onTabClose={handleCloseTab}
-        onNewTab={handleOpenConnectionModal}
-        onLocalTerminal={handleNewLocalTab}
-        onToggleSidebar={() => setOpenSidebar(openSidebar === "menu" ? "none" : "menu")}
-        isSidebarOpen={isSidebarOpen}
-        onToggleTunnelSidebar={() => setOpenSidebar(openSidebar === "tunnel" ? "none" : "tunnel")}
-        isTunnelSidebarOpen={isTunnelSidebarOpen}
-        activeTunnelCount={activeTunnelCount}
-        headerActions={headerActions}
-      />
-
-      {/* Sidebar drawer */}
-      <Sidebar
-        isOpen={isSidebarOpen}
-        onClose={() => setOpenSidebar("none")}
-        savedSessions={savedSessions}
-        connectingSessionId={connectingSessionId}
-        onSavedSessionConnect={handleConnectToSavedSession}
-        onSavedSessionEdit={handleEditSavedSession}
-        onSavedSessionDelete={handleDeleteSavedSession}
-        onSavedSessionSftp={handleOpenSftpTab}
-        onSavedSessionTunnel={handleOpenTunnelTab}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        vaultExists={vault.status?.exists}
-        vaultUnlocked={vault.status?.isUnlocked}
-        onVaultLock={lockVault}
-        onVaultUnlock={openVaultUnlock}
-      />
+      {/* Sidebar overlay (only when not pinned) */}
+      {!sidebarPinned && (
+        <Sidebar
+          isOpen={openSidebar === "menu"}
+          onClose={() => setOpenSidebar("none")}
+          mode="overlay"
+          onTogglePin={handleToggleSidebarPin}
+          savedSessions={savedSessions}
+          connectingSessionId={connectingSessionId}
+          onSavedSessionConnect={handleConnectToSavedSession}
+          onSavedSessionEdit={handleEditSavedSession}
+          onSavedSessionDelete={handleDeleteSavedSession}
+          onSavedSessionSftp={handleOpenSftpTab}
+          onSavedSessionTunnel={handleOpenTunnelTab}
+        />
+      )}
 
       {/* Connection Modal */}
       <NewConnectionModal
@@ -1748,7 +1262,7 @@ function App() {
         isLoading={hostKeyLoading}
       />
 
-      {/* Passphrase Prompt Modal (for SSH key profiles) */}
+      {/* Passphrase Prompt Modal */}
       <PassphrasePromptModal
         isOpen={!!passphrasePrompt}
         keyName={passphrasePrompt?.keyName || ""}
@@ -1760,16 +1274,6 @@ function App() {
           passphrasePrompt?.resolve(null);
           setPassphrasePrompt(null);
         }}
-      />
-
-      {/* Settings Modal */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        settings={appSettings}
-        onSettingsChange={handleSettingsChange}
-        savedSessionsCount={savedSessions.length}
-        onClearAllSessions={clearAllSavedSessions}
       />
 
       {/* Command Palette */}
@@ -1784,20 +1288,6 @@ function App() {
         onExecuteCommand={commandPalette.executeCommand}
         onKeyDown={commandPalette.handleKeyDown}
       />
-
-      {/* Tunnel Manager Modal (for SSH session tunnels) */}
-      {tunnelManagerTabId && (() => {
-        const tab = tabs.find(t => t.id === tunnelManagerTabId);
-        if (!tab || tab.type !== "ssh") return null;
-        return (
-          <TunnelManager
-            isOpen={true}
-            onClose={() => setTunnelManagerTabId(null)}
-            sessionId={tab.sessionId}
-            sessionName={tab.title}
-          />
-        );
-      })()}
 
       {/* Tunnel Sidebar (standalone tunnels) */}
       <TunnelSidebar
@@ -1872,7 +1362,7 @@ function App() {
         onUnlockWithSecurityKey={vault.unlockWithSecurityKey}
       />
 
-      {/* Status Bar (hidden by default, for plugin widgets) */}
+      {/* Status Bar */}
       <StatusBar visible={statusBarVisible} items={statusBarItems} />
     </div>
   );

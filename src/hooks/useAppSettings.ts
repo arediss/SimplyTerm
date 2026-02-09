@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { AppSettings, defaultSettings } from "../components/SettingsModal";
+import { AppSettings, defaultSettings } from "../types/settings";
 
 export function useAppSettings() {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);

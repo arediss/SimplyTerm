@@ -45,7 +45,8 @@ export const monokaiTheme: Theme = {
     glassHover: "rgba(46, 47, 41, 0.95)",
     glassSubtle: "rgba(39, 40, 34, 0.6)",
 
-    backgroundGradient: "radial-gradient(1200px circle at 50% 30%, #272822 0%, #1E1F1C 60%)",
+    panel: "#1C1D19",
+    backgroundGradient: "#1E1F1C",
   },
 
   terminal: {

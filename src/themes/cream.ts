@@ -45,7 +45,8 @@ export const creamTheme: Theme = {
     glassHover: "rgba(250, 246, 238, 0.95)",
     glassSubtle: "rgba(250, 246, 238, 0.7)",
 
-    backgroundGradient: "radial-gradient(1200px circle at 50% 30%, #FAF6EE 0%, #F0E9DA 60%)",
+    panel: "#E5DECE",
+    backgroundGradient: "#F0E9DA",
   },
 
   terminal: {

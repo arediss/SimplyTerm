@@ -70,6 +70,9 @@ export interface ThemeColors {
   glassHover: string;
   glassSubtle: string;
 
+  /** Panel background (pane groups, pinned sidebar) */
+  panel: string;
+
   /** Background gradient (CSS gradient string) */
   backgroundGradient: string;
 }

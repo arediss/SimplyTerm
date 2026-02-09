@@ -1,77 +1,78 @@
 import type { Theme } from "./types";
 
 /**
- * Default dark theme - Warm Dark
+ * Default dark theme — Fleet-inspired
  *
- * A warm, comfortable dark theme with carefully chosen colors
- * for reduced eye strain during extended terminal sessions.
+ * Cool-toned dark theme inspired by JetBrains Fleet.
+ * Deep blue-grays with crisp accent colors.
  */
 export const darkTheme: Theme = {
   meta: {
     id: "dark",
     name: "Dark",
-    description: "Default warm dark theme",
+    description: "Fleet-inspired dark theme",
     author: "SimplyTerm",
     variant: "dark",
-    preview: ["#181715", "#1F1E1B", "#7DA6E8"],
+    preview: ["#1E1F22", "#2B2D30", "#3574F0"],
   },
 
   colors: {
-    base: "#1F1E1B",
-    mantle: "#1A1917",
-    crust: "#141311",
-    terminal: "#181715",
+    base: "#1E1F22",
+    mantle: "#1E1F22",
+    crust: "#16171A",
+    terminal: "#1E1F22",
 
-    surface0: "#262421",
-    surface1: "#2E2C28",
-    surface2: "#38352F",
+    surface0: "#2B2D30",
+    surface1: "#393B40",
+    surface2: "#4E5157",
 
-    text: "#E6E2DC",
-    textSecondary: "#B6B0A7",
-    textMuted: "#8E887F",
+    text: "#DFE1E5",
+    textSecondary: "#BCBEC4",
+    textMuted: "#6F737A",
 
-    accent: "#7DA6E8",
-    accentHover: "#8FB2EC",
+    accent: "#3574F0",
+    accentHover: "#467FF5",
 
-    success: "#9CD68D",
-    warning: "#E8C878",
-    error: "#E88B8B",
+    success: "#5FB865",
+    warning: "#E9AA42",
+    error: "#F75464",
 
-    borderSoft: "rgba(255, 245, 235, 0.06)",
-    borderStrong: "rgba(255, 245, 235, 0.12)",
+    borderSoft: "rgba(255, 255, 255, 0.06)",
+    borderStrong: "rgba(255, 255, 255, 0.12)",
 
-    glass: "rgba(26, 25, 23, 0.85)",
-    glassBorder: "rgba(38, 36, 33, 0.6)",
-    glassHover: "rgba(31, 30, 27, 0.9)",
-    glassSubtle: "rgba(26, 25, 23, 0.6)",
+    glass: "rgba(30, 31, 34, 0.85)",
+    glassBorder: "rgba(43, 45, 48, 0.6)",
+    glassHover: "rgba(43, 45, 48, 0.9)",
+    glassSubtle: "rgba(30, 31, 34, 0.6)",
 
-    backgroundGradient: "radial-gradient(1200px circle at 50% 30%, #1F1E1B 0%, #161513 60%)",
+    panel: "#18191B",
+    backgroundGradient: "#16171A",
   },
 
   terminal: {
-    background: "#181715",
-    foreground: "#E6E2DC",
-    cursor: "#7DA6E8",
-    cursorAccent: "#181715",
-    selectionBackground: "rgba(125, 166, 232, 0.3)",
+    background: "#1E1F22",
+    foreground: "#DFE1E5",
+    cursor: "#3574F0",
+    cursorAccent: "#1E1F22",
+    selectionBackground: "rgba(53, 116, 240, 0.3)",
     selectionForeground: undefined,
 
-    black: "#38352F",
-    red: "#E88B8B",
-    green: "#9CD68D",
-    yellow: "#E8C878",
-    blue: "#7DA6E8",
-    magenta: "#D4A5D9",
-    cyan: "#7FCFCF",
-    white: "#B6B0A7",
+    black: "#393B40",
+    red: "#F75464",
+    green: "#5FB865",
+    yellow: "#E9AA42",
+    blue: "#3574F0",
+    magenta: "#C77DBB",
+    cyan: "#2AACB8",
+    white: "#BCBEC4",
 
-    brightBlack: "#5A564E",
-    brightRed: "#F0A0A0",
-    brightGreen: "#B0E0A0",
-    brightYellow: "#F0D090",
-    brightBlue: "#8FB2EC",
-    brightMagenta: "#E0B0E5",
-    brightCyan: "#90E0E0",
-    brightWhite: "#E6E2DC",
+    brightBlack: "#6F737A",
+    brightRed: "#FF6B7A",
+    brightGreen: "#72C978",
+    brightYellow: "#F0BC5E",
+    brightBlue: "#467FF5",
+    brightMagenta: "#D68FCC",
+    brightCyan: "#3DC0CC",
+    brightWhite: "#DFE1E5",
   },
 };

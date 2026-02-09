@@ -3,20 +3,20 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
   Monitor,
-  Settings,
   Terminal,
   Search,
   XCircle,
   Pencil,
   FolderOpen,
   ArrowLeftRight,
-  KeyRound,
   Trash2,
   List,
   Clock,
   Folder,
   Tag,
   Loader2,
+  Pin,
+  PinOff,
 } from "lucide-react";
 import { SavedSession } from "../types";
 import { pluginManager } from "../plugins";
@@ -26,6 +26,8 @@ import type { ContextMenuContext } from "../plugins/extensionTypes";
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  mode: "overlay" | "pinned";
+  onTogglePin: () => void;
   savedSessions: SavedSession[];
   connectingSessionId?: string | null;
   onSavedSessionConnect: (session: SavedSession) => void;
@@ -33,12 +35,6 @@ interface SidebarProps {
   onSavedSessionDelete: (sessionId: string) => void;
   onSavedSessionSftp: (session: SavedSession) => void;
   onSavedSessionTunnel: (session: SavedSession) => void;
-  onOpenSettings: () => void;
-  // Vault status
-  vaultExists?: boolean;
-  vaultUnlocked?: boolean;
-  onVaultLock?: () => void;
-  onVaultUnlock?: () => void;
 }
 
 // Tab definition
@@ -55,6 +51,8 @@ interface SidebarTab {
 function Sidebar({
   isOpen,
   onClose,
+  mode,
+  onTogglePin,
   savedSessions,
   connectingSessionId,
   onSavedSessionConnect,
@@ -62,11 +60,6 @@ function Sidebar({
   onSavedSessionDelete,
   onSavedSessionSftp,
   onSavedSessionTunnel,
-  onOpenSettings,
-  vaultExists,
-  vaultUnlocked,
-  onVaultLock,
-  onVaultUnlock,
 }: SidebarProps) {
   const { t } = useTranslation();
   const [isAnimating, setIsAnimating] = useState(false);
@@ -124,6 +117,12 @@ function Sidebar({
   }, [pluginViews, t]);
 
   useEffect(() => {
+    if (mode === "pinned") {
+      // No animation in pinned mode
+      setShouldRender(isOpen);
+      setIsAnimating(isOpen);
+      return;
+    }
     if (isOpen) {
       setShouldRender(true);
       setIsAnimating(true);
@@ -132,7 +131,7 @@ function Sidebar({
       const timer = setTimeout(() => setShouldRender(false), 200);
       return () => clearTimeout(timer);
     }
-  }, [isOpen]);
+  }, [isOpen, mode]);
 
   // Reset search when sidebar closes
   useEffect(() => {
@@ -158,6 +157,109 @@ function Sidebar({
 
   if (!shouldRender) return null;
 
+  const sidebarInner = (
+    <>
+      {/* Search bar */}
+      <div className="p-3 border-b border-surface-0/30">
+        <div className="relative">
+          <Search
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
+          />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t('sidebar.searchPlaceholder')}
+            className="w-full pl-9 pr-8 py-2 bg-crust rounded-lg text-sm text-text placeholder:text-text-muted/50 border border-transparent focus:border-accent/50 focus:outline-none transition-colors"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text transition-colors"
+            >
+              <XCircle size={14} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Tab bar - only show if there are plugin views */}
+      {tabs.length > 1 && (
+        <div className="px-3 py-2">
+          <div className="flex gap-1 p-1 bg-crust rounded-xl">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`
+                  flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200
+                  ${activeTab === tab.id
+                    ? 'bg-surface-0 text-text shadow-sm'
+                    : 'text-text-muted hover:text-text hover:bg-surface-0/50'
+                  }
+                `}
+                title={tab.label}
+              >
+                {tab.icon}
+                <span className="truncate">{tab.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Tab content */}
+      <div className="flex-1 overflow-y-auto p-3">
+        {activeTabDef?.type === 'core' && activeTabDef.id === 'all' && (
+          <AllSessionsView
+            sessions={filteredSessions}
+            searchQuery={searchQuery}
+            connectingSessionId={connectingSessionId}
+            onConnect={onSavedSessionConnect}
+            onEdit={onSavedSessionEdit}
+            onDelete={onSavedSessionDelete}
+            onSftp={onSavedSessionSftp}
+            onTunnel={onSavedSessionTunnel}
+          />
+        )}
+        {activeTabDef?.type === 'plugin' && activeTabDef.view && (
+          <PluginSidebarView
+            key={activeTabDef.id}
+            pluginId={activeTabDef.pluginId!}
+            view={activeTabDef.view}
+          />
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="p-3 border-t border-surface-0/30 flex items-center justify-end">
+        {/* Pin/Unpin button */}
+        <button
+          onClick={onTogglePin}
+          className={`p-2.5 rounded-lg transition-colors ${
+            mode === "pinned"
+              ? "text-accent hover:text-accent/80 hover:bg-accent/10"
+              : "text-text-muted hover:text-text hover:bg-white/5"
+          }`}
+          title={mode === "pinned" ? t('sidebar.unpin') : t('sidebar.pin')}
+        >
+          {mode === "pinned" ? <PinOff size={16} /> : <Pin size={16} />}
+        </button>
+      </div>
+    </>
+  );
+
+  // Pinned mode: render as a simple flex child, no backdrop/animation
+  if (mode === "pinned") {
+    return (
+      <div className="w-72 flex flex-col shrink-0 ml-1.5 mb-1.5 rounded-xl overflow-hidden" style={{ backgroundColor: "var(--color-panel)" }}>
+        {sidebarInner}
+      </div>
+    );
+  }
+
+  // Overlay mode: floating panel with backdrop and animation
   return (
     <>
       {/* Backdrop - sous la titlebar */}
@@ -177,108 +279,7 @@ function Sidebar({
           ${isAnimating ? "animate-slide-in" : "animate-slide-out"}
         `}
       >
-        {/* Search bar */}
-        <div className="p-3 border-b border-surface-0/30">
-          <div className="relative">
-            <Search
-              size={14}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
-            />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t('sidebar.searchPlaceholder')}
-              className="w-full pl-9 pr-8 py-2 bg-crust rounded-lg text-sm text-text placeholder:text-text-muted/50 border border-transparent focus:border-accent/50 focus:outline-none transition-colors"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text transition-colors"
-              >
-                <XCircle size={14} />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Tab bar - only show if there are plugin views */}
-        {tabs.length > 1 && (
-          <div className="px-3 py-2">
-            <div className="flex gap-1 p-1 bg-crust rounded-xl">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`
-                    flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200
-                    ${activeTab === tab.id
-                      ? 'bg-surface-0 text-text shadow-sm'
-                      : 'text-text-muted hover:text-text hover:bg-surface-0/50'
-                    }
-                  `}
-                  title={tab.label}
-                >
-                  {tab.icon}
-                  <span className="truncate">{tab.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Tab content */}
-        <div className="flex-1 overflow-y-auto p-3">
-          {activeTabDef?.type === 'core' && activeTabDef.id === 'all' && (
-            <AllSessionsView
-              sessions={filteredSessions}
-              searchQuery={searchQuery}
-              connectingSessionId={connectingSessionId}
-              onConnect={onSavedSessionConnect}
-              onEdit={onSavedSessionEdit}
-              onDelete={onSavedSessionDelete}
-              onSftp={onSavedSessionSftp}
-              onTunnel={onSavedSessionTunnel}
-            />
-          )}
-          {activeTabDef?.type === 'plugin' && activeTabDef.view && (
-            <PluginSidebarView
-              key={activeTabDef.id}
-              pluginId={activeTabDef.pluginId!}
-              view={activeTabDef.view}
-            />
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="p-3 border-t border-surface-0/30 flex items-center gap-2">
-          <button
-            onClick={onOpenSettings}
-            className="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-lg text-text-muted hover:text-text hover:bg-white/5 transition-colors"
-          >
-            <Settings size={16} />
-            <span className="text-sm">{t('sidebar.settings')}</span>
-          </button>
-
-          {/* Vault status button */}
-          {vaultExists && (
-            <div className="relative group">
-              <button
-                onClick={() => vaultUnlocked ? onVaultLock?.() : onVaultUnlock?.()}
-                className="relative p-2.5 rounded-lg text-text-muted hover:text-text hover:bg-white/5 transition-colors"
-              >
-                <KeyRound size={16} />
-                <span className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ${
-                  vaultUnlocked ? "bg-success" : "bg-warning"
-                }`} />
-              </button>
-              {/* Fast tooltip */}
-              <div className="absolute bottom-full right-0 mb-2 px-2.5 py-1.5 bg-crust border border-surface-0/50 rounded-lg shadow-lg text-xs text-text-secondary whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none">
-                {vaultUnlocked ? t('sidebar.vaultUnlocked') : t('sidebar.vaultLocked')}
-              </div>
-            </div>
-          )}
-        </div>
+        {sidebarInner}
       </div>
     </>
   );
