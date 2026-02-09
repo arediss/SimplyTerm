@@ -4,10 +4,10 @@
  * API v1 - Unified types for backend and frontend plugin system
  */
 
-import type { SidebarSectionRegistration, SidebarViewRegistration, SettingsPanelRegistration, ContextMenuItemConfig, StatusBarItemConfig, StatusBarItemHandle, HeaderActionConfig, HeaderActionHandle, QuickConnectSectionRegistration } from './extensionTypes';
+import type { SidebarSectionRegistration, SidebarViewRegistration, SettingsPanelRegistration, ContextMenuItemConfig, StatusBarItemConfig, StatusBarItemHandle, HeaderActionConfig, HeaderActionHandle, QuickConnectSectionRegistration, SessionDecoratorRegistration } from './extensionTypes';
 
 // Re-export extension types
-export type { SidebarSectionRegistration, SidebarViewRegistration, SettingsPanelRegistration, ContextMenuItemConfig, StatusBarItemConfig, StatusBarItemHandle, HeaderActionConfig, HeaderActionHandle, QuickConnectSectionRegistration } from './extensionTypes';
+export type { SidebarSectionRegistration, SidebarViewRegistration, SettingsPanelRegistration, ContextMenuItemConfig, StatusBarItemConfig, StatusBarItemHandle, HeaderActionConfig, HeaderActionHandle, QuickConnectSectionRegistration, SessionDecoratorRegistration } from './extensionTypes';
 export type { ContextMenuContext } from './extensionTypes';
 
 // ============================================================================
@@ -75,6 +75,7 @@ export type Permission =
   | 'ui_sidebar'
   | 'ui_context_menu'
   | 'ui_quick_connect'
+  | 'ui_session_decorator'
   // Terminal
   | 'terminal_read'
   | 'terminal_write'
@@ -205,6 +206,10 @@ export interface SimplyTermPluginAPI {
   registerQuickConnectSection(config: QuickConnectSectionRegistration): void;
   unregisterQuickConnectSection(sectionId: string): void;
 
+  // Session decorators (requires ui_session_decorator)
+  registerSessionDecorator(config: SessionDecoratorRegistration): void;
+  unregisterSessionDecorator(decoratorId: string): void;
+
   // Commands (requires ui_commands)
   registerCommand(config: CommandRegistration): void;
   executeCommand(commandId: string): void;
@@ -297,6 +302,7 @@ export interface LoadedPlugin {
   settingsPanels: Map<string, SettingsPanelRegistration>;
   contextMenuItems: Map<string, ContextMenuItemConfig>;
   quickConnectSections: Map<string, QuickConnectSectionRegistration>;
+  sessionDecorators: Map<string, SessionDecoratorRegistration>;
   subscriptions: Unsubscribe[];
   onLoadCallback?: () => void;
   onUnloadCallback?: () => void;
@@ -329,6 +335,8 @@ export type PluginEvent =
   | { type: 'context-menu:unregister'; pluginId: string; itemId: string }
   | { type: 'quick-connect:register'; pluginId: string; sectionId: string }
   | { type: 'quick-connect:unregister'; pluginId: string; sectionId: string }
+  | { type: 'session-decorator:register'; pluginId: string; decoratorId: string }
+  | { type: 'session-decorator:unregister'; pluginId: string; decoratorId: string }
   | { type: 'statusbar:changed' }
   | { type: 'headeractions:changed' };
 

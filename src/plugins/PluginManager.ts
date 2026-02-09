@@ -28,6 +28,7 @@ import type {
   HeaderActionConfig,
   HeaderActionHandle,
   QuickConnectSectionRegistration,
+  SessionDecoratorRegistration,
 } from './types';
 import type { StatusBarItem } from '../components/StatusBar';
 
@@ -69,6 +70,7 @@ export class PluginManager {
   public registeredSettingsPanels: Map<string, { pluginId: string; panel: SettingsPanelRegistration }> = new Map();
   public registeredContextMenuItems: Map<string, { pluginId: string; item: ContextMenuItemConfig }> = new Map();
   public registeredQuickConnectSections: Map<string, { pluginId: string; section: QuickConnectSectionRegistration }> = new Map();
+  public registeredSessionDecorators: Map<string, { pluginId: string; decorator: SessionDecoratorRegistration }> = new Map();
 
   // Status bar items
   public registeredStatusBarItems: Map<string, { pluginId: string; config: StatusBarItemConfig; visible: boolean }> = new Map();
@@ -158,6 +160,7 @@ export class PluginManager {
         settingsPanels: new Map(),
         contextMenuItems: new Map(),
         quickConnectSections: new Map(),
+        sessionDecorators: new Map(),
         subscriptions: [],
       };
 
@@ -182,6 +185,8 @@ export class PluginManager {
         onContextMenuItemUnregister: this.handleContextMenuItemUnregister.bind(this),
         onQuickConnectSectionRegister: this.handleQuickConnectSectionRegister.bind(this),
         onQuickConnectSectionUnregister: this.handleQuickConnectSectionUnregister.bind(this),
+        onSessionDecoratorRegister: this.handleSessionDecoratorRegister.bind(this),
+        onSessionDecoratorUnregister: this.handleSessionDecoratorUnregister.bind(this),
         onAddStatusBarItem: this.handleAddStatusBarItem.bind(this),
         onAddHeaderAction: this.handleAddHeaderAction.bind(this),
         // Arrow functions for property-based callbacks
@@ -351,6 +356,12 @@ export class PluginManager {
     plugin.quickConnectSections.forEach((_, sectionId) => {
       this.registeredQuickConnectSections.delete(sectionId);
       this.emit({ type: 'quick-connect:unregister', pluginId: id, sectionId });
+    });
+
+    // Remove registered session decorators
+    plugin.sessionDecorators.forEach((_, decoratorId) => {
+      this.registeredSessionDecorators.delete(decoratorId);
+      this.emit({ type: 'session-decorator:unregister', pluginId: id, decoratorId });
     });
 
     // Remove registered status bar items for this plugin
@@ -545,6 +556,33 @@ export class PluginManager {
       this.registeredQuickConnectSections.delete(sectionId);
       this.emit({ type: 'quick-connect:unregister', pluginId, sectionId });
     }
+  }
+
+  // Session decorator registration handlers
+  private handleSessionDecoratorRegister(pluginId: string, decorator: SessionDecoratorRegistration): void {
+    const plugin = this.plugins.get(pluginId);
+    if (plugin) {
+      plugin.sessionDecorators.set(decorator.config.id, decorator);
+      this.registeredSessionDecorators.set(decorator.config.id, { pluginId, decorator });
+      this.emit({ type: 'session-decorator:register', pluginId, decoratorId: decorator.config.id });
+    }
+  }
+
+  private handleSessionDecoratorUnregister(pluginId: string, decoratorId: string): void {
+    const plugin = this.plugins.get(pluginId);
+    if (plugin) {
+      plugin.sessionDecorators.delete(decoratorId);
+      this.registeredSessionDecorators.delete(decoratorId);
+      this.emit({ type: 'session-decorator:unregister', pluginId, decoratorId });
+    }
+  }
+
+  /**
+   * Get all registered session decorators, sorted by order
+   */
+  getSessionDecorators(): { pluginId: string; decorator: SessionDecoratorRegistration }[] {
+    return Array.from(this.registeredSessionDecorators.values())
+      .sort((a, b) => (a.decorator.config.order ?? 50) - (b.decorator.config.order ?? 50));
   }
 
   // Status bar item handler
