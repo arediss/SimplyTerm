@@ -25,7 +25,7 @@ import type {
   HeaderActionConfig,
   HeaderActionHandle,
 } from './types';
-import type { SidebarViewRegistration, SidebarSectionRegistration, SettingsPanelRegistration, ContextMenuItemConfig } from './extensionTypes';
+import type { SidebarViewRegistration, SidebarSectionRegistration, SettingsPanelRegistration, ContextMenuItemConfig, QuickConnectSectionRegistration } from './extensionTypes';
 
 /**
  * Check if a plugin has a specific permission
@@ -56,6 +56,8 @@ export function createPluginAPI(
     onSettingsPanelUnregister: (pluginId: string, panelId: string) => void;
     onContextMenuItemRegister: (pluginId: string, item: ContextMenuItemConfig) => void;
     onContextMenuItemUnregister: (pluginId: string, itemId: string) => void;
+    onQuickConnectSectionRegister: (pluginId: string, section: QuickConnectSectionRegistration) => void;
+    onQuickConnectSectionUnregister: (pluginId: string, sectionId: string) => void;
     onAddStatusBarItem: (pluginId: string, config: StatusBarItemConfig) => StatusBarItemHandle;
     onAddHeaderAction: (pluginId: string, config: HeaderActionConfig) => HeaderActionHandle;
     getSessions: () => SessionInfo[];
@@ -154,6 +156,21 @@ export function createPluginAPI(
     unregisterContextMenuItem(itemId: string) {
       pluginState.contextMenuItems.delete(itemId);
       callbacks.onContextMenuItemUnregister(pluginId, itemId);
+    },
+
+    // QuickConnect sections
+    registerQuickConnectSection(config: QuickConnectSectionRegistration) {
+      if (!hasPermission(permissions, 'ui_quick_connect')) {
+        console.warn(`[Plugin ${pluginId}] Missing permission: ui_quick_connect`);
+        return;
+      }
+      pluginState.quickConnectSections.set(config.config.id, config);
+      callbacks.onQuickConnectSectionRegister(pluginId, config);
+    },
+
+    unregisterQuickConnectSection(sectionId: string) {
+      pluginState.quickConnectSections.delete(sectionId);
+      callbacks.onQuickConnectSectionUnregister(pluginId, sectionId);
     },
 
     // Commands

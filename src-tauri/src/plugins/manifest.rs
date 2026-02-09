@@ -123,6 +123,8 @@ pub enum Permission {
     UiSidebar,
     /// Register context menu items
     UiContextMenu,
+    /// Register items in the quick-connect dropdown
+    UiQuickConnect,
 
     // Terminal
     /// Read terminal output
@@ -188,6 +190,7 @@ impl Permission {
             Permission::UiModals => "Display modal dialogs",
             Permission::UiSidebar => "Register sections in the sidebar",
             Permission::UiContextMenu => "Add items to context menus",
+            Permission::UiQuickConnect => "Add items to the quick-connect dropdown",
             Permission::TerminalRead => "Read terminal output",
             Permission::TerminalWrite => "Write data to terminal sessions",
             Permission::ClipboardRead => "Read content from system clipboard",
@@ -234,6 +237,7 @@ impl Permission {
             | Permission::UiModals
             | Permission::UiSidebar
             | Permission::UiContextMenu
+            | Permission::UiQuickConnect
             | Permission::TerminalRead
             | Permission::ClipboardRead
             | Permission::ClipboardWrite
