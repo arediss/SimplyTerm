@@ -25,7 +25,7 @@ import type {
   HeaderActionConfig,
   HeaderActionHandle,
 } from './types';
-import type { SidebarViewRegistration, SidebarSectionRegistration, SettingsPanelRegistration, ContextMenuItemConfig, QuickConnectSectionRegistration } from './extensionTypes';
+import type { SidebarViewRegistration, SidebarSectionRegistration, SettingsPanelRegistration, ContextMenuItemConfig, QuickConnectSectionRegistration, SessionDecoratorRegistration } from './extensionTypes';
 
 /**
  * Check if a plugin has a specific permission
@@ -58,6 +58,8 @@ export function createPluginAPI(
     onContextMenuItemUnregister: (pluginId: string, itemId: string) => void;
     onQuickConnectSectionRegister: (pluginId: string, section: QuickConnectSectionRegistration) => void;
     onQuickConnectSectionUnregister: (pluginId: string, sectionId: string) => void;
+    onSessionDecoratorRegister: (pluginId: string, decorator: SessionDecoratorRegistration) => void;
+    onSessionDecoratorUnregister: (pluginId: string, decoratorId: string) => void;
     onAddStatusBarItem: (pluginId: string, config: StatusBarItemConfig) => StatusBarItemHandle;
     onAddHeaderAction: (pluginId: string, config: HeaderActionConfig) => HeaderActionHandle;
     getSessions: () => SessionInfo[];
@@ -172,6 +174,21 @@ export function createPluginAPI(
     unregisterQuickConnectSection(sectionId: string) {
       pluginState.quickConnectSections.delete(sectionId);
       callbacks.onQuickConnectSectionUnregister(pluginId, sectionId);
+    },
+
+    // Session decorators
+    registerSessionDecorator(config: SessionDecoratorRegistration) {
+      if (!hasPermission(permissions, 'ui_session_decorator')) {
+        console.warn(`[Plugin ${pluginId}] Missing permission: ui_session_decorator`);
+        return;
+      }
+      pluginState.sessionDecorators.set(config.config.id, config);
+      callbacks.onSessionDecoratorRegister(pluginId, config);
+    },
+
+    unregisterSessionDecorator(decoratorId: string) {
+      pluginState.sessionDecorators.delete(decoratorId);
+      callbacks.onSessionDecoratorUnregister(pluginId, decoratorId);
     },
 
     // Commands

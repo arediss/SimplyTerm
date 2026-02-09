@@ -298,6 +298,36 @@ export interface QuickConnectSectionRegistration {
 }
 
 // ============================================================================
+// Session Decorator Extension Types
+// ============================================================================
+
+/**
+ * Configuration for a session decorator registered by a plugin.
+ * Decorators render visual elements (e.g., tag pills) into session cards.
+ */
+export interface SessionDecoratorConfig {
+  /** Unique decorator identifier */
+  id: string;
+  /** Sort order (lower = rendered first) */
+  order?: number;
+}
+
+/**
+ * Registration object for a session decorator
+ */
+export interface SessionDecoratorRegistration {
+  /** Decorator configuration */
+  config: SessionDecoratorConfig;
+  /**
+   * Render function called for each session card
+   * @param sessionId - The session's unique ID
+   * @param container - DOM element to render into
+   * @returns Optional cleanup function called on unmount
+   */
+  render: (sessionId: string, container: HTMLElement) => void | (() => void);
+}
+
+// ============================================================================
 // Toolbar Extension Types
 // ============================================================================
 

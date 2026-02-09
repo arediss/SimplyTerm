@@ -435,6 +435,7 @@ function SavedSessionItem({
   const { t } = useTranslation();
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [pluginMenuItems, setPluginMenuItems] = useState<{ pluginId: string; item: ContextMenuItemConfig }[]>([]);
+  const decoratorRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to plugin context menu items
   useEffect(() => {
@@ -452,6 +453,46 @@ function SavedSessionItem({
 
     return unsubscribe;
   }, []);
+
+  // Session decorators (e.g., tag pills from plugins)
+  useEffect(() => {
+    const container = decoratorRef.current;
+    if (!container) return;
+
+    const cleanups: (() => void)[] = [];
+
+    const renderDecorators = () => {
+      // Run previous cleanups
+      cleanups.forEach(fn => fn());
+      cleanups.length = 0;
+      container.innerHTML = '';
+
+      const decorators = pluginManager.getSessionDecorators();
+      for (const { decorator } of decorators) {
+        const cleanup = decorator.render(session.id, container);
+        if (cleanup) cleanups.push(cleanup);
+      }
+    };
+
+    renderDecorators();
+
+    // Re-render when decorators change
+    const unsubscribe = pluginManager.subscribe((event) => {
+      if (event.type === 'session-decorator:register' || event.type === 'session-decorator:unregister') {
+        renderDecorators();
+      }
+    });
+
+    // Listen for plugin-triggered re-renders (e.g., after tag assignment changes)
+    const handleDecoratorChanged = () => renderDecorators();
+    window.addEventListener('plugin-decorators-changed', handleDecoratorChanged);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('plugin-decorators-changed', handleDecoratorChanged);
+      cleanups.forEach(fn => fn());
+    };
+  }, [session.id]);
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -524,6 +565,7 @@ function SavedSessionItem({
           <div className="text-[11px] text-text-muted truncate">
             {isConnecting ? t('sidebar.connecting') : `${session.username}@${session.host}:${session.port}`}
           </div>
+          <div ref={decoratorRef} className="flex flex-wrap gap-1 mt-0.5 empty:hidden" />
         </div>
         {!isConnecting && (
           <button
