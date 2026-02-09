@@ -827,6 +827,7 @@ struct PluginResponse {
     permissions: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     error_message: Option<String>,
+    is_dev: bool,
 }
 
 impl From<InstalledPlugin> for PluginResponse {
@@ -855,6 +856,7 @@ impl From<InstalledPlugin> for PluginResponse {
                 serde_json::to_string(p).unwrap_or_default().trim_matches('"').to_string()
             }).collect(),
             error_message: plugin.error_message,
+            is_dev: plugin.is_dev,
         }
     }
 }
@@ -1023,10 +1025,49 @@ fn refresh_plugins(app: AppHandle) -> Result<Vec<PluginResponse>, String> {
         Err(e) => println!("[refresh_plugins] Scan error: {}", e.message),
     }
 
+    // Also scan dev plugins if developer mode is enabled
+    if let Ok(settings) = load_app_settings() {
+        if settings.developer.enabled {
+            if let Some(dev_path) = &settings.developer.dev_plugins_path {
+                let path = std::path::PathBuf::from(dev_path);
+                match state.plugin_manager.scan_dev_plugins(&path) {
+                    Ok(discovered) => println!("[refresh_plugins] Discovered {} dev plugins", discovered.len()),
+                    Err(e) => println!("[refresh_plugins] Dev scan error: {}", e.message),
+                }
+            }
+        } else {
+            // Dev mode disabled, remove any stale dev plugins
+            let _ = state.plugin_manager.remove_all_dev_plugins();
+        }
+    }
+
     // Return updated list
     let plugins = state.plugin_manager.list_plugins()
         .map_err(|e| e.message)?;
     println!("[refresh_plugins] Returning {} plugins", plugins.len());
+    Ok(plugins.into_iter().map(|p| p.into()).collect())
+}
+
+/// Scan dev plugins directory
+#[tauri::command]
+fn scan_dev_plugins(app: AppHandle) -> Result<Vec<PluginResponse>, String> {
+    let state = app.state::<AppState>();
+    let settings = load_app_settings()?;
+
+    if !settings.developer.enabled {
+        return Err("Developer mode is not enabled".to_string());
+    }
+
+    let dev_path = settings.developer.dev_plugins_path
+        .ok_or_else(|| "No dev plugins path configured".to_string())?;
+
+    let path = std::path::PathBuf::from(&dev_path);
+    state.plugin_manager.scan_dev_plugins(&path)
+        .map_err(|e| e.message)?;
+
+    // Return full updated list
+    let plugins = state.plugin_manager.list_plugins()
+        .map_err(|e| e.message)?;
     Ok(plugins.into_iter().map(|p| p.into()).collect())
 }
 
@@ -1805,6 +1846,7 @@ pub fn run() {
             get_plugin_manifest,
             get_plugin_file,
             refresh_plugins,
+            scan_dev_plugins,
             get_plugins_dir,
             enable_plugin,
             disable_plugin,

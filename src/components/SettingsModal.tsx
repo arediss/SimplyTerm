@@ -51,6 +51,10 @@ export interface AppSettings {
   security: {
     vaultSetupSkipped: boolean;
   };
+  developer?: {
+    enabled: boolean;
+    devPluginsPath?: string;
+  };
 }
 
 export const defaultSettings: AppSettings = {
@@ -70,6 +74,10 @@ export const defaultSettings: AppSettings = {
   },
   security: {
     vaultSetupSkipped: false,
+  },
+  developer: {
+    enabled: false,
+    devPluginsPath: undefined,
   },
 };
 

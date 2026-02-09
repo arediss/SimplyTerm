@@ -29,6 +29,8 @@ pub struct InstalledPlugin {
     pub install_path: PathBuf,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_message: Option<String>,
+    #[serde(default)]
+    pub is_dev: bool,
 }
 
 /// Plugin registry persisted to disk
@@ -223,6 +225,7 @@ impl PluginManager {
             granted_permissions: GrantedPermissions::new(),
             install_path,
             error_message: None,
+            is_dev: false,
         };
 
         let mut plugins = self.plugins.write()
@@ -236,10 +239,18 @@ impl PluginManager {
         Ok(plugin)
     }
 
-    /// Uninstalls a plugin
+    /// Uninstalls a plugin (dev plugins cannot be uninstalled)
     pub fn uninstall_plugin(&self, id: &str) -> PluginResult<()> {
         let mut plugins = self.plugins.write()
             .map_err(|_| PluginError::internal("Failed to acquire lock"))?;
+
+        if let Some(plugin) = plugins.get(id) {
+            if plugin.is_dev {
+                return Err(PluginError::invalid_input(
+                    "Cannot uninstall a dev plugin. Remove it from the dev plugins directory instead.".to_string()
+                ));
+            }
+        }
 
         let plugin = plugins.remove(id)
             .ok_or_else(|| PluginError::not_found(format!("Plugin not found: {}", id)))?;
@@ -373,6 +384,120 @@ impl PluginManager {
         self.save_registry()?;
 
         Ok(())
+    }
+
+    /// Scans a dev plugins directory and registers/updates dev plugins
+    pub fn scan_dev_plugins(&self, dev_path: &std::path::Path) -> PluginResult<Vec<InstalledPlugin>> {
+        let mut discovered = Vec::new();
+
+        println!("[PluginManager] Scanning dev plugins directory: {:?}", dev_path);
+
+        if !dev_path.exists() || !dev_path.is_dir() {
+            println!("[PluginManager] Dev plugins directory does not exist: {:?}", dev_path);
+            return Ok(discovered);
+        }
+
+        let entries = fs::read_dir(dev_path)
+            .map_err(|e| PluginError::storage_error(format!("Failed to read dev plugins directory {:?}: {}", dev_path, e)))?;
+
+        let mut seen_ids: Vec<String> = Vec::new();
+
+        for entry in entries {
+            let entry = match entry {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
+
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+
+            let manifest_path = path.join("manifest.json");
+            if !manifest_path.exists() {
+                continue;
+            }
+
+            let manifest_content = match fs::read_to_string(&manifest_path) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("[PluginManager] Failed to read dev manifest at {:?}: {}", manifest_path, e);
+                    continue;
+                }
+            };
+
+            let manifest: PluginManifest = match serde_json::from_str(&manifest_content) {
+                Ok(m) => m,
+                Err(e) => {
+                    eprintln!("[PluginManager] Failed to parse dev manifest at {:?}: {}", manifest_path, e);
+                    continue;
+                }
+            };
+
+            println!("[PluginManager] Found dev plugin: {} ({})", manifest.name, manifest.id);
+            seen_ids.push(manifest.id.clone());
+
+            let mut plugins = self.plugins.write()
+                .map_err(|_| PluginError::internal("Failed to acquire lock"))?;
+
+            if let Some(existing) = plugins.get(&manifest.id) {
+                if !existing.is_dev {
+                    println!("[PluginManager] Skipping dev plugin {} - non-dev plugin with same ID already installed", manifest.id);
+                    continue;
+                }
+                // Update manifest in place for existing dev plugin
+                let existing = plugins.get_mut(&manifest.id).unwrap();
+                existing.manifest = manifest.clone();
+                existing.install_path = path.clone();
+                discovered.push(existing.clone());
+            } else {
+                let plugin = InstalledPlugin {
+                    manifest: manifest.clone(),
+                    state: PluginState::Disabled,
+                    granted_permissions: GrantedPermissions::new(),
+                    install_path: path,
+                    error_message: None,
+                    is_dev: true,
+                };
+                plugins.insert(manifest.id.clone(), plugin.clone());
+                discovered.push(plugin);
+            }
+        }
+
+        // Remove stale dev plugins (no longer on disk)
+        {
+            let mut plugins = self.plugins.write()
+                .map_err(|_| PluginError::internal("Failed to acquire lock"))?;
+            let stale_ids: Vec<String> = plugins.iter()
+                .filter(|(_, p)| p.is_dev && !seen_ids.contains(&p.manifest.id))
+                .map(|(id, _)| id.clone())
+                .collect();
+            for id in stale_ids {
+                println!("[PluginManager] Removing stale dev plugin: {}", id);
+                plugins.remove(&id);
+            }
+        }
+
+        self.save_registry()?;
+        Ok(discovered)
+    }
+
+    /// Removes all dev plugins from the registry
+    pub fn remove_all_dev_plugins(&self) -> PluginResult<()> {
+        let mut plugins = self.plugins.write()
+            .map_err(|_| PluginError::internal("Failed to acquire lock"))?;
+
+        let dev_ids: Vec<String> = plugins.iter()
+            .filter(|(_, p)| p.is_dev)
+            .map(|(id, _)| id.clone())
+            .collect();
+
+        for id in dev_ids {
+            plugins.remove(&id);
+        }
+
+        drop(plugins);
+        self.save_registry()
     }
 
     /// Gets the data directory for a plugin (for sandboxed file access)

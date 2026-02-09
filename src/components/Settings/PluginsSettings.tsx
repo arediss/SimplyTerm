@@ -15,13 +15,16 @@ import {
   ExternalLink,
   Trash2,
   ChevronRight,
+  Code2,
+  ScanSearch,
 } from "lucide-react";
 import { usePlugins, type PluginManifest } from "../../plugins";
 import { useRegistry, type RegistryPlugin, type PluginUpdate } from "../../hooks/useRegistry";
+import { useAppSettings } from "../../hooks/useAppSettings";
 import PermissionApprovalModal from "../PermissionApprovalModal";
 import Modal from "../Modal";
 
-type Tab = "installed" | "browse";
+type Tab = "installed" | "browse" | "dev";
 
 const CATEGORIES = [
   { key: "all", i18n: "categoryAll" },
@@ -170,25 +173,31 @@ export default function PluginsSettings() {
           (p) => p.category?.toLowerCase() === selectedCategory
         );
 
+  // Split plugins: non-dev for Installed tab, dev for Dev tab
+  const installedPlugins = plugins.filter((p) => !p.isDev);
+  const devPlugins = plugins.filter((p) => p.isDev);
+
   return (
     <div className="space-y-4">
       {/* Tabs */}
       <div className="flex gap-1 p-1 bg-surface-0/20 rounded-lg">
-        {(["installed", "browse"] as Tab[]).map((tabKey) => (
+        {(["installed", "browse", "dev"] as Tab[]).map((tabKey) => (
           <button
             key={tabKey}
             onClick={() => setTab(tabKey)}
             className={`
               flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all
               ${tab === tabKey
-                ? "bg-accent/20 text-accent"
+                ? tabKey === "dev" ? "bg-orange-400/20 text-orange-400" : "bg-accent/20 text-accent"
                 : "text-text-muted hover:text-text hover:bg-surface-0/30"
               }
             `}
           >
             {tabKey === "installed"
               ? t("settings.plugins.tabInstalled")
-              : t("settings.plugins.tabBrowse")}
+              : tabKey === "browse"
+                ? t("settings.plugins.tabBrowse")
+                : t("settings.plugins.tabDev")}
           </button>
         ))}
       </div>
@@ -197,7 +206,7 @@ export default function PluginsSettings() {
       {tab === "installed" && (
         <InstalledTab
           t={t}
-          plugins={plugins}
+          plugins={installedPlugins}
           updates={registry.updates}
           loading={loading}
           actionLoading={actionLoading}
@@ -223,6 +232,17 @@ export default function PluginsSettings() {
           onCategoryChange={setSelectedCategory}
           onInstall={handleInstall}
           onRefresh={() => registry.fetchPlugins()}
+        />
+      )}
+
+      {tab === "dev" && (
+        <DevTab
+          t={t}
+          plugins={devPlugins}
+          loading={loading}
+          actionLoading={actionLoading}
+          onToggle={handleTogglePlugin}
+          onRefresh={handleRefresh}
         />
       )}
 
@@ -346,6 +366,7 @@ function InstalledTab({
           })}
         </div>
       )}
+
     </div>
   );
 }
@@ -388,6 +409,11 @@ function InstalledPluginCard({
           <span className="text-[10px] text-text-muted bg-surface-0/50 px-1.5 py-0.5 rounded shrink-0">
             v{plugin.version}
           </span>
+          {plugin.isDev && (
+            <span className="text-[10px] font-semibold text-orange-400 bg-orange-400/15 px-1.5 py-0.5 rounded shrink-0">
+              {t("settings.plugins.devBadge")}
+            </span>
+          )}
           {plugin.status === "error" && <AlertCircle size={12} className="text-error shrink-0" />}
           {update && (
             <span className="w-1.5 h-1.5 rounded-full bg-warning shrink-0" title={t("settings.plugins.updateTo", { version: update.latestVersion })} />
@@ -419,14 +445,16 @@ function InstalledPluginCard({
               </>
             )}
           </button>
-          <button
-            onClick={onUninstall}
-            disabled={loading}
-            className="p-1.5 rounded-lg text-text-muted/40 hover:text-error hover:bg-error/10 transition-colors disabled:opacity-50"
-            title={t("settings.plugins.uninstall")}
-          >
-            <Trash2 size={13} />
-          </button>
+          {!plugin.isDev && (
+            <button
+              onClick={onUninstall}
+              disabled={loading}
+              className="p-1.5 rounded-lg text-text-muted/40 hover:text-error hover:bg-error/10 transition-colors disabled:opacity-50"
+              title={t("settings.plugins.uninstall")}
+            >
+              <Trash2 size={13} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -469,6 +497,146 @@ function InstalledPluginCard({
               )}
             </button>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// Dev Tab
+// ============================================================================
+
+function DevTab({
+  t,
+  plugins,
+  loading,
+  actionLoading,
+  onToggle,
+  onRefresh,
+}: {
+  t: (key: string, opts?: Record<string, unknown>) => string;
+  plugins: PluginManifest[];
+  loading: boolean;
+  actionLoading: string | null;
+  onToggle: (plugin: PluginManifest) => void;
+  onRefresh: () => void;
+}) {
+  const { settings, updateSettings } = useAppSettings();
+  const [scanning, setScanning] = useState(false);
+
+  const devPath = settings.developer?.devPluginsPath ?? "";
+
+  const handlePathChange = async (newPath: string) => {
+    const updated = {
+      ...settings,
+      developer: { enabled: true, devPluginsPath: newPath || undefined },
+    };
+    await updateSettings(updated);
+  };
+
+  const handleScan = async () => {
+    if (!devPath) return;
+    setScanning(true);
+    try {
+      // Ensure dev mode is enabled before scanning
+      if (!settings.developer?.enabled) {
+        const updated = {
+          ...settings,
+          developer: { enabled: true, devPluginsPath: devPath },
+        };
+        await updateSettings(updated);
+      }
+      await invoke("scan_dev_plugins");
+      onRefresh();
+    } catch (err) {
+      console.error("Dev scan failed:", err);
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  // Auto-enable dev mode when entering this tab (if path is set)
+  useEffect(() => {
+    if (devPath && !settings.developer?.enabled) {
+      const updated = {
+        ...settings,
+        developer: { enabled: true, devPluginsPath: devPath },
+      };
+      updateSettings(updated);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div className="space-y-4">
+      {/* Description */}
+      <div className="flex items-start gap-3 p-3 bg-orange-400/5 border border-orange-400/20 rounded-lg">
+        <Code2 size={16} className="text-orange-400 mt-0.5 shrink-0" />
+        <div>
+          <p className="text-xs font-medium text-text mb-1">
+            {t("settings.plugins.devModeTitle")}
+          </p>
+          <p className="text-[11px] text-text-muted leading-relaxed">
+            {t("settings.plugins.devModeDesc")}
+          </p>
+        </div>
+      </div>
+
+      {/* Path config + scan */}
+      <div className="space-y-1.5">
+        <label className="text-[11px] text-text-muted">
+          {t("settings.plugins.devPathLabel")}
+        </label>
+        <div className="flex gap-1.5">
+          <input
+            type="text"
+            value={devPath}
+            onChange={(e) => handlePathChange(e.target.value)}
+            placeholder={t("settings.plugins.devPathPlaceholder")}
+            className="flex-1 px-2.5 py-1.5 bg-surface-0/30 border border-surface-0/50 rounded-lg text-xs text-text placeholder:text-text-muted/50 focus:outline-none focus:border-orange-400/50"
+          />
+          <button
+            onClick={handleScan}
+            disabled={!devPath || scanning}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-orange-400/20 hover:bg-orange-400/30 text-orange-400 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+          >
+            {scanning ? (
+              <RefreshCw size={12} className="animate-spin" />
+            ) : (
+              <ScanSearch size={12} />
+            )}
+            {t("settings.plugins.devScan")}
+          </button>
+        </div>
+      </div>
+
+      {/* Dev plugins list */}
+      {loading ? (
+        <PluginListSkeleton count={2} />
+      ) : plugins.length === 0 ? (
+        <div className="text-center py-6 text-text-muted">
+          <Code2 size={28} className="mx-auto mb-3 opacity-30" />
+          <p className="text-xs">
+            {devPath
+              ? t("settings.plugins.devNoPlugins")
+              : t("settings.plugins.devNoPath")}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          <span className="text-xs text-text-muted">
+            {t("settings.plugins.pluginCount", { count: plugins.length })}
+          </span>
+          {plugins.map((plugin) => (
+            <InstalledPluginCard
+              key={plugin.id}
+              plugin={plugin}
+              loading={actionLoading === plugin.id}
+              onToggle={() => onToggle(plugin)}
+              onUninstall={() => {}}
+              t={t}
+            />
+          ))}
         </div>
       )}
     </div>

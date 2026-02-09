@@ -456,6 +456,16 @@ export default {
       uninstalling: "Désinstallation...",
       uninstallConfirm: "Êtes-vous sûr de vouloir désinstaller \"{{name}}\" ?",
       uninstallError: "Échec de la désinstallation du plugin",
+      // Mode Développeur
+      devModeTitle: "Mode développeur",
+      devModeDesc: "Charger les plugins directement depuis un dossier local pour le développement",
+      devPathLabel: "Chemin des plugins dev",
+      devPathPlaceholder: "Chemin vers le dossier de plugins dev...",
+      devScan: "Scanner",
+      devBadge: "DEV",
+      devNoPath: "Définissez un chemin de plugins dev pour commencer",
+      devNoPlugins: "Aucun plugin dev trouvé. Cliquez Scanner après avoir défini le chemin.",
+      tabDev: "Dev",
     },
 
     // --- Section À propos ---
