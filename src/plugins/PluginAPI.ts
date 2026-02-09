@@ -62,6 +62,7 @@ export function createPluginAPI(
     onAddHeaderAction: (pluginId: string, config: HeaderActionConfig) => HeaderActionHandle;
     getSessions: () => SessionInfo[];
     getActiveSession: () => SessionInfo | null;
+    onConnectSsh: (config: { host: string; port: number; username: string; name?: string }) => void;
   }
 ): SimplyTermPluginAPI {
   const pluginId = manifest.id;
@@ -441,6 +442,15 @@ export function createPluginAPI(
         };
       }
       return callbacks.onAddHeaderAction(pluginId, config);
+    },
+
+    // SSH connection
+    connectSsh(config: { host: string; port: number; username: string; name?: string }) {
+      if (!hasPermission(permissions, 'sessions_connect')) {
+        console.warn(`[Plugin ${pluginId}] Missing permission: sessions_connect`);
+        return;
+      }
+      callbacks.onConnectSsh(config);
     },
 
     // UI utilities

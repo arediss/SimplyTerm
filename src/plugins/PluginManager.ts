@@ -59,6 +59,7 @@ export class PluginManager {
   public onShowPrompt: (config: PromptConfig) => Promise<string | null> = async () => null;
   public getSessions: () => SessionInfo[] = () => [];
   public getActiveSession: () => SessionInfo | null = () => null;
+  public onConnectSsh: (config: { host: string; port: number; username: string; name?: string }) => void = () => {};
 
   // Panel and command registrations (observable by UI)
   public registeredPanels: Map<string, { pluginId: string; panel: PanelRegistration; position: string }> = new Map();
@@ -162,9 +163,11 @@ export class PluginManager {
 
       // Create API for this plugin
       const api = createPluginAPI(manifest, pluginState, {
-        onShowNotification: this.onShowNotification.bind(this),
-        onShowModal: this.onShowModal.bind(this),
-        onShowPrompt: this.onShowPrompt.bind(this),
+        // Arrow functions for property-based callbacks (late-binding: reads current value at call time)
+        onShowNotification: (msg, type) => this.onShowNotification(msg, type),
+        onShowModal: (config) => this.onShowModal(config),
+        onShowPrompt: (config) => this.onShowPrompt(config),
+        // .bind(this) for class methods (stable references, just needs correct `this`)
         onPanelRegister: this.handlePanelRegister.bind(this),
         onCommandRegister: this.handleCommandRegister.bind(this),
         onPanelShow: this.handlePanelShow.bind(this),
@@ -181,8 +184,10 @@ export class PluginManager {
         onQuickConnectSectionUnregister: this.handleQuickConnectSectionUnregister.bind(this),
         onAddStatusBarItem: this.handleAddStatusBarItem.bind(this),
         onAddHeaderAction: this.handleAddHeaderAction.bind(this),
-        getSessions: this.getSessions.bind(this),
-        getActiveSession: this.getActiveSession.bind(this),
+        // Arrow functions for property-based callbacks
+        getSessions: () => this.getSessions(),
+        getActiveSession: () => this.getActiveSession(),
+        onConnectSsh: (config) => this.onConnectSsh(config),
       });
 
       pluginState.api = api;

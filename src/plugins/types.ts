@@ -249,6 +249,9 @@ export interface SimplyTermPluginAPI {
   // Header actions (requires ui_notifications)
   addHeaderAction(config: HeaderActionConfig): HeaderActionHandle;
 
+  // SSH connection (requires sessions_connect)
+  connectSsh(config: { host: string; port: number; username: string; name?: string }): void;
+
   // UI utilities (requires ui_notifications/ui_modals)
   showNotification(message: string, type?: NotificationType): void;
   showModal(config: ModalConfig): Promise<unknown>;
