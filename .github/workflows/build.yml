@@ -32,7 +32,7 @@ jobs:
             label: macOS
             runner-labels: '["self-hosted", "macOS", "ARM64"]'
             rust-target: aarch64-apple-darwin
-            args: '--target aarch64-apple-darwin'
+            args: '--target aarch64-apple-darwin --bundles app'
 
     name: Build (${{ matrix.label }})
     runs-on: ${{ matrix.runner-labels && fromJSON(matrix.runner-labels) || matrix.os }}
