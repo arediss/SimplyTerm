@@ -105,6 +105,12 @@
     opacity: 0.4 !important;
   }
 
+  .xterm .xterm-viewport,
+  .xterm .xterm-scrollable-element {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+
   /* Transparent terminal for blur effect - let native blur show through */
   [data-blur="true"] .xterm,
   [data-blur="true"] .xterm-viewport,

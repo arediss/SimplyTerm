@@ -3,7 +3,7 @@
  *
  * Organization:
  * - common.*           - Boutons/actions partagés (Annuler, Enregistrer, Supprimer, etc.)
- * - settings.*         - Sections SettingsModal
+ * - settings.*         - Sections Settings (SettingsTab)
  * - vault.*            - VaultSetupModal, VaultUnlockModal
  * - connection.*       - ConnectionForm
  * - sidebar.*          - Sidebar
@@ -68,7 +68,7 @@ export default {
   },
 
   // ============================================
-  // SETTINGS - SettingsModal.tsx
+  // SETTINGS - SettingsTab.tsx
   // ============================================
   settings: {
     // Titre du modal
@@ -443,6 +443,8 @@ export default {
       update: "Mettre à jour",
       updating: "Mise à jour...",
       updateTo: "v{{version}} disponible",
+      updateAvailableSingular: "mise à jour disponible",
+      updateAvailablePlural: "mises à jour disponibles",
       categoryAll: "Tous",
       categoryThemes: "Thèmes",
       categoryProductivity: "Productivité",
@@ -768,6 +770,8 @@ export default {
     connecting: "Connexion en cours...",
     vaultLocked: "Coffre verrouillé - Cliquer pour déverrouiller",
     vaultUnlocked: "Coffre déverrouillé - Cliquer pour verrouiller",
+    pin: "Épingler la barre latérale",
+    unpin: "Détacher la barre latérale",
   },
 
   // ============================================
@@ -952,7 +956,7 @@ export default {
   },
 
   // ============================================
-  // HEADER - FloatingTabs.tsx
+  // HEADER - HeaderBar.tsx / PaneGroupTabBar.tsx
   // ============================================
   header: {
     // Tooltip bouton menu
@@ -968,6 +972,9 @@ export default {
     maximize: "Agrandir",
     restore: "Restaurer",
     close: "Fermer",
+    splitVertical: "Scinder verticalement",
+    splitHorizontal: "Scinder horizontalement",
+    closePane: "Fermer le panneau",
   },
 
   // ============================================

@@ -9,7 +9,7 @@ pub mod telnet;
 pub mod serial;
 
 pub use local::create_local_session;
-pub use ssh::{connect_ssh, check_host_key_only, load_ssh_key, SshAuth, SshConfig, HostKeyCheckResult};
+pub use ssh::{connect_ssh, finalize_cached_ssh, drop_cached_session, check_host_key_only, load_ssh_key, SshAuth, SshConfig, HostKeyCheckResult, SshConnectionResult};
 pub use known_hosts::{accept_pending_key, accept_and_update_pending_key, remove_pending_key};
 pub use sftp::{sftp_list_dir, sftp_read_file, sftp_write_file, sftp_delete, sftp_rename, sftp_mkdir, FileEntry};
 pub use telnet::connect_telnet;

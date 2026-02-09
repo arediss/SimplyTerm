@@ -24,15 +24,13 @@ function TerminalPane({
   terminalSettings,
 }: TerminalPaneProps) {
   return (
-    <div className="h-full w-full">
-      <Terminal
-        sessionId={sessionId}
-        type={type}
-        isActive={isActive}
-        appTheme={appTheme}
-        settings={terminalSettings}
-      />
-    </div>
+    <Terminal
+      sessionId={sessionId}
+      type={type}
+      isActive={isActive}
+      appTheme={appTheme}
+      settings={terminalSettings}
+    />
   );
 }
 

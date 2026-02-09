@@ -9,9 +9,6 @@ export const isMac = typeof navigator !== 'undefined' &&
 // Get the modifier key symbol based on platform
 export const modifierKey = isMac ? '⌘' : 'Ctrl';
 
-// Get the modifier key name (for accessibility/screen readers)
-export const modifierKeyName = isMac ? 'Command' : 'Control';
-
 /**
  * Check if the correct modifier key is pressed based on platform
  * On macOS: checks metaKey (⌘)

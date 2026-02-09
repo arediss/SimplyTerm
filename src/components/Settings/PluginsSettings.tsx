@@ -14,7 +14,6 @@ import {
   Globe,
   ExternalLink,
   Trash2,
-  ChevronRight,
   Code2,
   ScanSearch,
 } from "lucide-react";
@@ -23,6 +22,7 @@ import { useRegistry, type RegistryPlugin, type PluginUpdate } from "../../hooks
 import { useAppSettings } from "../../hooks/useAppSettings";
 import PermissionApprovalModal from "../PermissionApprovalModal";
 import Modal from "../Modal";
+import { SubTabs } from "./SettingsUIComponents";
 
 type Tab = "installed" | "browse" | "dev";
 
@@ -42,18 +42,13 @@ export default function PluginsSettings() {
 
   const [tab, setTab] = useState<Tab>("installed");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [pluginsDir, setPluginsDir] = useState("");
   const [pendingPlugin, setPendingPlugin] = useState<PluginManifest | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [uninstallTarget, setUninstallTarget] = useState<PluginManifest | null>(null);
 
-  // Installed plugin IDs for quick lookup
-  const installedIds = new Set(plugins.map((p) => p.id));
-
-  useEffect(() => {
-    invoke<string>("get_plugins_dir").then(setPluginsDir).catch(console.error);
-  }, []);
+  // Installed plugin IDs for quick lookup (exclude dev plugins for consistency with Installed tab)
+  const installedIds = new Set(plugins.filter((p) => !p.isDev).map((p) => p.id));
 
   // Check for updates on mount
   useEffect(() => {
@@ -180,27 +175,15 @@ export default function PluginsSettings() {
   return (
     <div className="space-y-4">
       {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-surface-0/20 rounded-lg">
-        {(["installed", "browse", "dev"] as Tab[]).map((tabKey) => (
-          <button
-            key={tabKey}
-            onClick={() => setTab(tabKey)}
-            className={`
-              flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all
-              ${tab === tabKey
-                ? tabKey === "dev" ? "bg-orange-400/20 text-orange-400" : "bg-accent/20 text-accent"
-                : "text-text-muted hover:text-text hover:bg-surface-0/30"
-              }
-            `}
-          >
-            {tabKey === "installed"
-              ? t("settings.plugins.tabInstalled")
-              : tabKey === "browse"
-                ? t("settings.plugins.tabBrowse")
-                : t("settings.plugins.tabDev")}
-          </button>
-        ))}
-      </div>
+      <SubTabs
+        tabs={[
+          { id: "installed" as const, label: t("settings.plugins.tabInstalled") },
+          { id: "browse" as const, label: t("settings.plugins.tabBrowse") },
+          { id: "dev" as const, label: t("settings.plugins.tabDev"), variant: "warning" },
+        ]}
+        activeTab={tab}
+        onChange={setTab}
+      />
 
       {/* Tab content */}
       {tab === "installed" && (
@@ -210,7 +193,7 @@ export default function PluginsSettings() {
           updates={registry.updates}
           loading={loading}
           actionLoading={actionLoading}
-          pluginsDir={pluginsDir}
+
           onToggle={handleTogglePlugin}
           onUninstall={handleUninstall}
           onUpdate={handleUpdate}
@@ -301,7 +284,6 @@ function InstalledTab({
   updates,
   loading,
   actionLoading,
-  pluginsDir,
   onToggle,
   onUninstall,
   onUpdate,
@@ -312,43 +294,62 @@ function InstalledTab({
   updates: PluginUpdate[];
   loading: boolean;
   actionLoading: string | null;
-  pluginsDir: string;
   onToggle: (plugin: PluginManifest) => void;
   onUninstall: (plugin: PluginManifest) => void;
   onUpdate: (update: PluginUpdate) => void;
   onRefresh: () => void;
 }) {
+  const updatableCount = updates.length;
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {/* Updates banner */}
+      {updatableCount > 0 && !loading && (
+        <div className="flex items-center gap-3 p-3 bg-warning/8 border border-warning/15 rounded-xl">
+          <div className="w-8 h-8 rounded-lg bg-warning/15 flex items-center justify-center shrink-0">
+            <ArrowUpCircle size={16} className="text-warning" />
+          </div>
+          <p className="flex-1 text-xs text-text">
+            <span className="font-medium">{updatableCount}</span>{" "}
+            <span className="text-text-muted">
+              {updatableCount === 1 ? t("settings.plugins.updateAvailableSingular") : t("settings.plugins.updateAvailablePlural")}
+            </span>
+          </p>
+        </div>
+      )}
+
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <span className="text-xs text-text-muted">
-          {t("settings.plugins.pluginCount", { count: plugins.length })}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-text-muted">
+            {t("settings.plugins.pluginCount", { count: plugins.length })}
+          </span>
+        </div>
         <button
           onClick={onRefresh}
           disabled={loading || actionLoading === "refresh"}
-          className="flex items-center gap-1.5 px-2 py-1 text-xs text-text-muted hover:text-text transition-colors disabled:opacity-50"
+          className="p-1.5 rounded-lg text-text-muted hover:text-text hover:bg-surface-0/30 transition-colors disabled:opacity-50"
+          title={t("common.refresh")}
         >
-          <RefreshCw size={12} className={actionLoading === "refresh" ? "animate-spin" : ""} />
-          {t("common.refresh")}
+          <RefreshCw size={14} className={actionLoading === "refresh" ? "animate-spin" : ""} />
         </button>
       </div>
 
+      {/* Plugin list */}
       {loading ? (
         <PluginListSkeleton />
       ) : plugins.length === 0 ? (
-        <div className="text-center py-8 text-text-muted">
-          <Puzzle size={32} className="mx-auto mb-3 opacity-50" />
-          <p className="text-sm">{t("settings.plugins.noPlugins")}</p>
-          <p className="text-xs mt-1">
-            {t("settings.plugins.pluginDirHint")}{" "}
-            <code className="px-1 py-0.5 bg-surface-0/50 rounded text-[10px]">
-              {pluginsDir || "plugins/"}
-            </code>
+        <div className="flex flex-col items-center py-12 text-text-muted">
+          <div className="w-16 h-16 rounded-2xl bg-surface-0/20 flex items-center justify-center mb-4">
+            <Puzzle size={28} className="opacity-40" />
+          </div>
+          <p className="text-sm font-medium text-text/60">{t("settings.plugins.noPlugins")}</p>
+          <p className="text-[11px] text-text-muted/60 mt-1 max-w-[240px] text-center">
+            {t("settings.plugins.pluginDirHint")}
           </p>
         </div>
       ) : (
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           {plugins.map((plugin) => {
             const update = updates.find((u) => u.id === plugin.id);
             return (
@@ -366,7 +367,6 @@ function InstalledTab({
           })}
         </div>
       )}
-
     </div>
   );
 }
@@ -388,25 +388,22 @@ function InstalledPluginCard({
   onUpdate?: () => void;
   t: (key: string, opts?: Record<string, unknown>) => string;
 }) {
-  const [expanded, setExpanded] = useState(false);
-
   return (
-    <div className="bg-surface-0/20 rounded-lg overflow-hidden">
-      {/* Header row - always visible, clickable to expand */}
-      <div
-        className="flex items-center gap-2.5 px-3 py-2.5 cursor-pointer select-none"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <ChevronRight
-          size={14}
-          className={`text-text-muted/50 transition-transform duration-200 shrink-0 ${expanded ? "rotate-90" : ""}`}
-        />
-        <div className="w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center text-accent shrink-0">
-          <Puzzle size={14} />
-        </div>
-        <div className="flex-1 min-w-0 flex items-center gap-2">
+    <div className="group flex gap-3 p-3 bg-surface-0/15 hover:bg-surface-0/25 rounded-xl transition-colors">
+      {/* Icon — color reflects status */}
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+        plugin.status === "error" ? "bg-error/15 text-error" :
+        plugin.status === "enabled" ? "bg-accent/15 text-accent" :
+        "bg-surface-0/40 text-text-muted"
+      }`}>
+        <Puzzle size={18} />
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-text truncate">{plugin.name}</span>
-          <span className="text-[10px] text-text-muted bg-surface-0/50 px-1.5 py-0.5 rounded shrink-0">
+          <span className="text-[10px] text-text-muted/60 bg-surface-0/40 px-1.5 py-0.5 rounded shrink-0">
             v{plugin.version}
           </span>
           {plugin.isDev && (
@@ -415,90 +412,68 @@ function InstalledPluginCard({
             </span>
           )}
           {plugin.status === "error" && <AlertCircle size={12} className="text-error shrink-0" />}
-          {update && (
-            <span className="w-1.5 h-1.5 rounded-full bg-warning shrink-0" title={t("settings.plugins.updateTo", { version: update.latestVersion })} />
-          )}
         </div>
-        {/* Actions - stop propagation to avoid toggling expand */}
-        <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+        {plugin.description && (
+          <p className="text-[11px] text-text-muted/70 truncate mt-0.5">{plugin.description}</p>
+        )}
+        {plugin.author && (
+          <p className="text-[10px] text-text-muted/50 mt-0.5">
+            {t("settings.plugins.byAuthor", { author: plugin.author })}
+          </p>
+        )}
+
+        {/* Update banner — inline in the card */}
+        {update && onUpdate && (
           <button
-            onClick={onToggle}
+            onClick={onUpdate}
             disabled={loading}
-            className={`
-              flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors
-              ${plugin.status === "enabled"
-                ? "bg-success/20 text-success hover:bg-success/30"
-                : "bg-surface-0/50 text-text-muted hover:bg-surface-0"
-              }
-              disabled:opacity-50
-            `}
+            className="flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-lg bg-warning/10 hover:bg-warning/20 transition-colors disabled:opacity-50"
           >
-            {plugin.status === "enabled" ? (
-              <>
-                <Power size={11} />
-                {t("common.active")}
-              </>
+            {loading ? (
+              <RefreshCw size={11} className="text-warning animate-spin" />
             ) : (
-              <>
-                <PowerOff size={11} />
-                {t("common.inactive")}
-              </>
+              <ArrowUpCircle size={11} className="text-warning" />
             )}
+            <span className="text-[11px] text-warning font-medium">
+              {loading
+                ? t("settings.plugins.updating")
+                : t("settings.plugins.updateTo", { version: update.latestVersion })}
+            </span>
           </button>
-          {!plugin.isDev && (
-            <button
-              onClick={onUninstall}
-              disabled={loading}
-              className="p-1.5 rounded-lg text-text-muted/40 hover:text-error hover:bg-error/10 transition-colors disabled:opacity-50"
-              title={t("settings.plugins.uninstall")}
-            >
-              <Trash2 size={13} />
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
-      {/* Expanded details */}
-      {expanded && (
-        <div className="px-3 pb-3 pt-0 space-y-2 ml-[26px]">
-          {plugin.description && (
-            <p className="text-xs text-text-muted leading-relaxed">{plugin.description}</p>
+      {/* Actions */}
+      <div className="flex items-start gap-1 shrink-0">
+        <button
+          onClick={onToggle}
+          disabled={loading}
+          className={`
+            flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors
+            ${plugin.status === "enabled"
+              ? "bg-success/15 text-success hover:bg-success/25"
+              : "bg-surface-0/40 text-text-muted hover:bg-surface-0/60"
+            }
+            disabled:opacity-50
+          `}
+        >
+          {plugin.status === "enabled" ? (
+            <><Power size={11} />{t("common.active")}</>
+          ) : (
+            <><PowerOff size={11} />{t("common.inactive")}</>
           )}
-          <div className="flex items-center gap-3">
-            {plugin.author && (
-              <span className="text-[10px] text-text-muted/70">
-                {t("settings.plugins.byAuthor", { author: plugin.author })}
-              </span>
-            )}
-            <span className="text-[10px] text-text-muted/40">{plugin.id}</span>
-          </div>
-
-          {/* Update banner */}
-          {update && onUpdate && (
-            <button
-              onClick={onUpdate}
-              disabled={loading}
-              className="flex items-center gap-2 w-full px-2.5 py-1.5 rounded-md bg-warning/10 hover:bg-warning/20 transition-colors disabled:opacity-50 group"
-            >
-              {loading ? (
-                <RefreshCw size={12} className="text-warning animate-spin" />
-              ) : (
-                <ArrowUpCircle size={12} className="text-warning" />
-              )}
-              <span className="text-[11px] text-warning font-medium">
-                {loading
-                  ? t("settings.plugins.updating")
-                  : t("settings.plugins.updateTo", { version: update.latestVersion })}
-              </span>
-              {!loading && (
-                <span className="ml-auto text-[10px] text-warning/60 group-hover:text-warning transition-colors">
-                  {t("settings.plugins.update")}
-                </span>
-              )}
-            </button>
-          )}
-        </div>
-      )}
+        </button>
+        {!plugin.isDev && (
+          <button
+            onClick={onUninstall}
+            disabled={loading}
+            className="p-1.5 rounded-lg text-text-muted/30 opacity-0 group-hover:opacity-100 hover:text-error hover:bg-error/10 transition-all disabled:opacity-50"
+            title={t("settings.plugins.uninstall")}
+          >
+            <Trash2 size={13} />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -569,36 +544,35 @@ function DevTab({
 
   return (
     <div className="space-y-4">
-      {/* Description */}
-      <div className="flex items-start gap-3 p-3 bg-orange-400/5 border border-orange-400/20 rounded-lg">
-        <Code2 size={16} className="text-orange-400 mt-0.5 shrink-0" />
-        <div>
-          <p className="text-xs font-medium text-text mb-1">
-            {t("settings.plugins.devModeTitle")}
-          </p>
-          <p className="text-[11px] text-text-muted leading-relaxed">
-            {t("settings.plugins.devModeDesc")}
-          </p>
+      {/* Dev info + path config grouped */}
+      <div className="p-3 bg-orange-400/5 border border-orange-400/15 rounded-xl space-y-3">
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 rounded-lg bg-orange-400/15 flex items-center justify-center shrink-0">
+            <Code2 size={16} className="text-orange-400" />
+          </div>
+          <div>
+            <p className="text-xs font-medium text-text">
+              {t("settings.plugins.devModeTitle")}
+            </p>
+            <p className="text-[11px] text-text-muted/70 leading-relaxed mt-0.5">
+              {t("settings.plugins.devModeDesc")}
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Path config + scan */}
-      <div className="space-y-1.5">
-        <label className="text-[11px] text-text-muted">
-          {t("settings.plugins.devPathLabel")}
-        </label>
+        {/* Path config inline */}
         <div className="flex gap-1.5">
           <input
             type="text"
             value={devPath}
             onChange={(e) => handlePathChange(e.target.value)}
             placeholder={t("settings.plugins.devPathPlaceholder")}
-            className="flex-1 px-2.5 py-1.5 bg-surface-0/30 border border-surface-0/50 rounded-lg text-xs text-text placeholder:text-text-muted/50 focus:outline-none focus:border-orange-400/50"
+            className="flex-1 px-2.5 py-1.5 bg-surface-0/20 border border-orange-400/15 rounded-lg text-xs text-text placeholder:text-text-muted/40 focus:outline-none focus:border-orange-400/40 transition-colors"
           />
           <button
             onClick={handleScan}
             disabled={!devPath || scanning}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-orange-400/20 hover:bg-orange-400/30 text-orange-400 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-400/20 hover:bg-orange-400/30 text-orange-400 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
           >
             {scanning ? (
               <RefreshCw size={12} className="animate-spin" />
@@ -614,17 +588,19 @@ function DevTab({
       {loading ? (
         <PluginListSkeleton count={2} />
       ) : plugins.length === 0 ? (
-        <div className="text-center py-6 text-text-muted">
-          <Code2 size={28} className="mx-auto mb-3 opacity-30" />
-          <p className="text-xs">
+        <div className="flex flex-col items-center py-10 text-text-muted">
+          <div className="w-14 h-14 rounded-2xl bg-orange-400/8 flex items-center justify-center mb-3">
+            <Code2 size={24} className="text-orange-400/40" />
+          </div>
+          <p className="text-xs text-text-muted/60">
             {devPath
               ? t("settings.plugins.devNoPlugins")
               : t("settings.plugins.devNoPath")}
           </p>
         </div>
       ) : (
-        <div className="space-y-1.5">
-          <span className="text-xs text-text-muted">
+        <div className="space-y-2">
+          <span className="text-[11px] text-text-muted/60">
             {t("settings.plugins.pluginCount", { count: plugins.length })}
           </span>
           {plugins.map((plugin) => (
@@ -675,47 +651,49 @@ function BrowseTab({
   onRefresh: () => void;
 }) {
   return (
-    <div className="space-y-3">
-      {/* Search bar */}
-      <div className="relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-        <input
-          type="text"
-          placeholder={t("settings.plugins.searchPlaceholder")}
-          value={searchQuery}
-          onChange={(e) => onSearch(e.target.value)}
-          className="w-full pl-9 pr-3 py-2 bg-surface-0/30 border border-surface-0/50 rounded-lg text-sm text-text placeholder:text-text-muted/50 focus:outline-none focus:border-accent/50"
-        />
-      </div>
-
-      {/* Category filter */}
-      <div className="flex gap-1.5 flex-wrap">
-        {CATEGORIES.map((cat) => (
-          <button
-            key={cat.key}
-            onClick={() => onCategoryChange(cat.key)}
-            className={`
-              px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors
-              ${selectedCategory === cat.key
-                ? "bg-accent/20 text-accent"
-                : "bg-surface-0/30 text-text-muted hover:text-text hover:bg-surface-0/50"
-              }
-            `}
-          >
-            {t(`settings.plugins.${cat.i18n}`)}
-          </button>
-        ))}
+    <div className="space-y-4">
+      {/* Search + Categories grouped */}
+      <div className="space-y-3 p-3 bg-surface-0/10 rounded-xl">
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted/50" />
+          <input
+            type="text"
+            placeholder={t("settings.plugins.searchPlaceholder")}
+            value={searchQuery}
+            onChange={(e) => onSearch(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 bg-surface-0/30 border border-surface-0/30 rounded-xl text-xs text-text placeholder:text-text-muted/40 focus:outline-none focus:border-accent/40 focus:bg-surface-0/40 transition-colors"
+          />
+        </div>
+        <div className="flex gap-1.5 flex-wrap">
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat.key}
+              onClick={() => onCategoryChange(cat.key)}
+              className={`
+                px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors
+                ${selectedCategory === cat.key
+                  ? "bg-accent/20 text-accent"
+                  : "text-text-muted/60 hover:text-text hover:bg-surface-0/40"
+                }
+              `}
+            >
+              {t(`settings.plugins.${cat.i18n}`)}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Results */}
       {error ? (
-        <div className="text-center py-8 text-text-muted">
-          <AlertCircle size={28} className="mx-auto mb-3 text-error opacity-60" />
-          <p className="text-sm text-error">{t("settings.plugins.registryError")}</p>
-          {error && <p className="text-[10px] text-text-muted mt-1 break-all">{error}</p>}
+        <div className="flex flex-col items-center py-12 text-text-muted">
+          <div className="w-16 h-16 rounded-2xl bg-error/10 flex items-center justify-center mb-4">
+            <AlertCircle size={28} className="text-error/60" />
+          </div>
+          <p className="text-sm font-medium text-error/80">{t("settings.plugins.registryError")}</p>
+          {error && <p className="text-[10px] text-text-muted/60 mt-1.5 max-w-[280px] text-center break-all">{error}</p>}
           <button
             onClick={onRefresh}
-            className="mt-3 px-3 py-1.5 text-xs text-accent hover:text-accent-hover transition-colors"
+            className="mt-4 px-4 py-1.5 text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20 rounded-lg transition-colors"
           >
             {t("common.refresh")}
           </button>
@@ -723,13 +701,15 @@ function BrowseTab({
       ) : loading ? (
         <PluginListSkeleton />
       ) : plugins.length === 0 ? (
-        <div className="text-center py-8 text-text-muted">
-          <Globe size={28} className="mx-auto mb-3 opacity-50" />
-          <p className="text-sm">{t("settings.plugins.noResults")}</p>
-          <p className="text-xs mt-1">{t("settings.plugins.noResultsHint")}</p>
+        <div className="flex flex-col items-center py-12 text-text-muted">
+          <div className="w-16 h-16 rounded-2xl bg-surface-0/20 flex items-center justify-center mb-4">
+            <Globe size={28} className="opacity-40" />
+          </div>
+          <p className="text-sm font-medium text-text/60">{t("settings.plugins.noResults")}</p>
+          <p className="text-[11px] text-text-muted/60 mt-1">{t("settings.plugins.noResultsHint")}</p>
         </div>
       ) : (
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           {plugins.map((plugin) => {
             const isInstalled = installedIds.has(plugin.id);
             return (
@@ -762,25 +742,20 @@ function BrowsePluginCard({
   onInstall: () => void;
   t: (key: string, opts?: Record<string, unknown>) => string;
 }) {
-  const [expanded, setExpanded] = useState(false);
-
   return (
-    <div className="bg-surface-0/20 rounded-lg overflow-hidden">
-      {/* Header row - clickable to expand */}
-      <div
-        className="flex items-center gap-2.5 px-3 py-2.5 cursor-pointer select-none"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <ChevronRight
-          size={14}
-          className={`text-text-muted/50 transition-transform duration-200 shrink-0 ${expanded ? "rotate-90" : ""}`}
-        />
-        <div className="w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center text-accent shrink-0">
-          <Puzzle size={14} />
-        </div>
-        <div className="flex-1 min-w-0 flex items-center gap-2">
+    <div className="flex gap-3 p-3 bg-surface-0/15 hover:bg-surface-0/25 rounded-xl transition-colors">
+      {/* Icon — changes when installed */}
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+        isInstalled ? "bg-success/15 text-success" : "bg-accent/15 text-accent"
+      }`}>
+        {isInstalled ? <Check size={18} /> : <Puzzle size={18} />}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-text truncate">{plugin.name}</span>
-          <span className="text-[10px] text-text-muted bg-surface-0/50 px-1.5 py-0.5 rounded shrink-0">
+          <span className="text-[10px] text-text-muted/60 bg-surface-0/40 px-1.5 py-0.5 rounded shrink-0">
             v{plugin.version}
           </span>
           {plugin.category && (
@@ -789,66 +764,56 @@ function BrowsePluginCard({
             </span>
           )}
         </div>
-        {/* Action - stop propagation to avoid toggling expand */}
+        {plugin.description && (
+          <p className="text-[11px] text-text-muted/70 truncate mt-0.5">{plugin.description}</p>
+        )}
+        <div className="flex items-center gap-2.5 mt-1">
+          {plugin.author && (
+            <span className="text-[10px] text-text-muted/50">
+              {t("settings.plugins.byAuthor", { author: plugin.author })}
+            </span>
+          )}
+          {plugin.downloads > 0 && (
+            <span className="text-[10px] text-text-muted/40 flex items-center gap-0.5">
+              <Download size={9} />
+              {plugin.downloads.toLocaleString()}
+            </span>
+          )}
+          {plugin.repository && (
+            <a
+              href={plugin.repository}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-text-muted/40 hover:text-accent flex items-center gap-0.5 transition-colors"
+            >
+              <ExternalLink size={9} />
+              Source
+            </a>
+          )}
+        </div>
+      </div>
+
+      {/* Action */}
+      <div className="shrink-0 self-start">
         {isInstalled ? (
-          <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-success/15 text-success shrink-0" onClick={(e) => e.stopPropagation()}>
+          <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-success/15 text-success">
             <Check size={11} />
             {t("settings.plugins.installed")}
           </span>
         ) : (
           <button
-            onClick={(e) => { e.stopPropagation(); onInstall(); }}
+            onClick={onInstall}
             disabled={loading}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-accent/20 text-accent hover:bg-accent/30 transition-colors disabled:opacity-50 shrink-0"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-accent/15 text-accent hover:bg-accent/25 transition-colors disabled:opacity-50"
           >
             {loading ? (
-              <>
-                <RefreshCw size={11} className="animate-spin" />
-                {t("settings.plugins.installing")}
-              </>
+              <><RefreshCw size={11} className="animate-spin" />{t("settings.plugins.installing")}</>
             ) : (
-              <>
-                <Download size={11} />
-                {t("settings.plugins.install")}
-              </>
+              <><Download size={11} />{t("settings.plugins.install")}</>
             )}
           </button>
         )}
       </div>
-
-      {/* Expanded details */}
-      {expanded && (
-        <div className="px-3 pb-3 pt-0 space-y-1.5 ml-[26px]">
-          {plugin.description && (
-            <p className="text-xs text-text-muted leading-relaxed">{plugin.description}</p>
-          )}
-          <div className="flex items-center gap-3 flex-wrap">
-            {plugin.author && (
-              <span className="text-[10px] text-text-muted/70">
-                {t("settings.plugins.byAuthor", { author: plugin.author })}
-              </span>
-            )}
-            {plugin.downloads > 0 && (
-              <span className="text-[10px] text-text-muted/50 flex items-center gap-0.5">
-                <Download size={9} />
-                {plugin.downloads.toLocaleString()}
-              </span>
-            )}
-            {plugin.repository && (
-              <a
-                href={plugin.repository}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[10px] text-text-muted/50 hover:text-accent flex items-center gap-0.5 transition-colors"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <ExternalLink size={9} />
-                Source
-              </a>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -859,16 +824,18 @@ function BrowsePluginCard({
 
 function PluginListSkeleton({ count = 3 }: { count?: number }) {
   return (
-    <div className="space-y-1.5 animate-pulse">
+    <div className="space-y-2 animate-pulse">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="flex items-center gap-2.5 px-3 py-2.5 bg-surface-0/20 rounded-lg">
-          <div className="w-3.5 h-3.5 rounded bg-surface-0/20 shrink-0" />
-          <div className="w-8 h-8 rounded-lg bg-surface-0/30 shrink-0" />
-          <div className="flex-1 flex items-center gap-2">
-            <div className="h-3.5 w-24 bg-surface-0/25 rounded" />
-            <div className="h-3 w-10 bg-surface-0/15 rounded" />
+        <div key={i} className="flex gap-3 p-3 bg-surface-0/15 rounded-xl">
+          <div className="w-10 h-10 rounded-xl bg-surface-0/30 shrink-0" />
+          <div className="flex-1 space-y-2 py-0.5">
+            <div className="flex items-center gap-2">
+              <div className="h-3.5 w-28 bg-surface-0/25 rounded" />
+              <div className="h-3 w-10 bg-surface-0/15 rounded" />
+            </div>
+            <div className="h-2.5 w-48 bg-surface-0/15 rounded" />
           </div>
-          <div className="h-7 w-16 bg-surface-0/20 rounded-lg" />
+          <div className="h-7 w-16 bg-surface-0/20 rounded-lg shrink-0" />
         </div>
       ))}
     </div>

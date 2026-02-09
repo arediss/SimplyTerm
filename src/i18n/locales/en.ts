@@ -3,7 +3,7 @@
  *
  * Organization:
  * - common.*           - Shared buttons/actions (Cancel, Save, Delete, etc.)
- * - settings.*         - SettingsModal sections
+ * - settings.*         - Settings sections (SettingsTab)
  * - vault.*            - VaultSetupModal, VaultUnlockModal
  * - connection.*       - ConnectionForm
  * - sidebar.*          - Sidebar
@@ -68,7 +68,7 @@ export default {
   },
 
   // ============================================
-  // SETTINGS - SettingsModal.tsx
+  // SETTINGS - SettingsTab.tsx
   // ============================================
   settings: {
     // Modal title
@@ -446,6 +446,8 @@ export default {
       update: "Update",
       updating: "Updating...",
       updateTo: "v{{version}} available",
+      updateAvailableSingular: "plugin update available",
+      updateAvailablePlural: "plugin updates available",
       // Categories
       categoryAll: "All",
       categoryThemes: "Themes",
@@ -774,6 +776,8 @@ export default {
     connecting: "Connecting...",
     vaultLocked: "Vault locked - Click to unlock",
     vaultUnlocked: "Vault unlocked - Click to lock",
+    pin: "Pin sidebar",
+    unpin: "Unpin sidebar",
   },
 
   // ============================================
@@ -958,7 +962,7 @@ export default {
   },
 
   // ============================================
-  // HEADER - FloatingTabs.tsx
+  // HEADER - HeaderBar.tsx / PaneGroupTabBar.tsx
   // ============================================
   header: {
     // Menu button tooltip
@@ -974,6 +978,9 @@ export default {
     maximize: "Maximize",
     restore: "Restore",
     close: "Close",
+    splitVertical: "Split vertically",
+    splitHorizontal: "Split horizontally",
+    closePane: "Close pane",
   },
 
   // ============================================

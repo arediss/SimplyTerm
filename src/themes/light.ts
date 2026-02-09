@@ -45,7 +45,8 @@ export const lightTheme: Theme = {
     glassHover: "rgba(255, 255, 255, 0.95)",
     glassSubtle: "rgba(255, 255, 255, 0.6)",
 
-    backgroundGradient: "radial-gradient(1200px circle at 50% 30%, #FFFFFF 0%, #F5F2ED 60%)",
+    panel: "#E6E3DD",
+    backgroundGradient: "#F5F2ED",
   },
 
   terminal: {

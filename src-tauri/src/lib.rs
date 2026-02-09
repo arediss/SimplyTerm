@@ -15,8 +15,11 @@ mod storage;
 mod tunnels;
 
 use connectors::{
-    connect_ssh, create_local_session, ssh_exec::{ssh_exec, get_server_stats, ServerStats}, SshAuth, SshConfig, FileEntry, sftp_read_file,
-    check_host_key_only, HostKeyCheckResult, accept_pending_key, accept_and_update_pending_key, remove_pending_key,
+    connect_ssh, finalize_cached_ssh, drop_cached_session, check_host_key_only,
+    create_local_session,
+    ssh_exec::{ssh_exec, get_server_stats, ServerStats}, SshAuth, SshConfig, SshConnectionResult,
+    HostKeyCheckResult, FileEntry, sftp_read_file,
+    accept_pending_key, accept_and_update_pending_key, remove_pending_key,
     connect_telnet, connect_serial, list_serial_ports, SerialConfig, SerialPortInfo,
 };
 use plugins::{PluginManager, InstalledPlugin, PluginState, RegistrySource, RegistryPlugin, PluginUpdate};
@@ -63,27 +66,21 @@ async fn create_pty_session(app: AppHandle, session_id: String) -> Result<(), St
     Ok(())
 }
 
-#[tauri::command]
-async fn create_ssh_session(
-    app: AppHandle,
-    session_id: String,
+/// Build SshConfig from Tauri command parameters
+fn build_ssh_config(
     host: String,
     port: u16,
     username: String,
     password: Option<String>,
     key_path: Option<String>,
     key_passphrase: Option<String>,
-    // Jump host parameters (optional)
     jump_host: Option<String>,
     jump_port: Option<u16>,
     jump_username: Option<String>,
     jump_password: Option<String>,
     jump_key_path: Option<String>,
     jump_key_passphrase: Option<String>,
-) -> Result<(), String> {
-    let state = app.state::<AppState>();
-    let output_tx = state.session_manager.output_sender();
-
+) -> Result<SshConfig, String> {
     let auth = if let Some(key) = key_path {
         SshAuth::KeyFile {
             path: key,
@@ -117,21 +114,75 @@ async fn create_ssh_session(
         None
     };
 
-    let config = SshConfig {
+    Ok(SshConfig {
         host,
         port,
         username,
         auth,
         jump_host: jump_host_config,
-    };
+    })
+}
 
-    let app_clone = app.clone();
-    let session_id_clone = session_id.clone();
+#[tauri::command]
+async fn create_ssh_session(
+    app: AppHandle,
+    session_id: String,
+    host: String,
+    port: u16,
+    username: String,
+    password: Option<String>,
+    key_path: Option<String>,
+    key_passphrase: Option<String>,
+    // Jump host parameters (optional)
+    jump_host: Option<String>,
+    jump_port: Option<u16>,
+    jump_username: Option<String>,
+    jump_password: Option<String>,
+    jump_key_path: Option<String>,
+    jump_key_passphrase: Option<String>,
+) -> Result<SshConnectionResult, String> {
+    let state = app.state::<AppState>();
+    let output_tx = state.session_manager.output_sender();
+
+    let config = build_ssh_config(
+        host, port, username, password, key_path, key_passphrase,
+        jump_host, jump_port, jump_username, jump_password, jump_key_path, jump_key_passphrase,
+    )?;
 
     // Store config for background commands (stats, etc.)
     state.session_manager.store_ssh_config(session_id.clone(), config.clone());
 
-    let session = connect_ssh(config, session_id.clone(), output_tx, move || {
+    let app_clone = app.clone();
+    let session_id_clone = session_id.clone();
+
+    let (result, maybe_session) = connect_ssh(config, session_id.clone(), output_tx, move || {
+        let _ = app_clone.emit(&format!("pty-exit-{}", session_id_clone), ());
+    })
+    .await?;
+
+    if let Some(session) = maybe_session {
+        state
+            .session_manager
+            .register(session_id, Box::new(session));
+    }
+
+    Ok(result)
+}
+
+/// Finalize a cached SSH connection after the user accepted the host key
+#[tauri::command]
+async fn finalize_ssh_session(
+    app: AppHandle,
+    cache_id: String,
+    session_id: String,
+) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let output_tx = state.session_manager.output_sender();
+
+    let app_clone = app.clone();
+    let session_id_clone = session_id.clone();
+
+    let session = finalize_cached_ssh(&cache_id, session_id.clone(), output_tx, move || {
         let _ = app_clone.emit(&format!("pty-exit-{}", session_id_clone), ());
     })
     .await?;
@@ -140,6 +191,13 @@ async fn create_ssh_session(
         .session_manager
         .register(session_id, Box::new(session));
 
+    Ok(())
+}
+
+/// Abort a cached SSH connection (user rejected the host key)
+#[tauri::command]
+async fn abort_ssh_connection(cache_id: String) -> Result<(), String> {
+    drop_cached_session(&cache_id);
     Ok(())
 }
 
@@ -214,6 +272,7 @@ async fn create_serial_session(
 // Host Key Verification Commands
 // ============================================================================
 
+/// Standalone host key check (for SFTP/tunnel pre-checks that don't use create_ssh_session)
 #[tauri::command]
 async fn check_host_key(host: String, port: u16) -> HostKeyCheckResult {
     check_host_key_only(&host, port).await
@@ -1806,7 +1865,10 @@ pub fn run() {
             create_telnet_session,
             get_serial_ports,
             create_serial_session,
-            // Host key verification
+            // SSH finalize/abort (single-connection architecture)
+            finalize_ssh_session,
+            abort_ssh_connection,
+            // Host key verification (standalone, for SFTP/tunnel pre-checks)
             check_host_key,
             trust_host_key,
             update_host_key,

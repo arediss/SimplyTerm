@@ -33,12 +33,15 @@ pub struct AppearanceSettings {
 #[serde(rename_all = "camelCase")]
 pub struct UiSettings {
     pub status_bar_visible: bool,
+    #[serde(default)]
+    pub sidebar_pinned: bool,
 }
 
 impl Default for UiSettings {
     fn default() -> Self {
         Self {
             status_bar_visible: false,
+            sidebar_pinned: false,
         }
     }
 }

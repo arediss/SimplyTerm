@@ -5,8 +5,10 @@ use parking_lot::Mutex as SyncMutex;
 use russh::client::{self, Config, Handle, Handler};
 use russh::keys::key::PublicKey;
 use russh::ChannelMsg;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::mpsc as std_mpsc;
+use std::time::Instant;
 use tokio::sync::mpsc as tokio_mpsc;
 
 use crate::session::{OutputMessage, Session};
@@ -76,15 +78,17 @@ pub struct HostKeyCheckResult {
     pub message: Option<String>,
 }
 
-/// Handler for checking host key only (no full connection)
-struct KeyCheckHandler {
+/// SSH handler — always accepts the connection but stores the host key verification result.
+/// This allows us to reuse the same TCP connection regardless of whether the key is trusted.
+/// No credentials are sent before the user confirms the key.
+struct SshHandler {
     host: String,
     port: u16,
-    result: Arc<SyncMutex<Option<HostKeyCheckResult>>>,
+    key_check: Arc<SyncMutex<Option<HostKeyCheckResult>>>,
 }
 
 #[async_trait]
-impl Handler for KeyCheckHandler {
+impl Handler for SshHandler {
     type Error = russh::Error;
 
     async fn check_server_key(
@@ -102,7 +106,6 @@ impl Handler for KeyCheckHandler {
                 message: None,
             },
             HostKeyVerification::UnknownHost { key_type, fingerprint } => {
-                // Store the key for later acceptance
                 store_pending_key(&self.host, self.port, server_public_key);
                 HostKeyCheckResult {
                     status: "unknown".to_string(),
@@ -115,7 +118,6 @@ impl Handler for KeyCheckHandler {
                 }
             }
             HostKeyVerification::KeyMismatch { expected_fingerprint, actual_fingerprint } => {
-                // Store the key for later acceptance (if user chooses to update)
                 store_pending_key(&self.host, self.port, server_public_key);
                 HostKeyCheckResult {
                     status: "mismatch".to_string(),
@@ -138,94 +140,67 @@ impl Handler for KeyCheckHandler {
             },
         };
 
-        *self.result.lock() = Some(result.clone());
+        *self.key_check.lock() = Some(result);
 
-        // Always return true to allow the connection to proceed for key checking
-        // We'll disconnect right after
+        // Always accept to keep the TCP connection alive.
+        // Authentication only happens AFTER the user confirms the key.
         Ok(true)
     }
 }
 
-/// Check host key before establishing a full connection
-pub async fn check_host_key_only(host: &str, port: u16) -> HostKeyCheckResult {
-    let result = Arc::new(SyncMutex::new(None));
-    let handler = KeyCheckHandler {
-        host: host.to_string(),
-        port,
-        result: result.clone(),
-    };
+// ============================================================================
+// Session cache — keeps TCP connections alive while waiting for user confirmation
+// ============================================================================
 
-    let ssh_config = Config::default();
-    let addr = format!("{}:{}", host, port);
+struct CachedSshConnection {
+    session: Handle<SshHandler>,
+    _jump_session: Option<Handle<SshHandler>>,
+    config: SshConfig,
+    created_at: Instant,
+}
 
-    // Try to connect just to get the host key
-    match client::connect(Arc::new(ssh_config), &addr, handler).await {
-        Ok(_session) => {
-            // Connection succeeded (at least TCP + key exchange)
-            // The handler should have stored the result
-            if let Some(r) = result.lock().take() {
-                r
-            } else {
-                HostKeyCheckResult {
-                    status: "error".to_string(),
-                    host: host.to_string(),
-                    port,
-                    key_type: None,
-                    fingerprint: None,
-                    expected_fingerprint: None,
-                    message: Some("Failed to retrieve host key".to_string()),
-                }
-            }
-        }
-        Err(e) => {
-            // Check if we got the result before the error
-            if let Some(r) = result.lock().take() {
-                r
-            } else {
-                HostKeyCheckResult {
-                    status: "error".to_string(),
-                    host: host.to_string(),
-                    port,
-                    key_type: None,
-                    fingerprint: None,
-                    expected_fingerprint: None,
-                    message: Some(format!("Connection failed: {}", e)),
-                }
-            }
-        }
+lazy_static::lazy_static! {
+    static ref SSH_SESSION_CACHE: SyncMutex<HashMap<String, CachedSshConnection>> =
+        SyncMutex::new(HashMap::new());
+}
+
+/// Maximum time a cached session can wait for user confirmation (2 minutes)
+const CACHE_TTL_SECS: u64 = 120;
+
+fn cache_session(cache_id: String, conn: CachedSshConnection) {
+    let mut cache = SSH_SESSION_CACHE.lock();
+    // Evict expired entries while we're at it
+    cache.retain(|_, v| v.created_at.elapsed().as_secs() < CACHE_TTL_SECS);
+    cache.insert(cache_id, conn);
+}
+
+fn take_cached_session(cache_id: &str) -> Option<CachedSshConnection> {
+    let mut cache = SSH_SESSION_CACHE.lock();
+    let conn = cache.remove(cache_id)?;
+    if conn.created_at.elapsed().as_secs() >= CACHE_TTL_SECS {
+        // Expired — drop it
+        None
+    } else {
+        Some(conn)
     }
 }
 
-/// SSH handler - trusts known hosts only
-struct SshHandler {
-    host: String,
-    port: u16,
+pub fn drop_cached_session(cache_id: &str) {
+    SSH_SESSION_CACHE.lock().remove(cache_id);
 }
 
-#[async_trait]
-impl Handler for SshHandler {
-    type Error = russh::Error;
-
-    async fn check_server_key(
-        &mut self,
-        server_public_key: &PublicKey,
-    ) -> Result<bool, Self::Error> {
-        match verify_host_key(&self.host, self.port, server_public_key) {
-            HostKeyVerification::Trusted => Ok(true),
-            HostKeyVerification::UnknownHost { .. } => {
-                // Host key should have been pre-approved via check_host_key
-                Err(russh::Error::UnknownKey)
-            }
-            HostKeyVerification::KeyMismatch { .. } => {
-                // Key mismatch - potential MITM attack!
-                Err(russh::Error::UnknownKey)
-            }
-            HostKeyVerification::Error(e) => {
-                eprintln!("Host key verification error: {}", e);
-                Err(russh::Error::UnknownKey)
-            }
-        }
-    }
+/// Result returned by `prepare_ssh_connection`
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(tag = "type")]
+pub enum SshConnectionResult {
+    /// Key was trusted, session is fully connected (PTY ready)
+    Connected,
+    /// Key needs user confirmation — session is cached under `cache_id`
+    HostKeyCheck {
+        #[serde(flatten)]
+        check: HostKeyCheckResult,
+        cache_id: String,
+    },
 }
 
 /// Commandes envoyées à la session SSH
@@ -302,28 +277,34 @@ async fn authenticate_session<H: Handler + Send>(
     Ok(())
 }
 
-/// Connecte une session SSH (avec support jump host optionnel)
-pub async fn connect_ssh(
-    config: SshConfig,
-    session_id: String,
-    output_tx: std_mpsc::Sender<OutputMessage>,
-    on_exit: impl FnOnce() + Send + 'static,
-) -> Result<SshSession, String> {
+/// Establish a TCP+SSH connection (handles jump hosts) without authenticating.
+/// Returns the session handle, jump session handle, and the host key check result.
+async fn establish_connection(
+    config: &SshConfig,
+) -> Result<(Handle<SshHandler>, Option<Handle<SshHandler>>, HostKeyCheckResult), String> {
     let ssh_config = Arc::new(Config::default());
+    let key_check = Arc::new(SyncMutex::new(None));
 
-    let _jump_session: Option<Handle<SshHandler>>;
-
-    let mut session = if let Some(ref jump) = config.jump_host {
-        // Connect via jump host
+    let (session, jump_session) = if let Some(ref jump) = config.jump_host {
+        // Jump host connection — the jump host key is verified strictly
+        let jump_key_check = Arc::new(SyncMutex::new(None));
         let jump_handler = SshHandler {
             host: jump.host.clone(),
             port: jump.port,
+            key_check: jump_key_check.clone(),
         };
         let jump_addr = format!("{}:{}", jump.host, jump.port);
 
         let mut jump_sess = client::connect(ssh_config.clone(), &jump_addr, jump_handler)
             .await
             .map_err(|e| format!("Jump host connection failed: {}", e))?;
+
+        // Check jump host key — must be trusted (we don't show modal for jump hosts)
+        if let Some(ref check) = *jump_key_check.lock() {
+            if check.status != "trusted" {
+                return Err(format!("Jump host key not trusted: {}", check.status));
+            }
+        }
 
         authenticate_session(&mut jump_sess, &jump.username, &jump.auth).await
             .map_err(|e| format!("Jump host auth failed: {}", e))?;
@@ -338,34 +319,54 @@ pub async fn connect_ssh(
         let dest_handler = SshHandler {
             host: config.host.clone(),
             port: config.port,
+            key_check: key_check.clone(),
         };
 
         let dest_session = client::connect_stream(ssh_config.clone(), stream, dest_handler)
             .await
             .map_err(|e| format!("Destination connection through jump host failed: {}", e))?;
 
-        _jump_session = Some(jump_sess);
-
-        dest_session
+        (dest_session, Some(jump_sess))
     } else {
         // Direct connection
         let handler = SshHandler {
             host: config.host.clone(),
             port: config.port,
+            key_check: key_check.clone(),
         };
         let addr = format!("{}:{}", config.host, config.port);
 
-        _jump_session = None;
-
-        client::connect(ssh_config, &addr, handler)
+        let sess = client::connect(ssh_config, &addr, handler)
             .await
-            .map_err(|e| format!("Connection failed: {}", e))?
+            .map_err(|e| format!("Connection failed: {}", e))?;
+
+        (sess, None)
     };
 
-    // Authentification sur le serveur destination
+    let check_result = key_check.lock().take().unwrap_or_else(|| HostKeyCheckResult {
+        status: "error".to_string(),
+        host: config.host.clone(),
+        port: config.port,
+        key_type: None,
+        fingerprint: None,
+        expected_fingerprint: None,
+        message: Some("Failed to retrieve host key".to_string()),
+    });
+
+    Ok((session, jump_session, check_result))
+}
+
+/// Authenticate an established session and set up PTY + I/O task.
+async fn setup_pty_session(
+    mut session: Handle<SshHandler>,
+    jump_session: Option<Handle<SshHandler>>,
+    config: &SshConfig,
+    session_id: String,
+    output_tx: std_mpsc::Sender<OutputMessage>,
+    on_exit: impl FnOnce() + Send + 'static,
+) -> Result<SshSession, String> {
     authenticate_session(&mut session, &config.username, &config.auth).await?;
 
-    // Ouvrir un channel et demander un PTY
     let mut channel = session
         .channel_open_session()
         .await
@@ -381,13 +382,11 @@ pub async fn connect_ssh(
         .await
         .map_err(|e| format!("Failed to request shell: {}", e))?;
 
-    // Channel pour les commandes (tokio car utilisé dans tokio::spawn)
     let (cmd_tx, mut cmd_rx) = tokio_mpsc::unbounded_channel::<SshCommand>();
 
-    // Task principale SSH
     tokio::spawn(async move {
-        let _session = session; // Garde la session en vie
-        let _jump = _jump_session; // Garde la session jump host en vie (si utilisée)
+        let _session = session;
+        let _jump = jump_session;
 
         loop {
             tokio::select! {
@@ -422,7 +421,6 @@ pub async fn connect_ssh(
                             let _ = channel.window_change(cols, rows, 0, 0).await;
                         }
                         SshCommand::Close => {
-                            // Close the channel gracefully
                             let _ = channel.eof().await;
                             let _ = channel.close().await;
                             break;
@@ -438,4 +436,83 @@ pub async fn connect_ssh(
     Ok(SshSession {
         cmd_tx: SyncMutex::new(cmd_tx),
     })
+}
+
+/// Connect SSH — single TCP connection. Returns immediately if host key is trusted,
+/// or caches the session and returns the key check result for user confirmation.
+pub async fn connect_ssh(
+    config: SshConfig,
+    session_id: String,
+    output_tx: std_mpsc::Sender<OutputMessage>,
+    on_exit: impl FnOnce() + Send + 'static,
+) -> Result<(SshConnectionResult, Option<SshSession>), String> {
+    let (session, jump_session, check_result) = establish_connection(&config).await?;
+
+    if check_result.status == "trusted" {
+        // Key is trusted → authenticate and set up PTY on the same connection
+        let ssh_session = setup_pty_session(
+            session, jump_session, &config, session_id, output_tx, on_exit,
+        ).await?;
+        Ok((SshConnectionResult::Connected, Some(ssh_session)))
+    } else if check_result.status == "unknown" || check_result.status == "mismatch" {
+        // Key needs user confirmation → cache the live connection
+        let cache_id = format!("{}:{}", config.host, config.port);
+        cache_session(cache_id.clone(), CachedSshConnection {
+            session,
+            _jump_session: jump_session,
+            config,
+            created_at: Instant::now(),
+        });
+        Ok((SshConnectionResult::HostKeyCheck { check: check_result, cache_id }, None))
+    } else {
+        // Error during key check
+        Err(check_result.message.unwrap_or_else(|| "Host key verification failed".to_string()))
+    }
+}
+
+/// Lightweight host key check — opens a temporary connection to verify the server key.
+/// Used for SFTP/tunnel pre-checks (flows that don't use `create_ssh_session`).
+pub async fn check_host_key_only(host: &str, port: u16) -> HostKeyCheckResult {
+    let ssh_config = Arc::new(Config::default());
+    let key_check = Arc::new(SyncMutex::new(None));
+    let handler = SshHandler {
+        host: host.to_string(),
+        port,
+        key_check: key_check.clone(),
+    };
+    let addr = format!("{}:{}", host, port);
+
+    // Connect just to capture the key check result, then drop the session
+    let _ = client::connect(ssh_config, &addr, handler).await;
+
+    let result = key_check.lock().take().unwrap_or_else(|| HostKeyCheckResult {
+        status: "error".to_string(),
+        host: host.to_string(),
+        port,
+        key_type: None,
+        fingerprint: None,
+        expected_fingerprint: None,
+        message: Some("Failed to retrieve host key".to_string()),
+    });
+    result
+}
+
+/// Finalize a cached SSH connection after the user accepted the host key.
+pub async fn finalize_cached_ssh(
+    cache_id: &str,
+    session_id: String,
+    output_tx: std_mpsc::Sender<OutputMessage>,
+    on_exit: impl FnOnce() + Send + 'static,
+) -> Result<SshSession, String> {
+    let cached = take_cached_session(cache_id)
+        .ok_or_else(|| "Cached session expired or not found. Please reconnect.".to_string())?;
+
+    setup_pty_session(
+        cached.session,
+        cached._jump_session,
+        &cached.config,
+        session_id,
+        output_tx,
+        on_exit,
+    ).await
 }
