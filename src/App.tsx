@@ -37,6 +37,22 @@ import { applyTheme } from "./themes";
 
 const noop = () => {};
 
+interface ShortcutEntry {
+  mod?: boolean;
+  ctrl?: boolean;
+  shift: boolean;
+  skipInput?: boolean;
+  action: () => void;
+}
+
+function matchesShortcut(entry: ShortcutEntry, mod: boolean, e: KeyboardEvent, isInput: boolean): boolean {
+  if (entry.mod && !mod) return false;
+  if (entry.ctrl && !e.ctrlKey) return false;
+  if (entry.shift !== e.shiftKey) return false;
+  if (entry.skipInput && isInput) return false;
+  return true;
+}
+
 function App() {
   const { t } = useTranslation();
 
@@ -320,44 +336,80 @@ function App() {
     }
   };
 
-  const handleSshConnect = async (config: SshConnectionConfig) => {
-    setIsConnecting(true);
-    setConnectionError(undefined);
+  const handleSftpConnectFromPending = async (config: SshConnectionConfig) => {
+    const saved = pendingSftpSession!;
+    setPendingSftpSession(null);
 
-    // Check if this is for SFTP (credentials were requested for SFTP)
-    if (pendingSftpSession) {
-      const saved = pendingSftpSession;
-      setPendingSftpSession(null);
+    try {
+      const sessionId = generateSessionId("sftp");
+      const keyPath = await expandHomeDir(config.keyPath);
+
+      await invoke("register_sftp_session", {
+        sessionId,
+        host: config.host,
+        port: config.port,
+        username: config.username,
+        password: config.authType === "password" ? config.password : null,
+        keyPath: config.authType === "key" ? keyPath : null,
+        keyPassphrase: config.authType === "key" ? config.keyPassphrase : null,
+      });
+
+      workspace.addTabToFocusedGroup({
+        type: "sftp",
+        title: `SFTP - ${saved.name}`,
+        sessionId,
+        sshConfig: config,
+      });
+
+      setIsConnectionModalOpen(false);
+      setOpenSidebar("none");
+      setIsConnecting(false);
+      setInitialConnectionConfig(null);
 
       try {
-        const sessionId = generateSessionId("sftp");
-        const keyPath = await expandHomeDir(config.keyPath);
-
-        await invoke("register_sftp_session", {
-          sessionId,
+        await invoke("save_session", {
+          id: saved.id,
+          name: config.name,
           host: config.host,
           port: config.port,
           username: config.username,
-          password: config.authType === "password" ? config.password : null,
-          keyPath: config.authType === "key" ? keyPath : null,
-          keyPassphrase: config.authType === "key" ? config.keyPassphrase : null,
+          authType: config.authType,
+          keyPath: config.keyPath,
+          password: config.password,
+          keyPassphrase: config.keyPassphrase,
+          sshKeyId: config.sshKeyId || null,
         });
+        await loadSavedSessions();
+      } catch (err) {
+        console.error("[SFTP] Failed to save credentials:", err);
+      }
+    } catch (error) {
+      console.error("Failed to open SFTP:", error);
+      setConnectionError(t('app.sftpError', { error }));
+      setIsConnecting(false);
+    }
+  };
 
-        workspace.addTabToFocusedGroup({
-          type: "sftp",
-          title: `SFTP - ${saved.name}`,
-          sessionId,
-          sshConfig: config,
-        });
+  const buildJumpHostParams = (config: SshConnectionConfig, jumpKeyPath: string | undefined) => {
+    if (!config.useJumpHost) {
+      return { jumpHost: null, jumpPort: null, jumpUsername: null, jumpPassword: null, jumpKeyPath: null, jumpKeyPassphrase: null };
+    }
+    return {
+      jumpHost: config.jumpHost,
+      jumpPort: config.jumpPort,
+      jumpUsername: config.jumpUsername || config.username,
+      jumpPassword: config.jumpAuthType === "password" ? config.jumpPassword : null,
+      jumpKeyPath: config.jumpAuthType === "key" ? jumpKeyPath : null,
+      jumpKeyPassphrase: config.jumpAuthType === "key" ? config.jumpKeyPassphrase : null,
+    };
+  };
 
-        setIsConnectionModalOpen(false);
-        setOpenSidebar("none");
-        setIsConnecting(false);
-        setInitialConnectionConfig(null);
-
+  const saveSessionAfterConnect = (config: SshConnectionConfig) => {
+    if (editingSessionId) {
+      (async () => {
         try {
           await invoke("save_session", {
-            id: saved.id,
+            id: editingSessionId,
             name: config.name,
             host: config.host,
             port: config.port,
@@ -370,114 +422,90 @@ function App() {
           });
           await loadSavedSessions();
         } catch (err) {
-          console.error("[SFTP] Failed to save credentials:", err);
+          console.error("[SavedSession] Failed to save credentials:", err);
         }
-        return;
-      } catch (error) {
-        console.error("Failed to open SFTP:", error);
-        setConnectionError(t('app.sftpError', { error }));
-        setIsConnecting(false);
-        return;
+      })();
+      setEditingSessionId(null);
+    } else {
+      const isAlreadySaved = savedSessions.some(
+        (s) => s.host === config.host && s.username === config.username && s.port === config.port
+      );
+      if (!isAlreadySaved) {
+        setPendingSaveConfig(config);
+        setIsSaveModalOpen(true);
       }
     }
+  };
 
-    // Normal SSH connection — single TCP connection (host key check built-in)
-    {
-      const ptySessionId = generateSessionId("ssh");
+  const handleSshConnect = async (config: SshConnectionConfig) => {
+    setIsConnecting(true);
+    setConnectionError(undefined);
 
-      try {
-        let resolvedKeyPath = config.keyPath;
-        let resolvedKeyPassphrase = config.keyPassphrase;
+    if (pendingSftpSession) {
+      await handleSftpConnectFromPending(config);
+      return;
+    }
 
-        if (config.sshKeyId) {
-          const resolved = await resolveSshKey(config.sshKeyId);
-          if (!resolved) {
-            setIsConnecting(false);
-            return;
-          }
-          resolvedKeyPath = resolved.keyPath;
-          resolvedKeyPassphrase = resolved.passphrase || undefined;
+    const ptySessionId = generateSessionId("ssh");
+
+    try {
+      let resolvedKeyPath = config.keyPath;
+      let resolvedKeyPassphrase = config.keyPassphrase;
+
+      if (config.sshKeyId) {
+        const resolved = await resolveSshKey(config.sshKeyId);
+        if (!resolved) {
+          setIsConnecting(false);
+          return;
         }
+        resolvedKeyPath = resolved.keyPath;
+        resolvedKeyPassphrase = resolved.passphrase || undefined;
+      }
 
-        const keyPath = await expandHomeDir(resolvedKeyPath);
-        const jumpKeyPath = config.useJumpHost ? await expandHomeDir(config.jumpKeyPath) : undefined;
+      const keyPath = await expandHomeDir(resolvedKeyPath);
+      const jumpKeyPath = config.useJumpHost ? await expandHomeDir(config.jumpKeyPath) : undefined;
 
-        const result = await invoke<SshConnectionResult>("create_ssh_session", {
-          sessionId: ptySessionId,
+      const result = await invoke<SshConnectionResult>("create_ssh_session", {
+        sessionId: ptySessionId,
+        host: config.host,
+        port: config.port,
+        username: config.username,
+        password: config.password,
+        keyPath,
+        keyPassphrase: resolvedKeyPassphrase,
+        ...buildJumpHostParams(config, jumpKeyPath),
+      });
+
+      const onConnected = () => {
+        workspace.addTabToFocusedGroup({
+          type: "ssh",
+          title: config.name,
+          sessionId: `ssh-${config.host}`,
+          ptySessionId,
+          sshConfig: config,
+        });
+
+        setIsConnectionModalOpen(false);
+        setOpenSidebar("none");
+        setIsConnecting(false);
+
+        pluginManager.notifySessionConnect({
+          id: ptySessionId,
+          type: 'ssh',
           host: config.host,
           port: config.port,
           username: config.username,
-          password: config.password,
-          keyPath,
-          keyPassphrase: resolvedKeyPassphrase,
-          jumpHost: config.useJumpHost ? config.jumpHost : null,
-          jumpPort: config.useJumpHost ? config.jumpPort : null,
-          jumpUsername: config.useJumpHost ? (config.jumpUsername || config.username) : null,
-          jumpPassword: config.useJumpHost && config.jumpAuthType === "password" ? config.jumpPassword : null,
-          jumpKeyPath: config.useJumpHost && config.jumpAuthType === "key" ? jumpKeyPath : null,
-          jumpKeyPassphrase: config.useJumpHost && config.jumpAuthType === "key" ? config.jumpKeyPassphrase : null,
+          status: 'connected',
         });
 
-        const onConnected = () => {
-          workspace.addTabToFocusedGroup({
-            type: "ssh",
-            title: config.name,
-            sessionId: `ssh-${config.host}`,
-            ptySessionId,
-            sshConfig: config,
-          });
+        saveSessionAfterConnect(config);
+      };
 
-          setIsConnectionModalOpen(false);
-          setOpenSidebar("none");
-          setIsConnecting(false);
-
-          pluginManager.notifySessionConnect({
-            id: ptySessionId,
-            type: 'ssh',
-            host: config.host,
-            port: config.port,
-            username: config.username,
-            status: 'connected',
-          });
-
-          if (editingSessionId) {
-            (async () => {
-              try {
-                await invoke("save_session", {
-                  id: editingSessionId,
-                  name: config.name,
-                  host: config.host,
-                  port: config.port,
-                  username: config.username,
-                  authType: config.authType,
-                  keyPath: config.keyPath,
-                  password: config.password,
-                  keyPassphrase: config.keyPassphrase,
-                  sshKeyId: config.sshKeyId || null,
-                });
-                await loadSavedSessions();
-              } catch (err) {
-                console.error("[SavedSession] Failed to save credentials:", err);
-              }
-            })();
-            setEditingSessionId(null);
-          } else {
-            const isAlreadySaved = savedSessions.some(
-              (s) => s.host === config.host && s.username === config.username && s.port === config.port
-            );
-            if (!isAlreadySaved) {
-              setPendingSaveConfig(config);
-              setIsSaveModalOpen(true);
-            }
-          }
-        };
-
-        handleSshConnectionResult(result, onConnected, ptySessionId);
-      } catch (error) {
-        console.error("SSH connection failed:", error);
-        setConnectionError(String(error));
-        setIsConnecting(false);
-      }
+      handleSshConnectionResult(result, onConnected, ptySessionId);
+    } catch (error) {
+      console.error("SSH connection failed:", error);
+      setConnectionError(String(error));
+      setIsConnecting(false);
     }
   };
 
@@ -805,69 +833,42 @@ function App() {
   // ============================================================================
 
   useEffect(() => {
+    const closeActiveTab = () => {
+      const g = workspace.groups.get(workspace.focusedGroupId);
+      if (g?.activeTabId) handleCloseTab(g.activeTabId);
+    };
+
+    const shortcuts: Record<string, ShortcutEntry[]> = {
+      t: [{ mod: true, shift: false, action: handleNewLocalTab }],
+      n: [{ mod: true, shift: false, skipInput: true, action: handleOpenConnectionModal }],
+      w: [{ mod: true, shift: false, action: closeActiveTab }],
+      Tab: [
+        { ctrl: true, shift: false, action: () => workspace.cycleFocusedGroupTab("next") },
+        { ctrl: true, shift: true, action: () => workspace.cycleFocusedGroupTab("prev") },
+      ],
+      ",": [{ mod: true, shift: false, action: () => workspace.openSettings() }],
+      D: [{ mod: true, shift: true, action: () => workspace.splitFocusedGroup("vertical") }],
+      E: [{ mod: true, shift: true, action: () => workspace.splitFocusedGroup("horizontal") }],
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA";
       const mod = isModifierPressed(e);
 
-      // Mod+T: New local terminal
-      if (mod && !e.shiftKey && e.key === "t") {
-        e.preventDefault();
-        handleNewLocalTab();
-        return;
-      }
-      // Mod+N: New SSH connection
-      if (mod && !e.shiftKey && e.key === "n") {
-        if (isInput) return;
-        e.preventDefault();
-        handleOpenConnectionModal();
-        return;
-      }
-      // Mod+W: Close active tab in focused group
-      if (mod && !e.shiftKey && e.key === "w") {
-        e.preventDefault();
-        const focusedGroup = workspace.groups.get(workspace.focusedGroupId);
-        if (focusedGroup?.activeTabId) {
-          handleCloseTab(focusedGroup.activeTabId);
-        }
-        return;
-      }
-      // Ctrl+Tab: Next tab in focused group
-      if (e.ctrlKey && !e.shiftKey && e.key === "Tab") {
-        e.preventDefault();
-        workspace.cycleFocusedGroupTab("next");
-        return;
-      }
-      // Ctrl+Shift+Tab: Previous tab in focused group
-      if (e.ctrlKey && e.shiftKey && e.key === "Tab") {
-        e.preventDefault();
-        workspace.cycleFocusedGroupTab("prev");
-        return;
-      }
-      // Mod+,: Open settings
-      if (mod && !e.shiftKey && e.key === ",") {
-        e.preventDefault();
-        workspace.openSettings();
-        return;
-      }
+      const entries = shortcuts[e.key];
+      if (!entries) return;
 
-      // Mod+Shift+D: Split focused group vertical
-      if (mod && e.shiftKey && e.key === "D") {
+      const match = entries.find(entry => matchesShortcut(entry, mod, e, isInput));
+      if (match) {
         e.preventDefault();
-        workspace.splitFocusedGroup("vertical");
-        return;
-      }
-      // Mod+Shift+E: Split focused group horizontal
-      if (mod && e.shiftKey && e.key === "E") {
-        e.preventDefault();
-        workspace.splitFocusedGroup("horizontal");
-        return;
+        match.action();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [workspace, handleNewLocalTab, handleCloseTab]);
+  }, [workspace, handleNewLocalTab, handleCloseTab, handleOpenConnectionModal]);
 
   // ============================================================================
   // Command Palette
@@ -966,21 +967,23 @@ function App() {
 
   // Auto-check for updates on startup (lazy-loads plugin-updater)
   useEffect(() => {
-    const timer = setTimeout(() => {
-      import("@tauri-apps/plugin-updater")
-        .then(({ check }) => check())
-        .then((update) => {
-          if (update) {
-            setNotification({
-              message: t("settings.about.updateAvailable") + ` v${update.version}`,
-              type: "info",
-            });
-            if (notifTimeoutRef.current) clearTimeout(notifTimeoutRef.current);
-            notifTimeoutRef.current = setTimeout(() => setNotification(null), 5000);
-          }
-        })
-        .catch(() => {});
-    }, 3000);
+    const checkForUpdates = async () => {
+      try {
+        const { check } = await import("@tauri-apps/plugin-updater");
+        const update = await check();
+        if (update) {
+          setNotification({
+            message: t("settings.about.updateAvailable") + ` v${update.version}`,
+            type: "info",
+          });
+          if (notifTimeoutRef.current) clearTimeout(notifTimeoutRef.current);
+          notifTimeoutRef.current = setTimeout(() => setNotification(null), 5000);
+        }
+      } catch {
+        // Ignore update check failures
+      }
+    };
+    const timer = setTimeout(checkForUpdates, 3000);
     return () => clearTimeout(timer);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
