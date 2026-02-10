@@ -214,7 +214,7 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
         path: entry.path,
         isDir: entry.is_dir,
       });
-      loadDirectory(currentPath);
+      await loadDirectory(currentPath);
     } catch (err) {
       setError(getErrorMessage(err));
     }
@@ -229,7 +229,7 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
       await invoke("sftp_mkdir", { sessionId, path });
       setShowNewFolderDialog(false);
       setNewFolderName("");
-      loadDirectory(currentPath);
+      await loadDirectory(currentPath);
     } catch (err) {
       setError(getErrorMessage(err));
     }
@@ -247,7 +247,7 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
       });
       setRenamingEntry(null);
       setRenameValue("");
-      loadDirectory(currentPath);
+      await loadDirectory(currentPath);
     } catch (err) {
       setError(getErrorMessage(err));
     }
