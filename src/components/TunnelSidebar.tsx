@@ -238,6 +238,7 @@ export default function TunnelSidebar({
         className={`fixed inset-0 top-10 z-30 bg-black/40 transition-opacity duration-200 ${
           isAnimating ? "opacity-100" : "opacity-0"
         }`}
+        role="presentation"
         onClick={onClose}
       />
 
@@ -325,7 +326,7 @@ export default function TunnelSidebar({
                             : "border-surface-0 text-text-muted hover:text-text hover:border-surface-0/80"
                         }`}
                       >
-                        {type === "local" ? "Local" : type === "remote" ? "Remote" : "SOCKS5"}
+                        {getTunnelTypeLabel(type)}
                       </button>
                     ))}
                   </div>
@@ -465,6 +466,30 @@ export default function TunnelSidebar({
   );
 }
 
+function getTunnelTypeLabel(type: string): string {
+  if (type === "local") return "Local";
+  if (type === "remote") return "Remote";
+  return "SOCKS5";
+}
+
+function TunnelStatusIcon({
+  isActive,
+  tunnel,
+  getStatusColor,
+}: {
+  isActive: boolean;
+  tunnel: Tunnel;
+  getStatusColor: (status: Tunnel["status"]) => string;
+}) {
+  if (isActive) {
+    return <CheckCircle size={10} className={getStatusColor(tunnel.status)} />;
+  }
+  if (tunnel.status.state === "Error") {
+    return <AlertCircle size={10} className={getStatusColor(tunnel.status)} />;
+  }
+  return null;
+}
+
 interface TunnelItemProps {
   tunnel: Tunnel;
   onStop: () => void;
@@ -502,11 +527,7 @@ function TunnelItem({ tunnel, onStop, onRemove, getTunnelIcon, getStatusColor }:
               )}
             </div>
             <div className="flex items-center gap-1 mt-0.5">
-              {isActive ? (
-                <CheckCircle size={10} className={getStatusColor(tunnel.status)} />
-              ) : tunnel.status.state === "Error" ? (
-                <AlertCircle size={10} className={getStatusColor(tunnel.status)} />
-              ) : null}
+              <TunnelStatusIcon isActive={isActive} tunnel={tunnel} getStatusColor={getStatusColor} />
               <span className={`text-[10px] ${getStatusColor(tunnel.status)}`}>
                 {tunnel.status.state === "Error" ? tunnel.status.error : tunnel.status.state}
               </span>

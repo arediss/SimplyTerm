@@ -98,7 +98,7 @@ export function PaneGroupTabBar({
   };
 
   return (
-    <div className="flex items-center h-10" onContextMenu={handleTabBarContextMenu}>
+    <div className="flex items-center h-10" role="tablist" onContextMenu={handleTabBarContextMenu}>
       {/* New tab split button */}
       <div className="flex items-center shrink-0 ml-1.5" ref={dropdownRef}>
         <button
@@ -157,6 +157,7 @@ export function PaneGroupTabBar({
           ref={contextMenuRef}
           className="fixed z-[100] min-w-[180px] bg-crust/95 backdrop-blur-xl border border-surface-0/50 rounded-xl shadow-xl py-1.5 overflow-hidden"
           style={{ transform: `translate3d(${contextMenu.x}px, ${contextMenu.y}px, 0)`, left: 0, top: 0 }}
+          role="menu"
           onClick={(e) => e.stopPropagation()}
         >
           <button
@@ -227,6 +228,9 @@ const TabPill = memo(function TabPill({ tab, isActive, typeColor, onSelect, onCl
           : "text-text-muted hover:text-text-secondary hover:bg-surface-0/25"
         }
       `}
+      role="tab"
+      tabIndex={0}
+      aria-selected={isActive}
       onClick={onSelect}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}

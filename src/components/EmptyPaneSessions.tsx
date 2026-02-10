@@ -65,6 +65,12 @@ export default memo(function EmptyPaneSessions({
   );
 });
 
+function getSessionItemClassName(isConnecting: boolean, isDisabled: boolean): string {
+  if (isConnecting) return "bg-accent/10 cursor-wait";
+  if (isDisabled) return "opacity-50 cursor-not-allowed";
+  return "hover:bg-surface-0/30 cursor-pointer";
+}
+
 const EmptyPaneSessionItem = memo(function EmptyPaneSessionItem({
   session,
   isConnecting,
@@ -85,13 +91,7 @@ const EmptyPaneSessionItem = memo(function EmptyPaneSessionItem({
     <button
       onClick={handleClick}
       disabled={isDisabled}
-      className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-colors text-left group ${
-        isConnecting
-          ? "bg-accent/10 cursor-wait"
-          : isDisabled
-            ? "opacity-50 cursor-not-allowed"
-            : "hover:bg-surface-0/30 cursor-pointer"
-      }`}
+      className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-colors text-left group ${getSessionItemClassName(isConnecting, isDisabled)}`}
     >
       {isConnecting ? (
         <Loader2 size={16} className="text-accent shrink-0 animate-spin" />

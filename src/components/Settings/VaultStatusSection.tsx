@@ -5,6 +5,13 @@ import { getAutoLockOptions } from "../../utils";
 import { SettingGroup, SettingRow, Toggle } from "./SettingsUIComponents";
 import type { useVault } from "../../hooks";
 
+function getMethodLabel(method: string, t: (key: string) => string): string {
+  if (method === 'master_password') return t("settings.security.methodPassword");
+  if (method === 'pin') return t("settings.security.methodPin");
+  if (method === 'security_key') return t("settings.security.methodSecurityKey");
+  return method;
+}
+
 interface VaultStatusSectionProps {
   vault: ReturnType<typeof useVault>;
 }
@@ -47,9 +54,7 @@ export default function VaultStatusSection({ vault }: VaultStatusSectionProps) {
           }`}
           title={vault.status?.isUnlocked ? t("settings.security.vaultUnlocked") : t("settings.security.vaultLocked")}
           description={`${t("settings.security.methods")}: ${vault.status?.unlockMethods.map(m =>
-            m === 'master_password' ? t("settings.security.methodPassword") :
-            m === 'pin' ? t("settings.security.methodPin") :
-            m === 'security_key' ? t("settings.security.methodSecurityKey") : m
+            getMethodLabel(m, t)
           ).join(', ')}`}
         >
           {vault.status?.isUnlocked && (

@@ -20,6 +20,16 @@ interface HostKeyModalProps {
   isLoading?: boolean;
 }
 
+function getHostKeyButtonLabel(
+  isLoading: boolean,
+  isMismatch: boolean,
+  t: (key: string) => string,
+): string {
+  if (isLoading) return t('hostKey.processing');
+  if (isMismatch) return t('hostKey.updateConnect');
+  return t('hostKey.trustConnect');
+}
+
 function HostKeyModal({
   isOpen,
   result,
@@ -57,6 +67,7 @@ function HostKeyModal({
       {/* Overlay */}
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        role="presentation"
         onClick={() => !isLoading && onReject()}
       />
 
@@ -174,11 +185,7 @@ function HostKeyModal({
                 : "text-green bg-green/20 hover:bg-green/30"
             }`}
           >
-            {isLoading
-              ? t('hostKey.processing')
-              : isMismatch
-              ? t('hostKey.updateConnect')
-              : t('hostKey.trustConnect')}
+            {getHostKeyButtonLabel(isLoading, isMismatch, t)}
           </button>
         </div>
       </div>

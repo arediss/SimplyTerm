@@ -423,15 +423,17 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
 
       {/* File list */}
       <div className="flex-1 overflow-auto">
-        {loading && entries.length === 0 ? (
+        {loading && entries.length === 0 && (
           <div className="flex items-center justify-center h-full">
             <Loader2 size={24} className="animate-spin text-subtext-0" />
           </div>
-        ) : entries.length === 0 ? (
+        )}
+        {!loading && entries.length === 0 && (
           <div className="flex items-center justify-center h-full text-subtext-0 text-sm">
             Empty directory
           </div>
-        ) : (
+        )}
+        {entries.length > 0 && (
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-mantle text-subtext-0 text-xs">
               <tr>
@@ -531,6 +533,7 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
             left: Math.min(contextMenu.x, window.innerWidth - 180),
             top: Math.min(contextMenu.y, window.innerHeight - 200),
           }}
+          role="menu"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Edit externally (only for files) */}

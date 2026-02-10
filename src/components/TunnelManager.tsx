@@ -37,6 +37,12 @@ interface TunnelManagerProps {
 
 type TunnelType = "local" | "remote" | "dynamic";
 
+function getTunnelTypeLabel(type: TunnelType): string {
+  if (type === "local") return "Local (-L)";
+  if (type === "remote") return "Remote (-R)";
+  return "Dynamic (-D)";
+}
+
 function TunnelManager({ isOpen, onClose, sessionId, sessionName, embedded = false }: TunnelManagerProps) {
   const [tunnels, setTunnels] = useState<Tunnel[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -184,7 +190,7 @@ function TunnelManager({ isOpen, onClose, sessionId, sessionName, embedded = fal
                   }`}
                 >
                   {getTunnelIcon(type)}
-                  {type === "local" ? "Local (-L)" : type === "remote" ? "Remote (-R)" : "Dynamic (-D)"}
+                  {getTunnelTypeLabel(type)}
                 </button>
               ))}
             </div>
@@ -366,6 +372,7 @@ function TunnelManager({ isOpen, onClose, sessionId, sessionName, embedded = fal
       {/* Overlay */}
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        role="presentation"
         onClick={onClose}
       />
 

@@ -17,6 +17,24 @@ interface VaultSetupModalProps {
 
 type SetupStep = 'intro' | 'password' | 'pin' | 'settings';
 
+const SETUP_STEPS: SetupStep[] = ['password', 'pin', 'settings'];
+
+function getStepClassName(currentStep: string, stepName: string, index: number): string {
+  if (currentStep === stepName) return 'bg-accent text-crust';
+  if (SETUP_STEPS.indexOf(currentStep as SetupStep) > index) return 'bg-accent/30 text-accent';
+  return 'bg-surface-0/30 text-text-muted';
+}
+
+function getPinStepInfo(
+  enablePin: boolean,
+  pinStep: 'enter' | 'confirm',
+  t: (key: string) => string,
+): string {
+  if (!enablePin) return t('vault.setup.pinInfoDisabled');
+  if (pinStep === 'enter') return t('vault.setup.pinInfoEnter');
+  return t('vault.setup.pinInfoConfirm');
+}
+
 export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = true }: VaultSetupModalProps) {
   const { t } = useTranslation();
   const [step, setStep] = useState<SetupStep>('intro');
@@ -120,10 +138,7 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
                   className={`
                     w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
                     transition-colors
-                    ${step === s ? 'bg-accent text-crust' :
-                      ['password', 'pin', 'settings'].indexOf(step) > i
-                        ? 'bg-accent/30 text-accent'
-                        : 'bg-surface-0/30 text-text-muted'}
+                    ${getStepClassName(step, s, i)}
                   `}
                 >
                   {i + 1}
@@ -253,11 +268,7 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
             <div className="flex items-center gap-3 p-4 bg-accent/10 rounded-xl">
               <KeyRound className="w-5 h-5 text-accent flex-shrink-0" />
               <p className="text-sm text-text-secondary">
-                {enablePin
-                  ? pinStep === 'enter'
-                    ? t('vault.setup.pinInfoEnter')
-                    : t('vault.setup.pinInfoConfirm')
-                  : t('vault.setup.pinInfoDisabled')}
+                {getPinStepInfo(enablePin, pinStep, t)}
               </p>
             </div>
 
