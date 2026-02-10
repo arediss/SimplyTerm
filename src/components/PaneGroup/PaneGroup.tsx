@@ -1,6 +1,8 @@
+import { memo } from "react";
 import type { PaneGroup as PaneGroupType } from "../../types/workspace";
 import { PaneGroupTabBar } from "./PaneGroupTabBar";
 import { PaneGroupContent } from "./PaneGroupContent";
+import { useWorkspaceActions } from "./WorkspaceActionsContext";
 
 interface PaneGroupProps {
   group: PaneGroupType;
@@ -8,42 +10,32 @@ interface PaneGroupProps {
   onTabSelect: (tabId: string) => void;
   onTabClose: (tabId: string) => void;
   onFocus: () => void;
-  onNewConnection: () => void;
-  onLocalTerminal: () => void;
-  onToggleTunnelSidebar: () => void;
-  isTunnelSidebarOpen: boolean;
-  activeTunnelCount: number;
-  onSplitVertical: () => void;
-  onSplitHorizontal: () => void;
   onClosePane: () => void;
-  // Content renderers
-  renderTerminal: (ptySessionId: string, isActive: boolean, type: string) => React.ReactNode;
-  renderSftp: (sessionId: string) => React.ReactNode;
-  renderTunnel: (sessionId: string, sessionName: string) => React.ReactNode;
-  renderSettings: () => React.ReactNode;
-  renderEmpty: () => React.ReactNode;
 }
 
-export function PaneGroupComponent({
+export const PaneGroupComponent = memo(function PaneGroupComponent({
   group,
   isFocused,
   onTabSelect,
   onTabClose,
   onFocus,
-  onNewConnection,
-  onLocalTerminal,
-  onToggleTunnelSidebar,
-  isTunnelSidebarOpen,
-  activeTunnelCount,
-  onSplitVertical,
-  onSplitHorizontal,
   onClosePane,
-  renderTerminal,
-  renderSftp,
-  renderTunnel,
-  renderSettings,
-  renderEmpty,
 }: PaneGroupProps) {
+  const {
+    onNewConnection,
+    onLocalTerminal,
+    onToggleTunnelSidebar,
+    isTunnelSidebarOpen,
+    activeTunnelCount,
+    onSplitVertical,
+    onSplitHorizontal,
+    renderTerminal,
+    renderSftp,
+    renderTunnel,
+    renderSettings,
+    renderEmpty,
+  } = useWorkspaceActions();
+
   return (
     <div
       className="w-full h-full flex flex-col overflow-hidden rounded-xl"
@@ -67,7 +59,7 @@ export function PaneGroupComponent({
       />
 
       {/* Content area — render ALL tabs, hide inactive (preserve terminal state) */}
-      <div className="flex-1 relative overflow-hidden">
+      <div className="flex-1 relative overflow-hidden [contain:strict]">
         {group.tabs.length === 0 ? (
           <PaneGroupContent
             tab={null}
@@ -105,4 +97,4 @@ export function PaneGroupComponent({
       </div>
     </div>
   );
-}
+});

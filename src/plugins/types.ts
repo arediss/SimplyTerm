@@ -37,62 +37,6 @@ export interface PluginManifest {
 }
 
 // ============================================================================
-// Permission Types
-// ============================================================================
-
-export type Permission =
-  // Sessions
-  | 'sessions_read'
-  | 'sessions_write'
-  | 'sessions_connect'
-  | 'sessions_metadata_read'
-  | 'sessions_metadata_write'
-  // Vault
-  | 'vault_status'
-  | 'vault_read'
-  | 'vault_write'
-  // Settings
-  | 'settings_read'
-  | 'settings_write'
-  // Events
-  | 'events_subscribe'
-  | 'events_emit'
-  // Shell
-  | 'shell_execute'
-  // Network
-  | 'network_http'
-  | 'network_websocket'
-  // File System
-  | 'fs_read'
-  | 'fs_write'
-  // UI
-  | 'ui_menu'
-  | 'ui_notifications'
-  | 'ui_settings'
-  | 'ui_panels'
-  | 'ui_commands'
-  | 'ui_modals'
-  | 'ui_sidebar'
-  | 'ui_context_menu'
-  | 'ui_quick_connect'
-  | 'ui_session_decorator'
-  // Terminal
-  | 'terminal_read'
-  | 'terminal_write'
-  // Clipboard
-  | 'clipboard_read'
-  | 'clipboard_write'
-  // Bastions
-  | 'bastions_read'
-  | 'bastions_write'
-  // Known Hosts
-  | 'known_hosts_read'
-  | 'known_hosts_write'
-  // Vault Sync
-  | 'vault_export_encrypted'
-  | 'vault_import_encrypted';
-
-// ============================================================================
 // Session Types
 // ============================================================================
 
@@ -103,20 +47,6 @@ export interface SessionInfo {
   port?: number;
   username?: string;
   status: 'connected' | 'disconnected' | 'connecting';
-}
-
-/**
- * Core saved session (connection info only)
- * Plugin-managed metadata is stored via sessionMetadata API
- */
-export interface SavedSession {
-  id: string;
-  name: string;
-  host: string;
-  port: number;
-  username: string;
-  authType: 'password' | 'key';
-  keyPath?: string;
 }
 
 /**
@@ -149,13 +79,6 @@ export type Unsubscribe = () => void;
 // ============================================================================
 // Panel & Command Registration
 // ============================================================================
-
-export interface PanelConfig {
-  id: string;
-  title: string;
-  icon?: string;
-  position: 'left' | 'right' | 'bottom' | 'floating-left' | 'floating-right';
-}
 
 export interface PanelRegistration {
   id: string;
@@ -341,34 +264,3 @@ export type PluginEvent =
   | { type: 'headeractions:changed' };
 
 export type PluginEventHandler = (event: PluginEvent) => void;
-
-// ============================================================================
-// Vault Types
-// ============================================================================
-
-export interface VaultStatus {
-  exists: boolean;
-  isUnlocked: boolean;
-}
-
-// ============================================================================
-// Settings Types
-// ============================================================================
-
-export interface AppSettings {
-  terminal: {
-    fontSize: number;
-    fontFamily: string;
-    cursorStyle: string;
-    cursorBlink: boolean;
-    scrollback: number;
-  };
-  appearance: {
-    theme: string;
-    accentColor: string;
-    windowEffect?: string; // "none" | "acrylic" | "mica"
-  };
-  ui: {
-    statusBarVisible: boolean;
-  };
-}

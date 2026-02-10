@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Command } from "./types";
 import { formatShortcut } from "./commands";
@@ -9,7 +10,7 @@ interface CommandItemProps {
   onExecute: () => void;
 }
 
-export function CommandItem({
+export const CommandItem = memo(function CommandItem({
   command,
   isSelected,
   onSelect,
@@ -54,4 +55,4 @@ export function CommandItem({
       )}
     </button>
   );
-}
+});

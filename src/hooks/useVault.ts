@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { VaultStatus, VaultCreateOptions, SecurityKeyInfo } from '../types/vault';
+import { getErrorMessage } from '../utils';
 
 /**
  * Hook for managing vault state and operations
@@ -19,7 +20,7 @@ export function useVault() {
       setError(null);
     } catch (err) {
       console.error('Failed to get vault status:', err);
-      setError(String(err));
+      setError(getErrorMessage(err));
     }
   }, []);
 
@@ -32,19 +33,25 @@ export function useVault() {
   // Auto-lock check interval
   useEffect(() => {
     if (status?.isUnlocked && status.autoLockTimeout > 0) {
+      let active = true;
+
       // Check for auto-lock every 10 seconds
       autoLockIntervalRef.current = window.setInterval(async () => {
+        if (!active) return;
         try {
           const locked = await invoke<boolean>('check_vault_auto_lock');
-          if (locked) {
+          if (active && locked) {
             await refreshStatus();
           }
         } catch (err) {
-          console.error('Auto-lock check failed:', err);
+          if (active) {
+            console.error('Auto-lock check failed:', err);
+          }
         }
       }, 10000);
 
       return () => {
+        active = false;
         if (autoLockIntervalRef.current) {
           clearInterval(autoLockIntervalRef.current);
         }
@@ -63,7 +70,7 @@ export function useVault() {
       await refreshStatus();
       return { success: true };
     } catch (err) {
-      const errorMsg = String(err);
+      const errorMsg = getErrorMessage(err);
       setError(errorMsg);
       return { success: false, error: errorMsg };
     }
@@ -76,7 +83,7 @@ export function useVault() {
       await refreshStatus();
       return { success: true };
     } catch (err) {
-      const errorMsg = String(err);
+      const errorMsg = getErrorMessage(err);
       setError(errorMsg);
       return { success: false, error: errorMsg };
     }
@@ -89,7 +96,7 @@ export function useVault() {
       await refreshStatus();
       return { success: true };
     } catch (err) {
-      const errorMsg = String(err);
+      const errorMsg = getErrorMessage(err);
       await refreshStatus(); // Update PIN attempts remaining
       return { success: false, error: errorMsg };
     }
@@ -102,7 +109,7 @@ export function useVault() {
       await refreshStatus();
       return { success: true };
     } catch (err) {
-      const errorMsg = String(err);
+      const errorMsg = getErrorMessage(err);
       setError(errorMsg);
       return { success: false, error: errorMsg };
     }
@@ -115,7 +122,7 @@ export function useVault() {
       await refreshStatus();
       return { success: true };
     } catch (err) {
-      const errorMsg = String(err);
+      const errorMsg = getErrorMessage(err);
       setError(errorMsg);
       return { success: false, error: errorMsg };
     }
@@ -127,7 +134,7 @@ export function useVault() {
       await invoke('change_master_password', { current, newPassword });
       return { success: true };
     } catch (err) {
-      const errorMsg = String(err);
+      const errorMsg = getErrorMessage(err);
       setError(errorMsg);
       return { success: false, error: errorMsg };
     }
@@ -140,7 +147,7 @@ export function useVault() {
       await refreshStatus();
       return { success: true };
     } catch (err) {
-      const errorMsg = String(err);
+      const errorMsg = getErrorMessage(err);
       setError(errorMsg);
       return { success: false, error: errorMsg };
     }
@@ -153,7 +160,7 @@ export function useVault() {
       await refreshStatus();
       return { success: true };
     } catch (err) {
-      const errorMsg = String(err);
+      const errorMsg = getErrorMessage(err);
       setError(errorMsg);
       return { success: false, error: errorMsg };
     }
@@ -166,7 +173,7 @@ export function useVault() {
       await refreshStatus();
       return { success: true };
     } catch (err) {
-      const errorMsg = String(err);
+      const errorMsg = getErrorMessage(err);
       setError(errorMsg);
       return { success: false, error: errorMsg };
     }
@@ -179,7 +186,7 @@ export function useVault() {
       await refreshStatus();
       return { success: true };
     } catch (err) {
-      const errorMsg = String(err);
+      const errorMsg = getErrorMessage(err);
       setError(errorMsg);
       return { success: false, error: errorMsg };
     }
@@ -201,7 +208,7 @@ export function useVault() {
       return { keys, error: null };
     } catch (err) {
       console.error('Failed to detect security keys:', err);
-      return { keys: [], error: String(err) };
+      return { keys: [], error: getErrorMessage(err) };
     }
   }, []);
 
@@ -213,7 +220,7 @@ export function useVault() {
       await refreshStatus();
       return { success: true };
     } catch (err) {
-      const errorMsg = String(err);
+      const errorMsg = getErrorMessage(err);
       setError(errorMsg);
       return { success: false, error: errorMsg };
     }
@@ -227,7 +234,7 @@ export function useVault() {
       await refreshStatus();
       return { success: true };
     } catch (err) {
-      const errorMsg = String(err);
+      const errorMsg = getErrorMessage(err);
       setError(errorMsg);
       return { success: false, error: errorMsg };
     }
@@ -240,7 +247,7 @@ export function useVault() {
       await refreshStatus();
       return { success: true };
     } catch (err) {
-      const errorMsg = String(err);
+      const errorMsg = getErrorMessage(err);
       setError(errorMsg);
       return { success: false, error: errorMsg };
     }

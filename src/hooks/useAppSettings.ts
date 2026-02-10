@@ -8,17 +8,27 @@ export function useAppSettings() {
 
   // Load settings on mount
   useEffect(() => {
+    let active = true;
     const loadSettings = async () => {
       try {
         const loaded = await invoke<AppSettings>("load_settings");
-        setSettings(loaded);
+        if (active) {
+          setSettings(loaded);
+        }
       } catch (err) {
-        console.error("Failed to load settings:", err);
+        if (active) {
+          console.error("Failed to load settings:", err);
+        }
       } finally {
-        setIsLoading(false);
+        if (active) {
+          setIsLoading(false);
+        }
       }
     };
     loadSettings();
+    return () => {
+      active = false;
+    };
   }, []);
 
   const updateSettings = useCallback(async (newSettings: AppSettings) => {

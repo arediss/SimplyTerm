@@ -2,7 +2,8 @@
  * Plugin System exports
  */
 
-export * from './types';
+export type { SessionInfo, ModalConfig, NotificationType, PromptConfig, PluginManifest, Unsubscribe, PluginEvent, PluginEventHandler, LoadedPlugin, CommandRegistration, PanelRegistration } from './types';
+export type { SidebarViewRegistration, SettingsPanelRegistration, ContextMenuItemConfig, StatusBarItemConfig, StatusBarItemHandle, HeaderActionConfig, HeaderActionHandle, QuickConnectSectionRegistration, SessionDecoratorRegistration, ContextMenuContext, SidebarSectionRegistration } from './types';
 export { createPluginAPI } from './PluginAPI';
 export { PluginManager, pluginManager, type HeaderActionItem } from './PluginManager';
 export { PluginHost, usePlugins } from './PluginHost';

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff, Lock, KeyRound, AlertTriangle, Key, Loader2 } from 'lucide-react';
+import { Lock, KeyRound, AlertTriangle, Key, Loader2 } from 'lucide-react';
+import { PasswordInput } from '../UI/PasswordInput';
 import Modal from '../Modal';
 import PinInput from './PinInput';
 import type { UnlockMethod } from '../../types/vault';
@@ -42,7 +43,6 @@ export function VaultUnlockModal({
 
   const [mode, setMode] = useState<UnlockMode>(getDefaultMode());
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -55,7 +55,6 @@ export function VaultUnlockModal({
   useEffect(() => {
     if (isOpen) {
       setPassword('');
-      setShowPassword(false);
       setError(null);
       setIsSubmitting(false);
     }
@@ -229,25 +228,14 @@ export function VaultUnlockModal({
           <form onSubmit={handlePasswordSubmit} className="flex flex-col gap-4">
             <label className="flex flex-col gap-2">
               <span className="text-sm text-text-secondary">{t('vault.unlock.masterPassword')}</span>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={t('vault.unlock.enterPassword')}
-                  className="w-full pl-10 pr-10 py-3 bg-surface-0/30 border border-surface-0/50 rounded-xl text-text placeholder-text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                  autoFocus={mode === 'password'}
-                  disabled={isSubmitting}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text"
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
+              <PasswordInput
+                icon={<Lock size={16} />}
+                value={password}
+                onChange={setPassword}
+                placeholder={t('vault.unlock.enterPassword')}
+                autoFocus={mode === 'password'}
+                disabled={isSubmitting}
+              />
             </label>
 
             {error && (

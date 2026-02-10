@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { getErrorMessage } from "../utils";
 import { listen } from "@tauri-apps/api/event";
 import {
   Folder,
@@ -70,6 +71,9 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
     entry: FileEntry;
   } | null>(null);
 
+  const isMountedRef = useRef(true);
+  useEffect(() => { return () => { isMountedRef.current = false; }; }, []);
+
   const loadDirectory = useCallback(async (path: string) => {
     setLoading(true);
     setError(null);
@@ -78,12 +82,14 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
         sessionId,
         path,
       });
+      if (!isMountedRef.current) return;
       setEntries(result);
       setCurrentPath(path);
     } catch (err) {
-      setError(String(err));
+      if (!isMountedRef.current) return;
+      setError(getErrorMessage(err));
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) setLoading(false);
     }
   }, [sessionId]);
 
@@ -93,42 +99,61 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
 
   // Listen for file upload events
   useEffect(() => {
-    const unlisten = listen<FileUploadedEvent>("sftp-file-uploaded", (event) => {
-      const { session_id, remote_path, success, error } = event.payload;
+    let isMounted = true;
+    let unlistenFn: (() => void) | null = null;
+    const pendingTimeouts = new Set<ReturnType<typeof setTimeout>>();
 
-      // Only handle events for this session
-      if (session_id !== sessionId) return;
+    (async () => {
+      const unlisten = await listen<FileUploadedEvent>("sftp-file-uploaded", (event) => {
+        if (!isMounted) return;
+        const { session_id, remote_path, success, error } = event.payload;
 
-      setEditingFiles((prev) => {
-        const newMap = new Map(prev);
-        const existing = newMap.get(remote_path);
-        if (existing) {
-          newMap.set(remote_path, {
-            ...existing,
-            status: success ? "synced" : "error",
-            error: error || undefined,
-          });
+        // Only handle events for this session
+        if (session_id !== sessionId) return;
+
+        setEditingFiles((prev) => {
+          const newMap = new Map(prev);
+          const existing = newMap.get(remote_path);
+          if (existing) {
+            newMap.set(remote_path, {
+              ...existing,
+              status: success ? "synced" : "error",
+              error: error || undefined,
+            });
+          }
+          return newMap;
+        });
+
+        // Auto-clear synced status after 3 seconds
+        if (success) {
+          const t = setTimeout(() => {
+            pendingTimeouts.delete(t);
+            if (!isMounted) return;
+            setEditingFiles((prev) => {
+              const newMap = new Map(prev);
+              const existing = newMap.get(remote_path);
+              if (existing && existing.status === "synced") {
+                newMap.set(remote_path, { ...existing, status: "synced" });
+              }
+              return newMap;
+            });
+          }, 3000);
+          pendingTimeouts.add(t);
         }
-        return newMap;
       });
 
-      // Auto-clear synced status after 3 seconds
-      if (success) {
-        setTimeout(() => {
-          setEditingFiles((prev) => {
-            const newMap = new Map(prev);
-            const existing = newMap.get(remote_path);
-            if (existing && existing.status === "synced") {
-              newMap.set(remote_path, { ...existing, status: "synced" });
-            }
-            return newMap;
-          });
-        }, 3000);
+      if (isMounted) {
+        unlistenFn = unlisten;
+      } else {
+        unlisten();
       }
-    });
+    })();
 
     return () => {
-      unlisten.then((fn) => fn());
+      isMounted = false;
+      unlistenFn?.();
+      pendingTimeouts.forEach(clearTimeout);
+      pendingTimeouts.clear();
     };
   }, [sessionId]);
 
@@ -191,7 +216,7 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
       });
       loadDirectory(currentPath);
     } catch (err) {
-      setError(String(err));
+      setError(getErrorMessage(err));
     }
   };
 
@@ -206,7 +231,7 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
       setNewFolderName("");
       loadDirectory(currentPath);
     } catch (err) {
-      setError(String(err));
+      setError(getErrorMessage(err));
     }
   };
 
@@ -224,7 +249,7 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
       setRenameValue("");
       loadDirectory(currentPath);
     } catch (err) {
-      setError(String(err));
+      setError(getErrorMessage(err));
     }
   };
 
@@ -261,7 +286,7 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
         return newMap;
       });
     } catch (err) {
-      setError(String(err));
+      setError(getErrorMessage(err));
       setEditingFiles((prev) => {
         const newMap = new Map(prev);
         newMap.delete(entry.path);

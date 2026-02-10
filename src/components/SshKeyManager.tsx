@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { Key, Plus, Pencil, Trash2, Lock, X, Check } from "lucide-react";
+import { getErrorMessage } from "../utils";
+import { Key, Plus, Pencil, Trash2, Lock, X, Check, AlertTriangle } from "lucide-react";
 import { useSshKeys } from "../hooks/useSshKeys";
 import type { SshKeyProfileInfo } from "../types";
 
@@ -13,6 +14,8 @@ export default function SshKeyManager({ isVaultUnlocked }: SshKeyManagerProps) {
   const { keys, createKey, updateKey, deleteKey } = useSshKeys();
   const [showForm, setShowForm] = useState(false);
   const [editingKey, setEditingKey] = useState<SshKeyProfileInfo | null>(null);
+  const [confirmDeleteKey, setConfirmDeleteKey] = useState<SshKeyProfileInfo | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Form state
   const [formName, setFormName] = useState("");
@@ -71,19 +74,22 @@ export default function SshKeyManager({ isVaultUnlocked }: SshKeyManagerProps) {
       }
       resetForm();
     } catch (err) {
-      setFormError(String(err));
+      setFormError(getErrorMessage(err));
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm(t("settings.security.sshKeysConfirmDelete"))) {
-      try {
-        await deleteKey(id);
-      } catch (err) {
-        console.error("Failed to delete SSH key:", err);
-      }
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!confirmDeleteKey) return;
+    setIsDeleting(true);
+    try {
+      await deleteKey(confirmDeleteKey.id);
+    } catch (err) {
+      console.error("Failed to delete SSH key:", err);
+    } finally {
+      setIsDeleting(false);
+      setConfirmDeleteKey(null);
     }
-  };
+  }, [confirmDeleteKey, deleteKey]);
 
   if (!isVaultUnlocked) {
     return (
@@ -161,7 +167,7 @@ export default function SshKeyManager({ isVaultUnlocked }: SshKeyManagerProps) {
               <Pencil size={14} />
             </button>
             <button
-              onClick={() => handleDelete(key.id)}
+              onClick={() => setConfirmDeleteKey(key)}
               className="p-1.5 text-text-muted hover:text-error hover:bg-error/10 rounded-md transition-colors"
               title={t("settings.security.sshKeysDeleteKey")}
             >
@@ -170,6 +176,61 @@ export default function SshKeyManager({ isVaultUnlocked }: SshKeyManagerProps) {
           </div>
         </div>
       ))}
+
+      {/* Delete confirmation modal */}
+      {confirmDeleteKey && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in">
+          <div
+            className="absolute inset-0 bg-black/70"
+            onClick={() => !isDeleting && setConfirmDeleteKey(null)}
+          />
+          <div className="relative bg-crust border border-surface-0/50 rounded-xl shadow-2xl w-[360px] animate-scale-in">
+            <div className="p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-error/10 text-error flex items-center justify-center shrink-0">
+                  <AlertTriangle size={20} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-text">
+                    {t("settings.security.sshKeysDeleteKey")}
+                  </h3>
+                  <p className="text-xs text-text-muted mt-0.5">
+                    {t("settings.security.sshKeysConfirmDelete")}
+                  </p>
+                </div>
+              </div>
+
+              <div className="px-3 py-2 bg-surface-0/30 rounded-lg mb-4">
+                <div className="flex items-center gap-2">
+                  <Key size={14} className="text-accent shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-xs font-medium text-text truncate">{confirmDeleteKey.name}</div>
+                    <div className="text-[10px] text-text-muted truncate">{confirmDeleteKey.keyPath}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setConfirmDeleteKey(null)}
+                  disabled={isDeleting}
+                  className="px-4 py-2 text-xs text-text-muted hover:text-text rounded-lg hover:bg-surface-0/50 transition-colors disabled:opacity-50"
+                >
+                  {t("common.cancel") || "Cancel"}
+                </button>
+                <button
+                  onClick={handleDeleteConfirm}
+                  disabled={isDeleting}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-error text-white text-xs font-medium rounded-lg hover:bg-error/90 transition-colors disabled:opacity-50"
+                >
+                  <Trash2 size={13} />
+                  {isDeleting ? "..." : t("settings.security.sshKeysDeleteKey")}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add/Edit form */}
       {showForm && (

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Menu, Minus, Square, Copy, X, Settings, KeyRound } from "lucide-react";
 import DynamicLucideIcon from "./DynamicLucideIcon";
@@ -44,20 +44,27 @@ export default function HeaderBar({
   };
 
   useEffect(() => {
+    let isMounted = true;
     const win = getCurrentWindow();
-    win.isMaximized().then(setIsMaximized);
-    win.isFullscreen().then(setIsFullscreen);
+    win.isMaximized().then((v) => { if (isMounted) setIsMaximized(v); });
+    win.isFullscreen().then((v) => { if (isMounted) setIsFullscreen(v); });
 
     const unlisten = win.onResized(async () => {
-      setIsMaximized(await win.isMaximized());
-      setIsFullscreen(await win.isFullscreen());
+      const [maximized, fullscreen] = await Promise.all([
+        win.isMaximized(),
+        win.isFullscreen(),
+      ]);
+      if (isMounted) {
+        setIsMaximized(maximized);
+        setIsFullscreen(fullscreen);
+      }
     });
 
-    return () => { unlisten.then((fn) => fn()); };
+    return () => { isMounted = false; unlisten.then((fn) => fn()); };
   }, []);
 
-  const leftActions = headerActions.filter((a) => a.position === "left");
-  const rightActions = headerActions.filter((a) => a.position === "right");
+  const leftActions = useMemo(() => headerActions.filter((a) => a.position === "left"), [headerActions]);
+  const rightActions = useMemo(() => headerActions.filter((a) => a.position === "right"), [headerActions]);
 
   const renderHeaderActions = (actions: HeaderActionItem[]) =>
     actions.map((action) => (

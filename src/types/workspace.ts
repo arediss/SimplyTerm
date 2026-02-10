@@ -1,4 +1,4 @@
-import { SshConnectionConfig } from "../components/ConnectionForm";
+import { SshConnectionConfig } from "./index";
 import { TelnetConnectionConfig, SerialConnectionConfig } from "./index";
 
 // ============================================================================

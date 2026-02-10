@@ -27,19 +27,11 @@ export interface VaultStatus {
   biometricType?: string;
 }
 
-/** Credential types that can be stored in the vault */
-export type CredentialType = 'password' | 'key_passphrase';
-
 /** Vault creation options */
 export interface VaultCreateOptions {
   masterPassword: string;
   autoLockTimeout: number;
   pin?: string;
-}
-
-/** Vault settings that can be updated */
-export interface VaultSettings {
-  autoLockTimeout: number;
 }
 
 /** Information about a detected FIDO2 security key */

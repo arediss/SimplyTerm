@@ -1,25 +1,36 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { SshKeyProfileInfo, SshKeyProfile } from "../types";
 
 export function useSshKeys() {
   const [keys, setKeys] = useState<SshKeyProfileInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const isMountedRef = useRef(true);
 
   const refresh = useCallback(async () => {
     setIsLoading(true);
     try {
       const result = await invoke<SshKeyProfileInfo[]>("list_ssh_keys");
-      setKeys(result);
+      if (isMountedRef.current) {
+        setKeys(result);
+      }
     } catch {
-      setKeys([]);
+      if (isMountedRef.current) {
+        setKeys([]);
+      }
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
+    isMountedRef.current = true;
     refresh();
+    return () => {
+      isMountedRef.current = false;
+    };
   }, [refresh]);
 
   const createKey = useCallback(

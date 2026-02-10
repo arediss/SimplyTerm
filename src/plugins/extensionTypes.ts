@@ -144,94 +144,6 @@ export interface ContextMenuContext {
 }
 
 // ============================================================================
-// Session Metadata Types
-// ============================================================================
-
-/**
- * Session metadata stored by plugins
- * Each plugin has isolated storage for session metadata
- */
-export interface SessionMetadata {
-  /** Arbitrary JSON data */
-  [key: string]: unknown;
-}
-
-/**
- * Session metadata API for plugins
- */
-export interface SessionMetadataAPI {
-  /**
-   * Get metadata for a specific session
-   * @param sessionId - Session ID
-   * @returns Metadata object or null if not found
-   */
-  get(sessionId: string): Promise<SessionMetadata | null>;
-
-  /**
-   * Get metadata for all sessions
-   * @returns Map of session ID to metadata
-   */
-  getAll(): Promise<Map<string, SessionMetadata>>;
-
-  /**
-   * Set metadata for a session (overwrites existing)
-   * @param sessionId - Session ID
-   * @param data - Metadata to store
-   */
-  set(sessionId: string, data: SessionMetadata): Promise<void>;
-
-  /**
-   * Update specific fields in session metadata (merge)
-   * @param sessionId - Session ID
-   * @param updates - Fields to update
-   * @returns Updated metadata
-   */
-  update(sessionId: string, updates: SessionMetadata): Promise<SessionMetadata>;
-
-  /**
-   * Delete metadata for a session
-   * @param sessionId - Session ID
-   * @returns True if metadata existed and was deleted
-   */
-  delete(sessionId: string): Promise<boolean>;
-}
-
-// ============================================================================
-// Event Types for Extensions
-// ============================================================================
-
-/**
- * Session-related events
- */
-export interface SessionEvents {
-  /** Fired when a session is created */
-  "session:created": { sessionId: string };
-  /** Fired when a session is deleted */
-  "session:deleted": { sessionId: string };
-  /** Fired when a session connection is established */
-  "session:connected": { sessionId: string };
-  /** Fired when a session connection is closed */
-  "session:disconnected": { sessionId: string };
-}
-
-/**
- * UI-related events
- */
-export interface UIEvents {
-  /** Fired when sidebar visibility changes */
-  "sidebar:toggle": { visible: boolean };
-  /** Fired when a tab is activated */
-  "tab:activated": { tabId: string };
-  /** Fired when a tab is closed */
-  "tab:closed": { tabId: string };
-}
-
-/**
- * All extension events
- */
-export type ExtensionEvent = SessionEvents & UIEvents;
-
-// ============================================================================
 // Header Action Extension Types
 // ============================================================================
 
@@ -325,28 +237,6 @@ export interface SessionDecoratorRegistration {
    * @returns Optional cleanup function called on unmount
    */
   render: (sessionId: string, container: HTMLElement) => void | (() => void);
-}
-
-// ============================================================================
-// Toolbar Extension Types
-// ============================================================================
-
-/**
- * Configuration for a toolbar button
- */
-export interface ToolbarButtonConfig {
-  /** Unique button identifier */
-  id: string;
-  /** Tooltip text */
-  tooltip: string;
-  /** Icon name (from lucide-react) */
-  icon: string;
-  /** Position in toolbar */
-  position?: "left" | "right";
-  /** Sort order within position */
-  order?: number;
-  /** Handler when button is clicked */
-  onClick: () => void;
 }
 
 // ============================================================================

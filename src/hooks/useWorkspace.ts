@@ -3,14 +3,14 @@ import type { WorkspaceNode, PaneGroup, PaneGroupTab } from "../types/workspace"
 import {
   createGroup,
   createGroupNode,
-  generateTabId,
   getAllGroupIds,
   splitGroupNode,
   closeGroupNode,
   resizeSplit,
 } from "../utils/workspaceTree";
+import { generateTabId } from "../utils/idGenerator";
 
-export interface WorkspaceState {
+interface WorkspaceState {
   tree: WorkspaceNode;
   groups: Map<string, PaneGroup>;
   focusedGroupId: string;
@@ -391,7 +391,9 @@ export function useWorkspace(): UseWorkspaceReturn {
       cycleFocusedPaneGroup,
     }),
     [
-      state,
+      state.tree,
+      state.groups,
+      state.focusedGroupId,
       addTabToFocusedGroup,
       addTabToGroup,
       closeTab,

@@ -10,14 +10,9 @@ import { X, ChevronUp, ChevronDown, CaseSensitive, Regex } from "lucide-react";
 import "@xterm/xterm/css/xterm.css";
 import { getTerminalTheme } from "../themes";
 import { isModifierPressed } from "../utils";
+import type { AppSettings } from "../types/settings";
 
-interface TerminalSettings {
-  fontSize: number;
-  fontFamily: string;
-  cursorStyle: "block" | "bar" | "underline";
-  cursorBlink: boolean;
-  scrollback: number;
-}
+type TerminalSettings = AppSettings["terminal"];
 
 interface TerminalProps {
   sessionId: string;
@@ -117,6 +112,7 @@ function Terminal({ sessionId, type, onExit, isActive = true, appTheme = "dark",
     // Get xterm container for scrollbar visibility control
     const xtermElement = terminalRef.current.querySelector('.xterm');
     let scrollHideTimeout: number | null = null;
+    let isScrollingVisible = false;
 
     // Show scrollbar when not at bottom, hide when at bottom or after delay
     const scrollDisposable = xterm.onScroll(() => {
@@ -126,28 +122,29 @@ function Terminal({ sessionId, type, onExit, isActive = true, appTheme = "dark",
       const isAtBottom = buffer.viewportY >= buffer.baseY;
 
       if (!isAtBottom) {
-        xtermElement.classList.add('is-scrolling');
-        // Clear existing timeout
+        if (!isScrollingVisible) {
+          xtermElement.classList.add('is-scrolling');
+          isScrollingVisible = true;
+        }
         if (scrollHideTimeout) clearTimeout(scrollHideTimeout);
-        // Hide after 1.5s of no scroll
         scrollHideTimeout = window.setTimeout(() => {
           xtermElement.classList.remove('is-scrolling');
+          isScrollingVisible = false;
         }, 1500);
-      } else {
-        // At bottom - hide immediately
+      } else if (isScrollingVisible) {
         if (scrollHideTimeout) clearTimeout(scrollHideTimeout);
         xtermElement.classList.remove('is-scrolling');
+        isScrollingVisible = false;
       }
     });
 
     // Fit after DOM is ready
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        fitAddon.fit();
-        xterm.focus();
-      });
+      fitAddon.fit();
+      xterm.focus();
     });
 
+    let isMounted = true;
     let unlistenOutput: UnlistenFn | null = null;
     let unlistenExit: UnlistenFn | null = null;
 
@@ -158,31 +155,36 @@ function Terminal({ sessionId, type, onExit, isActive = true, appTheme = "dark",
 
     const setupSession = async () => {
       try {
-        unlistenOutput = await listen<string>(
+        const outputUn = await listen<string>(
           `pty-output-${sessionId}`,
           (event) => {
             xterm.write(event.payload);
           }
         );
+        if (!isMounted) { outputUn(); return; }
+        unlistenOutput = outputUn;
 
-        unlistenExit = await listen(`pty-exit-${sessionId}`, () => {
+        const exitUn = await listen(`pty-exit-${sessionId}`, () => {
           xterm.write(`\r\n\x1b[38;5;244m${t("terminalView.sessionEnded")}\x1b[0m\r\n`);
           onExit?.();
         });
+        if (!isMounted) { exitUn(); return; }
+        unlistenExit = exitUn;
 
         if (type === "local") {
           await invoke("create_pty_session", { sessionId });
+          if (!isMounted) return;
         }
 
         requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            const dims = fitAddon.proposeDimensions();
-            if (dims) {
-              sendResize(dims.cols, dims.rows);
-            }
-          });
+          if (!isMounted) return;
+          const dims = fitAddon.proposeDimensions();
+          if (dims) {
+            sendResize(dims.cols, dims.rows);
+          }
         });
       } catch (error) {
+        if (!isMounted) return;
         console.error("[Terminal] Setup error:", error);
         xterm.write(`\x1b[31m${t("terminalView.errorPrefix")}${error}\x1b[0m\r\n`);
       }
@@ -190,10 +192,16 @@ function Terminal({ sessionId, type, onExit, isActive = true, appTheme = "dark",
 
     setupSession();
 
+    let resizeRafId: number | null = null;
     const handleResize = () => {
       if (!fitAddonRef.current) return;
 
-      fitAddonRef.current.fit();
+      // Debounce fit() via rAF to avoid layout thrashing
+      if (resizeRafId) cancelAnimationFrame(resizeRafId);
+      resizeRafId = requestAnimationFrame(() => {
+        resizeRafId = null;
+        fitAddonRef.current?.fit();
+      });
 
       if (resizeTimeoutRef.current) {
         clearTimeout(resizeTimeoutRef.current);
@@ -211,13 +219,17 @@ function Terminal({ sessionId, type, onExit, isActive = true, appTheme = "dark",
     resizeObserver.observe(terminalRef.current);
 
     return () => {
+      isMounted = false;
       if (resizeTimeoutRef.current) {
         clearTimeout(resizeTimeoutRef.current);
+      }
+      if (resizeRafId) {
+        cancelAnimationFrame(resizeRafId);
       }
       if (scrollHideTimeout) {
         clearTimeout(scrollHideTimeout);
       }
-      resizeObserver.disconnect();
+      resizeObserver?.disconnect();
       dataDisposable.dispose();
       scrollDisposable.dispose();
       unlistenOutput?.();
@@ -233,22 +245,27 @@ function Terminal({ sessionId, type, onExit, isActive = true, appTheme = "dark",
     }
   }, [appTheme]);
 
-  // Update terminal settings when they change
+  // Update terminal settings when they change (batched)
   useEffect(() => {
-    if (xtermRef.current) {
-      const xterm = xtermRef.current;
-      xterm.options.fontSize = terminalSettings.fontSize;
-      xterm.options.fontFamily = `"${terminalSettings.fontFamily}", "SF Mono", Menlo, Consolas, monospace`;
-      xterm.options.cursorStyle = terminalSettings.cursorStyle;
-      xterm.options.cursorBlink = terminalSettings.cursorBlink;
-      xterm.options.scrollback = terminalSettings.scrollback;
+    const xterm = xtermRef.current;
+    if (!xterm) return;
 
-      // Refit after font changes
-      if (fitAddonRef.current) {
-        fitAddonRef.current.fit();
-      }
+    const fontFamily = `"${terminalSettings.fontFamily}", "SF Mono", Menlo, Consolas, monospace`;
+    const needsRefit =
+      xterm.options.fontSize !== terminalSettings.fontSize ||
+      xterm.options.fontFamily !== fontFamily;
+
+    xterm.options.cursorStyle = terminalSettings.cursorStyle;
+    xterm.options.cursorBlink = terminalSettings.cursorBlink;
+    xterm.options.scrollback = terminalSettings.scrollback;
+    // Font changes last — they trigger internal char-size recalculation
+    xterm.options.fontSize = terminalSettings.fontSize;
+    xterm.options.fontFamily = fontFamily;
+
+    if (needsRefit && fitAddonRef.current) {
+      fitAddonRef.current.fit();
     }
-  }, [terminalSettings.fontSize, terminalSettings.fontFamily, terminalSettings.cursorStyle, terminalSettings.cursorBlink, terminalSettings.scrollback]);
+  }, [terminalSettings]);
 
   // Refocus and refit when terminal becomes active
   useEffect(() => {
@@ -312,6 +329,8 @@ function Terminal({ sessionId, type, onExit, isActive = true, appTheme = "dark",
 
   // Intercept Mod+F globally to prevent Tauri's native search
   useEffect(() => {
+    if (!isActive) return;
+
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (isModifierPressed(e) && e.key === "f") {
         e.preventDefault();
@@ -320,11 +339,8 @@ function Terminal({ sessionId, type, onExit, isActive = true, appTheme = "dark",
       }
     };
 
-    // Only add listener when terminal is active
-    if (isActive) {
-      document.addEventListener("keydown", handleGlobalKeyDown, true);
-      return () => document.removeEventListener("keydown", handleGlobalKeyDown, true);
-    }
+    document.addEventListener("keydown", handleGlobalKeyDown, true);
+    return () => document.removeEventListener("keydown", handleGlobalKeyDown, true);
   }, [isActive]);
 
   return (

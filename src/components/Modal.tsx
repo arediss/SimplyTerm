@@ -1,5 +1,14 @@
 import { useEffect, useRef } from "react";
 
+const widthClasses: Record<string, string> = {
+  sm: "max-w-sm",
+  md: "max-w-md",
+  lg: "max-w-lg",
+  xl: "max-w-xl",
+  "2xl": "max-w-2xl",
+  "3xl": "max-w-3xl",
+};
+
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -30,20 +39,11 @@ function Modal({ isOpen, onClose, title, children, width = "md" }: ModalProps) {
 
   if (!isOpen) return null;
 
-  const widthClasses = {
-    sm: "max-w-sm",
-    md: "max-w-md",
-    lg: "max-w-lg",
-    xl: "max-w-xl",
-    "2xl": "max-w-2xl",
-    "3xl": "max-w-3xl",
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in" style={{ contain: "layout" }}>
       {/* Overlay */}
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/70"
         onClick={onClose}
       />
 

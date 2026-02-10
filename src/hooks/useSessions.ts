@@ -4,25 +4,34 @@
  * Provides CRUD operations for saved sessions (connection info only).
  * Folder/tag/recent functionality is now handled by plugins via sessionMetadata API.
  */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { SavedSession } from "../types";
 
 export function useSessions() {
   const [savedSessions, setSavedSessions] = useState<SavedSession[]>([]);
+  const isMountedRef = useRef(true);
 
   const loadSavedSessions = useCallback(async () => {
     try {
       const sessions = await invoke<SavedSession[]>("load_saved_sessions");
-      setSavedSessions(sessions);
+      if (isMountedRef.current) {
+        setSavedSessions(sessions);
+      }
     } catch (err) {
-      console.error("Failed to load saved sessions:", err);
+      if (isMountedRef.current) {
+        console.error("Failed to load saved sessions:", err);
+      }
     }
   }, []);
 
   // Load on mount
   useEffect(() => {
+    isMountedRef.current = true;
     loadSavedSessions();
+    return () => {
+      isMountedRef.current = false;
+    };
   }, [loadSavedSessions]);
 
   const deleteSavedSession = useCallback(async (sessionId: string) => {

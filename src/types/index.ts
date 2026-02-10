@@ -5,6 +5,30 @@ export type { WorkspaceNode, PaneGroup, PaneGroupTab } from "./workspace";
 export type { AppSettings } from "./settings";
 export { defaultSettings } from "./settings";
 
+// Connection type
+export type ConnectionType = "ssh" | "telnet" | "serial";
+
+// SSH connection configuration
+export interface SshConnectionConfig {
+  name: string;
+  host: string;
+  port: number;
+  username: string;
+  authType: "password" | "key";
+  password?: string;
+  keyPath?: string;
+  keyPassphrase?: string;
+  sshKeyId?: string;
+  useJumpHost?: boolean;
+  jumpHost?: string;
+  jumpPort?: number;
+  jumpUsername?: string;
+  jumpAuthType?: "password" | "key";
+  jumpPassword?: string;
+  jumpKeyPath?: string;
+  jumpKeyPassphrase?: string;
+}
+
 // Telnet connection configuration
 export interface TelnetConnectionConfig {
   name: string;
@@ -29,36 +53,6 @@ export interface SerialPortInfo {
   port_type: string;
   manufacturer: string | null;
   product: string | null;
-}
-
-// Bastion/Jump Host profile stored in vault
-export interface BastionProfile {
-  id: string;
-  name: string;
-  host: string;
-  port: number;
-  username: string;
-  authType: "password" | "key";
-  password?: string;
-  keyPath?: string;
-  keyPassphrase?: string;
-  createdAt: number;
-  updatedAt: number;
-}
-
-// Bastion profile info (without sensitive data)
-export interface BastionProfileInfo {
-  id: string;
-  name: string;
-  host: string;
-  port: number;
-  username: string;
-  authType: "password" | "key";
-  hasPassword: boolean;
-  keyPath?: string;
-  hasKeyPassphrase: boolean;
-  createdAt: number;
-  updatedAt: number;
 }
 
 // SSH key profile info (without sensitive data)
@@ -96,10 +90,4 @@ export interface SavedSession {
   auth_type: "password" | "key";
   key_path?: string;
   ssh_key_id?: string;
-}
-
-
-export interface SessionCredentials {
-  password: string | null;
-  key_passphrase: string | null;
 }

@@ -267,31 +267,3 @@ export function observeAndSanitize(element: HTMLElement): () => void {
   return () => observer.disconnect();
 }
 
-/**
- * Wrap a plugin render function to sanitize its output
- *
- * @param renderFn - Original plugin render function
- * @returns Wrapped function that sanitizes after render
- */
-export function wrapRenderWithSanitization(
-  renderFn: (container: HTMLElement) => void | (() => void)
-): (container: HTMLElement) => () => void {
-  return (container: HTMLElement) => {
-    // Call the original render function
-    const cleanup = renderFn(container);
-
-    // Sanitize the result
-    sanitizeElement(container);
-
-    // Set up observer for future changes
-    const stopObserving = observeAndSanitize(container);
-
-    // Return combined cleanup
-    return () => {
-      stopObserving();
-      if (typeof cleanup === "function") {
-        cleanup();
-      }
-    };
-  };
-}

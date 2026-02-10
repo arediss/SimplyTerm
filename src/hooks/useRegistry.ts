@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { getErrorMessage } from "../utils";
 
 // ============================================================================
 // Types
@@ -33,7 +34,7 @@ export interface PluginUpdate {
   description?: string;
 }
 
-export interface RegistrySource {
+interface RegistrySource {
   name: string;
   url: string;
   enabled: boolean;
@@ -57,7 +58,7 @@ export function useRegistry() {
       setPlugins(result);
       return result;
     } catch (err) {
-      const msg = typeof err === "string" ? err : "Failed to fetch registry";
+      const msg = getErrorMessage(err, "Failed to fetch registry");
       setError(msg);
       return [];
     } finally {
@@ -73,7 +74,7 @@ export function useRegistry() {
       setPlugins(result);
       return result;
     } catch (err) {
-      const msg = typeof err === "string" ? err : "Failed to search registry";
+      const msg = getErrorMessage(err, "Failed to search registry");
       setError(msg);
       return [];
     } finally {
@@ -86,7 +87,7 @@ export function useRegistry() {
       await invoke("registry_install_plugin", { plugin });
       return true;
     } catch (err) {
-      const msg = typeof err === "string" ? err : "Failed to install plugin";
+      const msg = getErrorMessage(err, "Failed to install plugin");
       setError(msg);
       return false;
     }
@@ -98,7 +99,7 @@ export function useRegistry() {
       setUpdates(result);
       return result;
     } catch (err) {
-      const msg = typeof err === "string" ? err : "Failed to check updates";
+      const msg = getErrorMessage(err, "Failed to check updates");
       setError(msg);
       return [];
     }
@@ -111,7 +112,7 @@ export function useRegistry() {
       setUpdates((prev) => prev.filter((u) => u.id !== update.id));
       return true;
     } catch (err) {
-      const msg = typeof err === "string" ? err : "Failed to update plugin";
+      const msg = getErrorMessage(err, "Failed to update plugin");
       setError(msg);
       return false;
     }

@@ -20,7 +20,7 @@ export function SubTabs<T extends string>({
             type="button"
             onClick={() => onChange(tab.id)}
             className={`
-              flex items-center gap-1.5 px-3 pb-2 text-xs font-medium transition-all duration-200 border-b-2 -mb-px
+              flex items-center gap-1.5 px-3 pb-2 text-xs font-medium transition-colors duration-200 border-b-2 -mb-px
               ${isActive
                 ? isWarning
                   ? "border-orange-400 text-orange-400"
@@ -60,11 +60,13 @@ export function SettingGroup({
 
 export function SettingRow({
   icon,
+  iconClassName,
   title,
   description,
   children,
 }: {
   icon: React.ReactNode;
+  iconClassName?: string;
   title: string;
   description: string;
   children: React.ReactNode;
@@ -72,7 +74,7 @@ export function SettingRow({
   return (
     <div className="flex items-center justify-between p-4 bg-surface-0/20 rounded-lg">
       <div className="flex items-center gap-3">
-        <div className="text-text-muted">{icon}</div>
+        <div className={iconClassName ?? "text-text-muted"}>{icon}</div>
         <div>
           <div className="text-sm font-medium text-text">{title}</div>
           <div className="text-xs text-text-muted">{description}</div>
@@ -123,7 +125,7 @@ export function ThemeCard({
     <button
       onClick={onClick}
       className={`
-        relative flex flex-col items-center gap-2 p-3 rounded-xl transition-all
+        relative flex flex-col items-center gap-2 p-3 rounded-xl transition-[colors,box-shadow]
         ${active
           ? "ring-2 ring-accent bg-accent/10"
           : "hover:bg-white/5"

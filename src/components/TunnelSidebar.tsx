@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { getErrorMessage } from "../utils";
 import { invoke } from "@tauri-apps/api/core";
 import {
   X,
@@ -78,26 +79,32 @@ export default function TunnelSidebar({
     }
   }, [isOpen]);
 
+  const isMountedRef = useRef(true);
+  useEffect(() => () => { isMountedRef.current = false; }, []);
+
+  const onTunnelCountChangeRef = useRef(onTunnelCountChange);
+  onTunnelCountChangeRef.current = onTunnelCountChange;
+
   const loadTunnels = useCallback(async () => {
     setLoading(true);
     try {
       const list = await invoke<Tunnel[]>("tunnel_list", {});
+      if (!isMountedRef.current) return;
       setTunnels(list);
       const activeCount = list.filter(t => t.status.state === "Active" || t.status.state === "Starting").length;
-      onTunnelCountChange?.(activeCount);
+      onTunnelCountChangeRef.current?.(activeCount);
     } catch (err) {
       console.error("Failed to load tunnels:", err);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) setLoading(false);
     }
-  }, [onTunnelCountChange]);
+  }, []);
 
   useEffect(() => {
-    if (isOpen) {
-      loadTunnels();
-      const interval = setInterval(loadTunnels, 5000);
-      return () => clearInterval(interval);
-    }
+    if (!isOpen) return;
+    loadTunnels();
+    const interval = setInterval(loadTunnels, 5000);
+    return () => clearInterval(interval);
   }, [isOpen, loadTunnels]);
 
   const createTunnel = async (e: React.FormEvent) => {
@@ -173,7 +180,7 @@ export default function TunnelSidebar({
       setShowNewForm(false);
       await loadTunnels();
     } catch (err) {
-      setError(String(err));
+      setError(getErrorMessage(err));
     } finally {
       setCreating(false);
     }
@@ -234,7 +241,7 @@ export default function TunnelSidebar({
       <div
         className={`
           fixed top-14 left-3 bottom-3 z-40 w-80
-          bg-mantle/95 backdrop-blur-xl border border-surface-0/50 rounded-2xl
+          bg-mantle/98 backdrop-blur-sm border border-surface-0/50 rounded-2xl
           flex flex-col shadow-2xl overflow-hidden
           ${isAnimating ? "animate-slide-in" : "animate-slide-out"}
         `}
@@ -450,22 +457,6 @@ export default function TunnelSidebar({
         </div>
       </div>
 
-      <style>{`
-        @keyframes slide-in {
-          from { transform: translateX(-100%); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes slide-out {
-          from { transform: translateX(0); opacity: 1; }
-          to { transform: translateX(-100%); opacity: 0; }
-        }
-        .animate-slide-in {
-          animation: slide-in 0.2s ease-out forwards;
-        }
-        .animate-slide-out {
-          animation: slide-out 0.2s ease-out forwards;
-        }
-      `}</style>
     </>
   );
 }

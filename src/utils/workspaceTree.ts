@@ -10,12 +10,8 @@ function uid(prefix: string): string {
   return `${prefix}-${Date.now()}-${++counter}`;
 }
 
-export function generateGroupId(): string {
+function generateGroupId(): string {
   return uid("grp");
-}
-
-export function generateTabId(): string {
-  return uid("tab");
 }
 
 function generateSplitId(): string {
@@ -49,16 +45,6 @@ export function createGroupNode(groupId: string): WorkspaceNode {
 export function getAllGroupIds(node: WorkspaceNode): string[] {
   if (node.type === "group") return [node.id];
   return node.children.flatMap(getAllGroupIds);
-}
-
-/** Find the WorkspaceNode for a given group ID */
-export function findGroupNode(node: WorkspaceNode, groupId: string): WorkspaceNode | null {
-  if (node.type === "group") return node.id === groupId ? node : null;
-  for (const child of node.children) {
-    const found = findGroupNode(child, groupId);
-    if (found) return found;
-  }
-  return null;
 }
 
 // ============================================================================

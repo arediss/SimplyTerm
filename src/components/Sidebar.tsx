@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback, memo } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -48,7 +48,7 @@ interface SidebarTab {
   view?: SidebarViewRegistration;
 }
 
-function Sidebar({
+const Sidebar = memo(function Sidebar({
   isOpen,
   onClose,
   mode,
@@ -69,6 +69,7 @@ function Sidebar({
   const [pluginViews, setPluginViews] = useState<Map<string, { pluginId: string; view: SidebarViewRegistration }>>(
     new Map(pluginManager.registeredSidebarViews)
   );
+  const animTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   // Subscribe to plugin sidebar view changes
   useEffect(() => {
@@ -81,9 +82,6 @@ function Sidebar({
         setActiveTab((prev) => prev === event.viewId ? 'all' : prev);
       }
     });
-
-    // Initial load
-    setPluginViews(new Map(pluginManager.registeredSidebarViews));
 
     return unsubscribe;
   }, []);
@@ -128,9 +126,12 @@ function Sidebar({
       setIsAnimating(true);
     } else if (shouldRender) {
       setIsAnimating(false);
-      const timer = setTimeout(() => setShouldRender(false), 200);
-      return () => clearTimeout(timer);
+      if (animTimerRef.current) clearTimeout(animTimerRef.current);
+      animTimerRef.current = setTimeout(() => setShouldRender(false), 200);
     }
+    return () => {
+      if (animTimerRef.current) clearTimeout(animTimerRef.current);
+    };
   }, [isOpen, mode]);
 
   // Reset search when sidebar closes
@@ -189,21 +190,12 @@ function Sidebar({
         <div className="px-3 py-2">
           <div className="flex gap-1 p-1 bg-crust rounded-xl">
             {tabs.map((tab) => (
-              <button
+              <SidebarTabButton
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`
-                  flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200
-                  ${activeTab === tab.id
-                    ? 'bg-surface-0 text-text shadow-sm'
-                    : 'text-text-muted hover:text-text hover:bg-surface-0/50'
-                  }
-                `}
-                title={tab.label}
-              >
-                {tab.icon}
-                <span className="truncate">{tab.label}</span>
-              </button>
+                tab={tab}
+                isActive={activeTab === tab.id}
+                onSelect={setActiveTab}
+              />
             ))}
           </div>
         </div>
@@ -274,8 +266,8 @@ function Sidebar({
       <div
         className={`
           fixed top-14 left-3 bottom-3 z-40 w-72
-          bg-mantle/95 backdrop-blur-xl border border-surface-0/50 rounded-2xl
-          flex flex-col shadow-2xl
+          bg-mantle/98 backdrop-blur-sm border border-surface-0/50 rounded-2xl
+          flex flex-col shadow-2xl [contain:layout_paint]
           ${isAnimating ? "animate-slide-in" : "animate-slide-out"}
         `}
       >
@@ -283,7 +275,7 @@ function Sidebar({
       </div>
     </>
   );
-}
+});
 
 // Helper to get icon component from icon name
 function getIconForView(iconName?: string): React.ReactNode {
@@ -317,6 +309,35 @@ function getContextMenuIcon(iconName?: string): React.ReactNode {
   }
 }
 
+// Memoized sidebar tab button to avoid inline onClick closures
+const SidebarTabButton = memo(function SidebarTabButton({
+  tab,
+  isActive,
+  onSelect,
+}: {
+  tab: SidebarTab;
+  isActive: boolean;
+  onSelect: (id: string) => void;
+}) {
+  const handleClick = useCallback(() => onSelect(tab.id), [tab.id, onSelect]);
+  return (
+    <button
+      onClick={handleClick}
+      className={`
+        flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors duration-200
+        ${isActive
+          ? 'bg-surface-0 text-text shadow-sm'
+          : 'text-text-muted hover:text-text hover:bg-surface-0/50'
+        }
+      `}
+      title={tab.label}
+    >
+      {tab.icon}
+      <span className="truncate">{tab.label}</span>
+    </button>
+  );
+});
+
 // All sessions view (flat list)
 interface AllSessionsViewProps {
   sessions: SavedSession[];
@@ -329,7 +350,7 @@ interface AllSessionsViewProps {
   onTunnel: (session: SavedSession) => void;
 }
 
-function AllSessionsView({
+const AllSessionsView = memo(function AllSessionsView({
   sessions,
   searchQuery,
   connectingSessionId,
@@ -358,16 +379,16 @@ function AllSessionsView({
           key={session.id}
           session={session}
           isConnecting={connectingSessionId === session.id}
-          onClick={() => onConnect(session)}
-          onEdit={() => onEdit(session)}
-          onDelete={() => onDelete(session.id)}
-          onSftp={() => onSftp(session)}
-          onTunnel={() => onTunnel(session)}
+          onConnect={onConnect}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onSftp={onSftp}
+          onTunnel={onTunnel}
         />
       ))}
     </div>
   );
-}
+});
 
 // Plugin sidebar view renderer
 interface PluginSidebarViewProps {
@@ -375,9 +396,10 @@ interface PluginSidebarViewProps {
   view: SidebarViewRegistration;
 }
 
-function PluginSidebarView({ pluginId, view }: PluginSidebarViewProps) {
+const PluginSidebarView = memo(function PluginSidebarView({ pluginId, view }: PluginSidebarViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cleanupRef = useRef<(() => void) | void>(undefined);
+  const renderTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   const renderContent = useCallback(() => {
     if (containerRef.current && view.render) {
@@ -392,8 +414,11 @@ function PluginSidebarView({ pluginId, view }: PluginSidebarViewProps) {
   }, [view]);
 
   useEffect(() => {
-    const timer = setTimeout(renderContent, 0);
-    return () => clearTimeout(timer);
+    if (renderTimerRef.current) clearTimeout(renderTimerRef.current);
+    renderTimerRef.current = setTimeout(renderContent, 0);
+    return () => {
+      if (renderTimerRef.current) clearTimeout(renderTimerRef.current);
+    };
   }, [renderContent]);
 
   useEffect(() => {
@@ -412,22 +437,22 @@ function PluginSidebarView({ pluginId, view }: PluginSidebarViewProps) {
       data-view={view.config.id}
     />
   );
-}
+});
 
 interface SavedSessionItemProps {
   session: SavedSession;
   isConnecting?: boolean;
-  onClick: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-  onSftp: () => void;
-  onTunnel: () => void;
+  onConnect: (session: SavedSession) => void;
+  onEdit: (session: SavedSession) => void;
+  onDelete: (sessionId: string) => void;
+  onSftp: (session: SavedSession) => void;
+  onTunnel: (session: SavedSession) => void;
 }
 
-function SavedSessionItem({
+const SavedSessionItem = memo(function SavedSessionItem({
   session,
   isConnecting,
-  onClick,
+  onConnect,
   onEdit,
   onDelete,
   onSftp,
@@ -466,7 +491,7 @@ function SavedSessionItem({
       // Run previous cleanups
       cleanups.forEach(fn => fn());
       cleanups.length = 0;
-      container.innerHTML = '';
+      container.replaceChildren();
 
       const decorators = pluginManager.getSessionDecorators();
       for (const { decorator } of decorators) {
@@ -507,10 +532,11 @@ function SavedSessionItem({
     setContextMenu(null);
   };
 
-  const handleAction = (action: () => void) => {
-    action();
-    closeContextMenu();
-  };
+  const handleConnect = useCallback(() => { onConnect(session); }, [session, onConnect]);
+  const handleEdit = useCallback(() => { onEdit(session); }, [session, onEdit]);
+  const handleDelete = useCallback(() => { onDelete(session.id); }, [session.id, onDelete]);
+  const handleSftp = useCallback(() => { onSftp(session); }, [session, onSftp]);
+  const handleTunnel = useCallback(() => { onTunnel(session); }, [session, onTunnel]);
 
   const handlePluginAction = (item: ContextMenuItemConfig) => {
     const context: ContextMenuContext = {
@@ -544,7 +570,7 @@ function SavedSessionItem({
   return (
     <>
       <div
-        onClick={isConnecting ? undefined : onClick}
+        onClick={isConnecting ? undefined : handleConnect}
         onContextMenu={isConnecting ? undefined : handleContextMenu}
         className={`group/session w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left ${
           isConnecting
@@ -572,9 +598,9 @@ function SavedSessionItem({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onSftp();
+              handleSftp();
             }}
-            className="shrink-0 p-1.5 rounded-md text-text-muted opacity-0 group-hover/session:opacity-100 hover:!text-accent hover:bg-white/10 transition-all"
+            className="shrink-0 p-1.5 rounded-md text-text-muted opacity-0 group-hover/session:opacity-100 hover:!text-accent hover:bg-white/10 transition-[colors,opacity]"
             title={t('sidebar.openSftp')}
           >
             <FolderOpen size={14} />
@@ -586,25 +612,25 @@ function SavedSessionItem({
       {contextMenu && createPortal(
         <div
           className="fixed z-[100] min-w-[160px] bg-crust border border-surface-0/50 rounded-lg shadow-xl py-1"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
+          style={{ transform: `translate3d(${contextMenu.x}px, ${contextMenu.y}px, 0)`, left: 0, top: 0 }}
           onClick={(e) => e.stopPropagation()}
         >
           <button
-            onClick={() => handleAction(onClick)}
+            onClick={() => { handleConnect(); closeContextMenu(); }}
             className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-text hover:bg-surface-0/50 transition-colors"
           >
             <Terminal size={12} />
             <span>{t('sidebar.connect')}</span>
           </button>
           <button
-            onClick={() => handleAction(onSftp)}
+            onClick={() => { handleSftp(); closeContextMenu(); }}
             className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-text hover:bg-surface-0/50 transition-colors"
           >
             <FolderOpen size={12} />
             <span>{t('sidebar.openSftp')}</span>
           </button>
           <button
-            onClick={() => handleAction(onTunnel)}
+            onClick={() => { handleTunnel(); closeContextMenu(); }}
             className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-blue hover:bg-blue/10 transition-colors"
           >
             <ArrowLeftRight size={12} />
@@ -612,7 +638,7 @@ function SavedSessionItem({
           </button>
           <div className="h-px bg-surface-0/30 my-1" />
           <button
-            onClick={() => handleAction(onEdit)}
+            onClick={() => { handleEdit(); closeContextMenu(); }}
             className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-text hover:bg-surface-0/50 transition-colors"
           >
             <Pencil size={12} />
@@ -639,7 +665,7 @@ function SavedSessionItem({
 
           <div className="h-px bg-surface-0/30 my-1" />
           <button
-            onClick={() => handleAction(onDelete)}
+            onClick={() => { handleDelete(); closeContextMenu(); }}
             className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-error hover:bg-error/10 transition-colors"
           >
             <Trash2 size={12} />
@@ -650,6 +676,6 @@ function SavedSessionItem({
       )}
     </>
   );
-}
+});
 
 export default Sidebar;

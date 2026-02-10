@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff, Lock, KeyRound, Shield } from 'lucide-react';
+import { Lock, KeyRound, Shield } from 'lucide-react';
+import { PasswordInput } from '../UI/PasswordInput';
+import { validatePassword } from '../../utils/validatePassword';
 import Modal from '../Modal';
 import PinInput from './PinInput';
+import { getAutoLockOptions } from '../../utils';
 
 interface VaultSetupModalProps {
   isOpen: boolean;
@@ -19,8 +22,6 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
   const [step, setStep] = useState<SetupStep>('intro');
   const [masterPassword, setMasterPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
   const [enablePin, setEnablePin] = useState(false);
   const [pin, setPin] = useState('');
   const [pinStep, setPinStep] = useState<'enter' | 'confirm'>('enter');
@@ -32,8 +33,6 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
     setStep('intro');
     setMasterPassword('');
     setConfirmPassword('');
-    setShowPassword(false);
-    setShowConfirm(false);
     setEnablePin(false);
     setPin('');
     setPinStep('enter');
@@ -53,20 +52,15 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
     onClose();
   };
 
-  const validatePassword = () => {
-    if (masterPassword.length < 8) {
-      setError(t('vault.setup.passwordTooShort'));
-      return false;
-    }
-    if (masterPassword !== confirmPassword) {
-      setError(t('vault.setup.passwordMismatch'));
-      return false;
-    }
-    return true;
-  };
-
   const handlePasswordNext = () => {
-    if (!validatePassword()) return;
+    const pwdError = validatePassword(masterPassword, confirmPassword, {
+      tooShort: t('vault.setup.passwordTooShort'),
+      mismatch: t('vault.setup.passwordMismatch'),
+    });
+    if (pwdError) {
+      setError(pwdError);
+      return;
+    }
     setError(null);
     setStep('pin');
   };
@@ -112,14 +106,7 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
     }
   };
 
-  const autoLockOptions = [
-    { value: 0, label: t('settings.security.autoLockNever') },
-    { value: 60, label: t('settings.security.autoLock1min') },
-    { value: 300, label: t('settings.security.autoLock5min') },
-    { value: 600, label: t('settings.security.autoLock10min') },
-    { value: 1800, label: t('settings.security.autoLock30min') },
-    { value: 3600, label: t('settings.security.autoLock1hour') },
-  ];
+  const autoLockOptions = getAutoLockOptions(t);
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title={t('vault.setup.title')} width="md">
@@ -226,45 +213,23 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
             <div className="flex flex-col gap-4">
               <label className="flex flex-col gap-2">
                 <span className="text-sm text-text-secondary">{t('vault.setup.masterPassword')}</span>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={masterPassword}
-                    onChange={(e) => setMasterPassword(e.target.value)}
-                    placeholder={t('vault.setup.passwordPlaceholder')}
-                    className="w-full pl-10 pr-10 py-3 bg-surface-0/30 border border-surface-0/50 rounded-xl text-text placeholder-text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text"
-                  >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
+                <PasswordInput
+                  icon={<Lock size={16} />}
+                  value={masterPassword}
+                  onChange={setMasterPassword}
+                  placeholder={t('vault.setup.passwordPlaceholder')}
+                  autoFocus
+                />
               </label>
 
               <label className="flex flex-col gap-2">
                 <span className="text-sm text-text-secondary">{t('vault.setup.confirmPassword')}</span>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-                  <input
-                    type={showConfirm ? 'text' : 'password'}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder={t('vault.setup.confirmPlaceholder')}
-                    className="w-full pl-10 pr-10 py-3 bg-surface-0/30 border border-surface-0/50 rounded-xl text-text placeholder-text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirm(!showConfirm)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text"
-                  >
-                    {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
+                <PasswordInput
+                  icon={<Lock size={16} />}
+                  value={confirmPassword}
+                  onChange={setConfirmPassword}
+                  placeholder={t('vault.setup.confirmPlaceholder')}
+                />
               </label>
             </div>
 

@@ -91,7 +91,7 @@ export function PluginWidget({ pluginId, panel, position, visible }: PluginWidge
       <div
         className={`
           rounded-lg bg-crust/90 backdrop-blur-sm border border-surface-0/30
-          text-xs font-mono transition-all duration-200
+          text-xs font-mono transition-opacity duration-200
           ${isHovered ? 'opacity-100' : 'opacity-60'}
         `}
       >
