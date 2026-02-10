@@ -51,8 +51,8 @@ declare global {
 }
 
 export class PluginManager {
-  private plugins: Map<string, LoadedPlugin> = new Map();
-  private eventHandlers: Set<PluginEventHandler> = new Set();
+  private readonly plugins: Map<string, LoadedPlugin> = new Map();
+  private readonly eventHandlers: Set<PluginEventHandler> = new Set();
 
   // External callbacks (set by App.tsx)
   public onShowNotification: (message: string, type: NotificationType) => void = () => {};

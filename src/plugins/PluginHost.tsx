@@ -60,7 +60,7 @@ export function PluginHost({
   useEffect(() => {
     return pluginManager.subscribe((event) => {
       switch (event.type) {
-        case 'panel:register':
+        case 'panel:register': {
           setPanels(new Map(pluginManager.registeredPanels));
           // Auto-show floating widgets
           const entry = pluginManager.registeredPanels.get(event.panelId);
@@ -68,6 +68,7 @@ export function PluginHost({
             setVisiblePanels((prev) => new Set([...prev, event.panelId]));
           }
           break;
+        }
         case 'panel:show':
           setVisiblePanels((prev) => new Set([...prev, event.panelId]));
           break;

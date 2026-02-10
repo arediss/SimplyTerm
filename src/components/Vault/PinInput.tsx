@@ -96,16 +96,16 @@ export function PinInput({
   return (
     <div className="flex flex-col items-center gap-4">
       <div className="flex gap-3">
-        {digits.map((digit, index) => (
+        {Array.from({ length }, (_, i) => i).map(pos => (
           <input
-            key={index}
-            ref={(el) => { inputRefs.current[index] = el; }}
+            key={pos}
+            ref={(el) => { inputRefs.current[pos] = el; }}
             type="password"
             inputMode="numeric"
             maxLength={1}
-            value={digit}
-            onChange={(e) => handleChange(index, e.target.value)}
-            onKeyDown={(e) => handleKeyDown(index, e)}
+            value={digits[pos]}
+            onChange={(e) => handleChange(pos, e.target.value)}
+            onKeyDown={(e) => handleKeyDown(pos, e)}
             onPaste={handlePaste}
             disabled={disabled}
             className={`
@@ -117,7 +117,7 @@ export function PinInput({
               transition-colors
               ${error ? 'border-error/50 animate-shake' : 'border-surface-0/50'}
             `}
-            aria-label={`PIN digit ${index + 1}`}
+            aria-label={`PIN digit ${pos + 1}`}
           />
         ))}
       </div>

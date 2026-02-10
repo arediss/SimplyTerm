@@ -1,5 +1,11 @@
 import { ChevronRight } from "lucide-react";
 
+function getTabClassName(isActive: boolean, isWarning: boolean): string {
+  if (!isActive) return "border-transparent text-text-muted hover:text-text/80";
+  if (isWarning) return "border-orange-400 text-orange-400";
+  return "border-accent text-text";
+}
+
 export function SubTabs<T extends string>({
   tabs,
   activeTab,
@@ -21,12 +27,7 @@ export function SubTabs<T extends string>({
             onClick={() => onChange(tab.id)}
             className={`
               flex items-center gap-1.5 px-3 pb-2 text-xs font-medium transition-colors duration-200 border-b-2 -mb-px
-              ${isActive
-                ? isWarning
-                  ? "border-orange-400 text-orange-400"
-                  : "border-accent text-text"
-                : "border-transparent text-text-muted hover:text-text/80"
-              }
+              ${getTabClassName(isActive, isWarning)}
             `}
           >
             {tab.icon}
@@ -133,9 +134,9 @@ export function ThemeCard({
       `}
     >
       <div className="flex gap-1">
-        {colors.map((color, i) => (
+        {colors.map(color => (
           <div
-            key={i}
+            key={color}
             className="w-8 h-12 rounded-md first:rounded-l-lg last:rounded-r-lg"
             style={{ backgroundColor: color }}
           />

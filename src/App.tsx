@@ -53,6 +53,16 @@ function matchesShortcut(entry: ShortcutEntry, mod: boolean, e: KeyboardEvent, i
   return true;
 }
 
+function getConnectionModalTitle(
+  editingSessionId: string | null,
+  pendingSftpSession: unknown,
+  t: (key: string) => string,
+): string | undefined {
+  if (editingSessionId) return t('app.editConnection');
+  if (pendingSftpSession) return t('app.sftpConnection');
+  return undefined;
+}
+
 function App() {
   const { t } = useTranslation();
 
@@ -811,7 +821,7 @@ function App() {
 
   const handleCloseTab = useCallback((tabId: string) => {
     const closedTab = workspace.closeTab(tabId);
-    if (closedTab && closedTab.ptySessionId) {
+    if (closedTab?.ptySessionId) {
       invoke("close_pty_session", { sessionId: closedTab.ptySessionId }).catch(console.error);
       pluginManager.notifySessionDisconnect(closedTab.ptySessionId);
     }
@@ -903,7 +913,7 @@ function App() {
         const tab = activeTabRef.current;
         if (tab) {
           const newName = window.prompt("Enter new tab name:", tab.title);
-          if (newName && newName.trim()) {
+          if (newName?.trim()) {
             workspace.renameTab(tab.id, newName.trim());
           }
         }
@@ -1005,8 +1015,9 @@ function App() {
 
   const handleModalButtonClick = useCallback(async (index: number) => {
     if (pluginModal) {
-      const buttons = pluginModal.config.buttons && pluginModal.config.buttons.length > 0
-        ? pluginModal.config.buttons
+      const cfgButtons = pluginModal.config.buttons;
+      const buttons = cfgButtons?.length
+        ? cfgButtons
         : [{ label: "Close", variant: "secondary" as const }];
       const button = buttons[index];
       if (button?.onClick) {
@@ -1334,7 +1345,7 @@ function App() {
             initialTelnetConfig={initialTelnetConfig}
             initialSerialConfig={initialSerialConfig}
             initialConnectionType={connectionType}
-            title={editingSessionId ? t('app.editConnection') : (pendingSftpSession ? t('app.sftpConnection') : undefined)}
+            title={getConnectionModalTitle(editingSessionId, pendingSftpSession, t)}
           />
         </Suspense>
       )}

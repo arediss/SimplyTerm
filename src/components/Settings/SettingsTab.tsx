@@ -158,7 +158,7 @@ export default function SettingsTab({
           {activeSection === "connections" && (
             <ConnectionsSettings savedSessionsCount={savedSessionsCount} onClearAllSessions={onClearAllSessions} />
           )}
-          <Suspense fallback={<div className="animate-pulse space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="h-12 bg-surface-0/30 rounded-lg" />)}</div>}>
+          <Suspense fallback={<div className="animate-pulse space-y-3">{[0, 1, 2].map(n => <div key={n} className="h-12 bg-surface-0/30 rounded-lg" />)}</div>}>
             {activeSection === "security" && <SecuritySettings />}
             {activeSection === "plugins" && <PluginsSettings />}
             {activeSection === "about" && <AboutSettings />}

@@ -131,7 +131,7 @@ const purifyConfig = {
 
   // Block dangerous URI schemes
   ALLOWED_URI_REGEXP:
-    /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+    /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
 
   // Forbid certain protocols
   FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "form"],

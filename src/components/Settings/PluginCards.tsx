@@ -14,6 +14,12 @@ import {
 import type { PluginManifest } from "../../plugins";
 import type { RegistryPlugin, PluginUpdate } from "../../hooks/useRegistry";
 
+function getPluginStatusClassName(status: string | undefined): string {
+  if (status === "error") return "bg-error/15 text-error";
+  if (status === "enabled") return "bg-accent/15 text-accent";
+  return "bg-surface-0/40 text-text-muted";
+}
+
 export function InstalledPluginCard({
   plugin,
   update,
@@ -33,11 +39,7 @@ export function InstalledPluginCard({
 
   return (
     <div className="group flex gap-3 p-3 bg-surface-0/15 hover:bg-surface-0/25 rounded-xl transition-colors">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-        plugin.status === "error" ? "bg-error/15 text-error" :
-        plugin.status === "enabled" ? "bg-accent/15 text-accent" :
-        "bg-surface-0/40 text-text-muted"
-      }`}>
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${getPluginStatusClassName(plugin.status)}`}>
         <Puzzle size={18} />
       </div>
 
@@ -206,8 +208,8 @@ export function BrowsePluginCard({
 export function PluginListSkeleton({ count = 3 }: { count?: number }) {
   return (
     <div className="space-y-2 animate-pulse">
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="flex gap-3 p-3 bg-surface-0/15 rounded-xl">
+      {Array.from({ length: count }, (_, i) => i).map(n => (
+        <div key={n} className="flex gap-3 p-3 bg-surface-0/15 rounded-xl">
           <div className="w-10 h-10 rounded-xl bg-surface-0/30 shrink-0" />
           <div className="flex-1 space-y-2 py-0.5">
             <div className="flex items-center gap-2">
