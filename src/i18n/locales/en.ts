@@ -1000,4 +1000,50 @@ export default {
     // Search: next result tooltip
     nextResult: "Next (Enter)",
   },
+
+  // ============================================
+  // SFTP - SftpBrowser.tsx
+  // ============================================
+  sftp: {
+    // Toolbar
+    home: "Home",
+    goUp: "Go up",
+    refresh: "Refresh",
+    newFolder: "New folder",
+    newFolderPlaceholder: "New folder name...",
+    // Column headers
+    colName: "Name",
+    colSize: "Size",
+    colModified: "Modified",
+    // Empty states
+    emptyDirectory: "Empty directory",
+    allHidden: "All files are hidden",
+    // Drag & drop overlay
+    dropToUpload: "Drop files to upload",
+    uploadTo: "Upload to {{path}}",
+    uploading: "Uploading",
+    // Context menu
+    download: "Download",
+    open: "Open",
+    editExternally: "Edit externally",
+    openInEditor: "Open in editor",
+    copyPath: "Copy path",
+    pathCopied: "Path copied",
+    rename: "Rename",
+    watching: "watching",
+    // Delete
+    deleteTitle: "Delete {{type}}",
+    deleteConfirm: "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
+    // Hidden files toggle
+    showHidden: "Show hidden files",
+    hideHidden: "Hide hidden files",
+    // Status bar
+    connected: "Connected",
+    items: "{{count}} items",
+    itemsHidden: "{{count}} items ({{hidden}} hidden)",
+    editing: "{{count}} editing",
+    folder: "Folder",
+    // Download notice
+    downloaded: "Downloaded {{name}}",
+  },
 };
