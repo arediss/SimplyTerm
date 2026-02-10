@@ -47,7 +47,7 @@ export function registerTheme(theme: Theme): void {
   themes.set(theme.meta.id, theme);
 
   // Dispatch event for reactive updates
-  window.dispatchEvent(new CustomEvent("simplyterm:theme-registered", { detail: theme }));
+  globalThis.dispatchEvent(new CustomEvent("simplyterm:theme-registered", { detail: theme }));
 }
 
 /**
@@ -61,7 +61,7 @@ export function unregisterTheme(id: string): void {
   themes.delete(id);
 
   // Dispatch event for reactive updates
-  window.dispatchEvent(new CustomEvent("simplyterm:theme-unregistered", { detail: { id } }));
+  globalThis.dispatchEvent(new CustomEvent("simplyterm:theme-unregistered", { detail: { id } }));
 }
 
 /**
@@ -113,10 +113,10 @@ export function applyTheme(themeId: string): void {
   }
 
   // Body background: transparent when blur is enabled, otherwise solid color
-  if (root.dataset.blur !== "true") {
-    document.body.style.background = theme.colors.crust;
-  } else {
+  if (root.dataset.blur === "true") {
     document.body.style.background = "transparent";
+  } else {
+    document.body.style.background = theme.colors.crust;
   }
 
   // Set data attribute for CSS selectors
@@ -124,7 +124,7 @@ export function applyTheme(themeId: string): void {
   root.dataset.themeVariant = theme.meta.variant;
 
   // Dispatch event for components that need to react
-  window.dispatchEvent(new CustomEvent("simplyterm:theme-changed", { detail: theme }));
+  globalThis.dispatchEvent(new CustomEvent("simplyterm:theme-changed", { detail: theme }));
 }
 
 /**

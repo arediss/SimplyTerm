@@ -2,8 +2,13 @@
  * Plugin Manager - Frontend orchestration of plugins
  *
  * Handles loading, lifecycle, and communication with plugins.
- * Supports both legacy (module.exports.default) and new (window.SimplyTermPlugins) formats.
+ * Supports both legacy (module.exports.default) and new (globalThis.SimplyTermPlugins) formats.
  */
+
+declare global {
+  // eslint-disable-next-line no-var
+  var SimplyTermPlugins: Record<string, PluginModule> | undefined;
+}
 
 import { invoke } from '@tauri-apps/api/core';
 import { createPluginAPI } from './PluginAPI';
@@ -51,8 +56,8 @@ declare global {
 }
 
 export class PluginManager {
-  private plugins: Map<string, LoadedPlugin> = new Map();
-  private eventHandlers: Set<PluginEventHandler> = new Set();
+  private readonly plugins: Map<string, LoadedPlugin> = new Map();
+  private readonly eventHandlers: Set<PluginEventHandler> = new Set();
 
   // External callbacks (set by App.tsx)
   public onShowNotification: (message: string, type: NotificationType) => void = () => {};
@@ -225,7 +230,7 @@ export class PluginManager {
    * Execute plugin code
    *
    * Supports two formats:
-   * 1. New format (v1): window.SimplyTermPlugins[id] = { init, cleanup }
+   * 1. New format (v1): globalThis.SimplyTermPlugins[id] = { init, cleanup }
    * 2. Legacy format: module.exports.default = (api) => {}
    *
    * SECURITY NOTE: Plugins have full JavaScript execution within the renderer.
@@ -242,10 +247,10 @@ export class PluginManager {
   ): Promise<void> {
     try {
       // Initialize global plugins object
-      window.SimplyTermPlugins = window.SimplyTermPlugins || {};
+      globalThis.SimplyTermPlugins = globalThis.SimplyTermPlugins || {};
 
       // Execute the plugin code in global context
-      // This allows plugins to register themselves on window.SimplyTermPlugins
+      // This allows plugins to register themselves on globalThis.SimplyTermPlugins
       const wrappedCode = `
         (function() {
           // Provide CommonJS-like environment for legacy plugins
@@ -256,8 +261,8 @@ export class PluginManager {
 
           // If legacy format was used, convert to new format
           if (typeof module.exports.default === 'function') {
-            window.SimplyTermPlugins = window.SimplyTermPlugins || {};
-            window.SimplyTermPlugins['${pluginId}'] = {
+            globalThis.SimplyTermPlugins = globalThis.SimplyTermPlugins || {};
+            globalThis.SimplyTermPlugins['${pluginId}'] = {
               init: function(api) {
                 return module.exports.default(api);
               }
@@ -271,7 +276,7 @@ export class PluginManager {
       new Function(wrappedCode)();
 
       // Check if plugin registered itself
-      const pluginModule = window.SimplyTermPlugins?.[pluginId];
+      const pluginModule = globalThis.SimplyTermPlugins?.[pluginId];
       if (pluginModule && typeof pluginModule.init === 'function') {
         // Pass the API object to the init function
         await pluginModule.init(api);
@@ -285,6 +290,17 @@ export class PluginManager {
     }
   }
 
+  private removeEntriesByPlugin<T extends { pluginId: string }>(map: Map<string, T>, pluginId: string): boolean {
+    let changed = false;
+    for (const [itemId, entry] of map) {
+      if (entry.pluginId === pluginId) {
+        map.delete(itemId);
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
   /**
    * Unload a plugin
    */
@@ -293,7 +309,7 @@ export class PluginManager {
     if (!plugin) return;
 
     // Call cleanup if available
-    const pluginModule = window.SimplyTermPlugins?.[id];
+    const pluginModule = globalThis.SimplyTermPlugins?.[id];
     if (pluginModule?.cleanup) {
       try {
         pluginModule.cleanup();
@@ -366,26 +382,12 @@ export class PluginManager {
     });
 
     // Remove registered status bar items for this plugin
-    let statusBarChanged = false;
-    for (const [itemId, entry] of this.registeredStatusBarItems) {
-      if (entry.pluginId === id) {
-        this.registeredStatusBarItems.delete(itemId);
-        statusBarChanged = true;
-      }
-    }
-    if (statusBarChanged) {
+    if (this.removeEntriesByPlugin(this.registeredStatusBarItems, id)) {
       this.notifyStatusBarChanged();
     }
 
     // Remove registered header actions for this plugin
-    let headerActionsChanged = false;
-    for (const [itemId, entry] of this.registeredHeaderActions) {
-      if (entry.pluginId === id) {
-        this.registeredHeaderActions.delete(itemId);
-        headerActionsChanged = true;
-      }
-    }
-    if (headerActionsChanged) {
+    if (this.removeEntriesByPlugin(this.registeredHeaderActions, id)) {
       this.notifyHeaderActionsChanged();
     }
 
@@ -393,8 +395,8 @@ export class PluginManager {
     this.plugins.delete(id);
 
     // Remove from global registry
-    if (window.SimplyTermPlugins) {
-      delete window.SimplyTermPlugins[id];
+    if (globalThis.SimplyTermPlugins) {
+      delete globalThis.SimplyTermPlugins[id];
     }
 
     this.emit({ type: 'plugin:unloaded', pluginId: id });

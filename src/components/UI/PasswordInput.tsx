@@ -19,7 +19,7 @@ export function PasswordInput({
   disabled,
   autoFocus,
   className,
-}: PasswordInputProps) {
+}: Readonly<PasswordInputProps>) {
   const [show, setShow] = useState<boolean>(false);
 
   return (

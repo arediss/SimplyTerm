@@ -256,6 +256,7 @@ const Sidebar = memo(function Sidebar({
         className={`fixed inset-0 top-10 z-30 bg-black/40 transition-opacity duration-200 ${
           isAnimating ? "opacity-100" : "opacity-0"
         }`}
+        aria-hidden="true"
         onClick={onClose}
       />
 
@@ -506,11 +507,11 @@ const SavedSessionItem = memo(function SavedSessionItem({
 
     // Listen for plugin-triggered re-renders (e.g., after tag assignment changes)
     const handleDecoratorChanged = () => renderDecorators();
-    window.addEventListener('plugin-decorators-changed', handleDecoratorChanged);
+    globalThis.addEventListener('plugin-decorators-changed', handleDecoratorChanged);
 
     return () => {
       unsubscribe();
-      window.removeEventListener('plugin-decorators-changed', handleDecoratorChanged);
+      globalThis.removeEventListener('plugin-decorators-changed', handleDecoratorChanged);
       cleanups.forEach(fn => fn());
     };
   }, [session.id]);
@@ -519,7 +520,7 @@ const SavedSessionItem = memo(function SavedSessionItem({
     e.preventDefault();
     e.stopPropagation();
     // Fermer tous les autres context menus
-    window.dispatchEvent(new CustomEvent("closeContextMenus"));
+    globalThis.dispatchEvent(new CustomEvent("closeContextMenus"));
     setContextMenu({ x: e.clientX, y: e.clientY });
   };
 
@@ -554,47 +555,51 @@ const SavedSessionItem = memo(function SavedSessionItem({
     const handleCloseAll = () => closeContextMenu();
 
     document.addEventListener("click", handleClick);
-    window.addEventListener("closeContextMenus", handleCloseAll);
+    globalThis.addEventListener("closeContextMenus", handleCloseAll);
 
     return () => {
       document.removeEventListener("click", handleClick);
-      window.removeEventListener("closeContextMenus", handleCloseAll);
+      globalThis.removeEventListener("closeContextMenus", handleCloseAll);
     };
   }, []);
 
   return (
     <>
       <div
-        onClick={isConnecting ? undefined : handleConnect}
-        onContextMenu={isConnecting ? undefined : handleContextMenu}
         className={`group/session w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left ${
           isConnecting
             ? "bg-accent/10 cursor-wait"
             : "hover:bg-white/5 cursor-pointer"
         }`}
+        onContextMenu={isConnecting ? undefined : handleContextMenu}
       >
-        <span className="text-accent">
-          {isConnecting ? (
-            <Loader2 size={16} className="animate-spin" />
-          ) : (
-            <Monitor size={16} />
-          )}
-        </span>
-        <div className="flex-1 min-w-0">
-          <div className={`text-sm font-medium truncate ${isConnecting ? "text-accent" : "text-text"}`}>
-            {session.name}
+        <button
+          type="button"
+          disabled={isConnecting}
+          onClick={handleConnect}
+          className="flex items-center gap-3 flex-1 min-w-0 bg-transparent border-none p-0 text-left cursor-[inherit]"
+        >
+          <span className="text-accent">
+            {isConnecting ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Monitor size={16} />
+            )}
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className={`text-sm font-medium truncate ${isConnecting ? "text-accent" : "text-text"}`}>
+              {session.name}
+            </div>
+            <div className="text-[11px] text-text-muted truncate">
+              {isConnecting ? t('sidebar.connecting') : `${session.username}@${session.host}:${session.port}`}
+            </div>
+            <div ref={decoratorRef} className="flex flex-wrap gap-1 mt-0.5 empty:hidden" />
           </div>
-          <div className="text-[11px] text-text-muted truncate">
-            {isConnecting ? t('sidebar.connecting') : `${session.username}@${session.host}:${session.port}`}
-          </div>
-          <div ref={decoratorRef} className="flex flex-wrap gap-1 mt-0.5 empty:hidden" />
-        </div>
+        </button>
         {!isConnecting && (
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleSftp();
-            }}
+            type="button"
+            onClick={handleSftp}
             className="shrink-0 p-1.5 rounded-md text-text-muted opacity-0 group-hover/session:opacity-100 hover:!text-accent hover:bg-white/10 transition-[colors,opacity]"
             title={t('sidebar.openSftp')}
           >
@@ -608,7 +613,10 @@ const SavedSessionItem = memo(function SavedSessionItem({
         <div
           className="fixed z-[100] min-w-[160px] bg-crust border border-surface-0/50 rounded-lg shadow-xl py-1"
           style={{ transform: `translate3d(${contextMenu.x}px, ${contextMenu.y}px, 0)`, left: 0, top: 0 }}
+          role="menu"
+          tabIndex={-1}
           onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => { if (e.key === 'Escape') closeContextMenu(); }}
         >
           <button
             onClick={() => { handleConnect(); closeContextMenu(); }}

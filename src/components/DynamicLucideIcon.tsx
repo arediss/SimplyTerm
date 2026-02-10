@@ -23,7 +23,7 @@ interface DynamicLucideIconProps extends Omit<LucideProps, "ref"> {
   name: string;
 }
 
-export default function DynamicLucideIcon({ name, ...props }: DynamicLucideIconProps) {
+export default function DynamicLucideIcon({ name, ...props }: Readonly<DynamicLucideIconProps>) {
   const IconComponent = useMemo(() => toLazyIcon(name), [name]);
 
   return (

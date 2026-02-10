@@ -15,7 +15,7 @@ function TerminalPane({
   isActive = true,
   appTheme = "dark",
   terminalSettings,
-}: TerminalPaneProps) {
+}: Readonly<TerminalPaneProps>) {
   return (
     <Terminal
       sessionId={sessionId}

@@ -22,7 +22,7 @@ function PermissionApprovalModal({
   onApprove,
   pluginName,
   permissions,
-}: PermissionApprovalModalProps) {
+}: Readonly<PermissionApprovalModalProps>) {
   const sorted = sortPermissionsByRisk(permissions);
   const hasHighRisk = sorted.some((p) => getPermissionInfo(p).risk === 'high');
 

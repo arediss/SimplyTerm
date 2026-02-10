@@ -5,12 +5,12 @@ import { Server, User, Lock, Key } from "lucide-react";
 import type { SshKeyProfileInfo } from "../../types";
 
 // Auth type tabs (internal helper)
-function AuthTab({ active, onClick, icon, label }: {
+function AuthTab({ active, onClick, icon, label }: Readonly<{
   active: boolean;
   onClick: () => void;
   icon: React.ReactNode;
   label: string;
-}) {
+}>) {
   return (
     <button
       type="button"
@@ -86,7 +86,7 @@ export const SshFormContent = memo(function SshFormContent(props: SshFormContent
           <input
             type="number"
             value={props.port}
-            onChange={(e) => props.setPort(parseInt(e.target.value) || 22)}
+            onChange={(e) => props.setPort(Number.parseInt(e.target.value) || 22)}
             min={1}
             max={65535}
             className="input-field"

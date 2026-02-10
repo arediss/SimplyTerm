@@ -131,7 +131,7 @@ const purifyConfig = {
 
   // Block dangerous URI schemes
   ALLOWED_URI_REGEXP:
-    /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+    /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
 
   // Forbid certain protocols
   FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "form"],
@@ -192,41 +192,36 @@ export function sanitizeElement(element: HTMLElement): void {
  * @param element - Element to observe
  * @returns Cleanup function to disconnect the observer
  */
+function hasDangerousNodes(addedNodes: NodeList): boolean {
+  for (const node of addedNodes) {
+    if (node.nodeType !== Node.ELEMENT_NODE) continue;
+    const el = node as HTMLElement;
+    if (
+      el.querySelector("script, iframe, object, embed") ||
+      el.innerHTML.includes("javascript:") ||
+      el.innerHTML.includes("on") // Potential event handlers
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isDangerousAttribute(attrName: string | null): boolean {
+  const name = attrName?.toLowerCase() || "";
+  return name.startsWith("on") || name === "href" || name === "src";
+}
+
 export function observeAndSanitize(element: HTMLElement): () => void {
   const observer = new MutationObserver((mutations) => {
     // Temporarily disconnect to avoid infinite loop
     observer.disconnect();
 
-    // Check if any mutation added potentially dangerous content
-    let needsSanitization = false;
-
-    for (const mutation of mutations) {
-      if (mutation.type === "childList") {
-        for (const node of mutation.addedNodes) {
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            const el = node as HTMLElement;
-            // Check for dangerous patterns
-            if (
-              el.querySelector("script, iframe, object, embed") ||
-              el.innerHTML.includes("javascript:") ||
-              el.innerHTML.includes("on") // Potential event handlers
-            ) {
-              needsSanitization = true;
-              break;
-            }
-          }
-        }
-      } else if (mutation.type === "attributes") {
-        const attrName = mutation.attributeName?.toLowerCase() || "";
-        if (
-          attrName.startsWith("on") ||
-          attrName === "href" ||
-          attrName === "src"
-        ) {
-          needsSanitization = true;
-        }
-      }
-    }
+    const needsSanitization = mutations.some((mutation) => {
+      if (mutation.type === "childList") return hasDangerousNodes(mutation.addedNodes);
+      if (mutation.type === "attributes") return isDangerousAttribute(mutation.attributeName);
+      return false;
+    });
 
     if (needsSanitization) {
       sanitizeElement(element);

@@ -13,13 +13,11 @@ export function useVaultFlow() {
   useEffect(() => {
     if (vault.isLoading || settingsLoading) return;
 
-    if (!vault.status?.exists) {
-      // No vault exists - show setup modal (unless skipped in settings)
-      if (!settings.security?.vaultSetupSkipped) {
-        setShowVaultSetup(true);
-      }
+    if (vault.status?.exists && vault.status?.isUnlocked) {
+      // Vault is unlocked - hide all modals
+      setShowVaultSetup(false);
       setShowVaultUnlock(false);
-    } else if (!vault.status?.isUnlocked) {
+    } else if (vault.status?.exists) {
       // Vault exists but is locked
       // Only show unlock modal on initial load, not after auto-lock
       if (!initialVaultCheckDone) {
@@ -27,8 +25,10 @@ export function useVaultFlow() {
         setShowVaultUnlock(true);
       }
     } else {
-      // Vault is unlocked - hide all modals
-      setShowVaultSetup(false);
+      // No vault exists - show setup modal (unless skipped in settings)
+      if (!settings.security?.vaultSetupSkipped) {
+        setShowVaultSetup(true);
+      }
       setShowVaultUnlock(false);
     }
 
@@ -40,7 +40,7 @@ export function useVaultFlow() {
 
   const handleVaultSetupSkip = useCallback(() => {
     // Persist the skip choice in settings
-    void updateSettings({
+    updateSettings({
       ...settings,
       security: { ...settings.security, vaultSetupSkipped: true },
     });

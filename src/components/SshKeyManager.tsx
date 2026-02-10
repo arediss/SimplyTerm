@@ -9,7 +9,7 @@ interface SshKeyManagerProps {
   isVaultUnlocked: boolean;
 }
 
-export default function SshKeyManager({ isVaultUnlocked }: SshKeyManagerProps) {
+export default function SshKeyManager({ isVaultUnlocked }: Readonly<SshKeyManagerProps>) {
   const { t } = useTranslation();
   const { keys, createKey, updateKey, deleteKey } = useSshKeys();
   const [showForm, setShowForm] = useState(false);
@@ -182,6 +182,7 @@ export default function SshKeyManager({ isVaultUnlocked }: SshKeyManagerProps) {
         <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in">
           <div
             className="absolute inset-0 bg-black/70"
+            aria-hidden="true"
             onClick={() => !isDeleting && setConfirmDeleteKey(null)}
           />
           <div className="relative bg-crust border border-surface-0/50 rounded-xl shadow-2xl w-[360px] animate-scale-in">
@@ -292,10 +293,10 @@ export default function SshKeyManager({ isVaultUnlocked }: SshKeyManagerProps) {
               onChange={(e) => setFormAlwaysAsk(e.target.checked)}
               className="mt-0.5 accent-accent"
             />
-            <div>
-              <div className="text-xs text-text">{t("settings.security.sshKeysAlwaysAskPassphrase")}</div>
-              <div className="text-[10px] text-text-muted">{t("settings.security.sshKeysAlwaysAskPassphraseDesc")}</div>
-            </div>
+            <span>
+              <span className="block text-xs text-text">{t("settings.security.sshKeysAlwaysAskPassphrase")}</span>
+              <span className="block text-[10px] text-text-muted">{t("settings.security.sshKeysAlwaysAskPassphraseDesc")}</span>
+            </span>
           </label>
 
           {formError && (

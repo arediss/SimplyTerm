@@ -43,7 +43,7 @@ export interface SidebarViewRegistration {
 
 /**
  * Configuration for a sidebar section registered by a plugin
- * @deprecated Use SidebarViewConfig instead for tab-based UI
+ * Legacy API - prefer SidebarViewConfig for new plugins
  */
 export interface SidebarSectionConfig {
   /** Unique section identifier */
@@ -62,7 +62,7 @@ export interface SidebarSectionConfig {
 
 /**
  * Registration object for a sidebar section
- * @deprecated Use SidebarViewRegistration instead for tab-based UI
+ * Legacy API - prefer SidebarViewRegistration for new plugins
  */
 export interface SidebarSectionRegistration {
   /** Section configuration */

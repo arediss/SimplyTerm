@@ -5,11 +5,18 @@ import { getAutoLockOptions } from "../../utils";
 import { SettingGroup, SettingRow, Toggle } from "./SettingsUIComponents";
 import type { useVault } from "../../hooks";
 
+function getMethodLabel(method: string, t: (key: string) => string): string {
+  if (method === 'master_password') return t("settings.security.methodPassword");
+  if (method === 'pin') return t("settings.security.methodPin");
+  if (method === 'security_key') return t("settings.security.methodSecurityKey");
+  return method;
+}
+
 interface VaultStatusSectionProps {
   vault: ReturnType<typeof useVault>;
 }
 
-export default function VaultStatusSection({ vault }: VaultStatusSectionProps) {
+export default function VaultStatusSection({ vault }: Readonly<VaultStatusSectionProps>) {
   const { t } = useTranslation();
   const autoLockOptions = getAutoLockOptions(t);
 
@@ -47,9 +54,7 @@ export default function VaultStatusSection({ vault }: VaultStatusSectionProps) {
           }`}
           title={vault.status?.isUnlocked ? t("settings.security.vaultUnlocked") : t("settings.security.vaultLocked")}
           description={`${t("settings.security.methods")}: ${vault.status?.unlockMethods.map(m =>
-            m === 'master_password' ? t("settings.security.methodPassword") :
-            m === 'pin' ? t("settings.security.methodPin") :
-            m === 'security_key' ? t("settings.security.methodSecurityKey") : m
+            getMethodLabel(m, t)
           ).join(', ')}`}
         >
           {vault.status?.isUnlocked && (
@@ -106,15 +111,7 @@ export default function VaultStatusSection({ vault }: VaultStatusSectionProps) {
 
       {/* Delete Vault */}
       <SettingGroup title={t("settings.security.deleteVaultTitle")} description={t("settings.security.deleteVaultDesc")}>
-        {!showDeleteConfirm ? (
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="px-4 py-2.5 bg-error/10 text-error text-sm rounded-lg hover:bg-error/20 transition-colors"
-          >
-            <Trash2 size={16} className="inline mr-2" />
-            {t("settings.security.deleteVault")}
-          </button>
-        ) : (
+        {showDeleteConfirm ? (
           <div className="p-4 bg-error/10 rounded-lg border border-error/30 space-y-4">
             <p className="text-sm text-error">
               {t("settings.security.deleteVaultWarning")}
@@ -143,6 +140,14 @@ export default function VaultStatusSection({ vault }: VaultStatusSectionProps) {
               </button>
             </div>
           </div>
+        ) : (
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="px-4 py-2.5 bg-error/10 text-error text-sm rounded-lg hover:bg-error/20 transition-colors"
+          >
+            <Trash2 size={16} className="inline mr-2" />
+            {t("settings.security.deleteVault")}
+          </button>
         )}
       </SettingGroup>
     </>

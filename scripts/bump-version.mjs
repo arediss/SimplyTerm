@@ -17,9 +17,9 @@
  *   node scripts/bump-version.mjs 0.3.0-alpha   # explicit version
  */
 
-import { readFileSync, writeFileSync } from "fs";
-import { resolve, dirname } from "path";
-import { fileURLToPath } from "url";
+import { readFileSync, writeFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
@@ -39,9 +39,9 @@ function parseVersion(version) {
   const match = version.match(/^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$/);
   if (!match) throw new Error(`Invalid version: ${version}`);
   return {
-    major: parseInt(match[1]),
-    minor: parseInt(match[2]),
-    patch: parseInt(match[3]),
+    major: Number.parseInt(match[1]),
+    minor: Number.parseInt(match[2]),
+    patch: Number.parseInt(match[3]),
     prerelease: match[4] || null,
   };
 }

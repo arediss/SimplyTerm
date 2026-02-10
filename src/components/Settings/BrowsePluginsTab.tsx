@@ -38,7 +38,7 @@ export default function BrowsePluginsTab({
   onCategoryChange,
   onInstall,
   onRefresh,
-}: BrowsePluginsTabProps) {
+}: Readonly<BrowsePluginsTabProps>) {
   const { t } = useTranslation();
 
   return (
@@ -75,46 +75,87 @@ export default function BrowsePluginsTab({
       </div>
 
       {/* Results */}
-      {error ? (
-        <div className="flex flex-col items-center py-12 text-text-muted">
-          <div className="w-16 h-16 rounded-2xl bg-error/10 flex items-center justify-center mb-4">
-            <AlertCircle size={28} className="text-error/60" />
-          </div>
-          <p className="text-sm font-medium text-error/80">{t("settings.plugins.registryError")}</p>
-          {error && <p className="text-[10px] text-text-muted/60 mt-1.5 max-w-[280px] text-center break-all">{error}</p>}
-          <button
-            onClick={onRefresh}
-            className="mt-4 px-4 py-1.5 text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20 rounded-lg transition-colors"
-          >
-            {t("common.refresh")}
-          </button>
+      <BrowsePluginsResults
+        error={error}
+        loading={loading}
+        plugins={plugins}
+        installedIds={installedIds}
+        actionLoading={actionLoading}
+        onRefresh={onRefresh}
+        onInstall={onInstall}
+        t={t}
+      />
+    </div>
+  );
+}
+
+function BrowsePluginsResults({
+  error,
+  loading,
+  plugins,
+  installedIds,
+  actionLoading,
+  onRefresh,
+  onInstall,
+  t,
+}: Readonly<{
+  error: string | null;
+  loading: boolean;
+  plugins: RegistryPlugin[];
+  installedIds: Set<string>;
+  actionLoading: string | null;
+  onRefresh: () => void;
+  onInstall: (plugin: RegistryPlugin) => void;
+  t: (key: string) => string;
+}>) {
+  if (error) {
+    return (
+      <div className="flex flex-col items-center py-12 text-text-muted">
+        <div className="w-16 h-16 rounded-2xl bg-error/10 flex items-center justify-center mb-4">
+          <AlertCircle size={28} className="text-error/60" />
         </div>
-      ) : loading ? (
-        <PluginListSkeleton />
-      ) : plugins.length === 0 ? (
-        <div className="flex flex-col items-center py-12 text-text-muted">
-          <div className="w-16 h-16 rounded-2xl bg-surface-0/20 flex items-center justify-center mb-4">
-            <Globe size={28} className="opacity-40" />
-          </div>
-          <p className="text-sm font-medium text-text/60">{t("settings.plugins.noResults")}</p>
-          <p className="text-[11px] text-text-muted/60 mt-1">{t("settings.plugins.noResultsHint")}</p>
+        <p className="text-sm font-medium text-error/80">{t("settings.plugins.registryError")}</p>
+        <p className="text-[10px] text-text-muted/60 mt-1.5 max-w-[280px] text-center break-all">{error}</p>
+        <button
+          onClick={onRefresh}
+          className="mt-4 px-4 py-1.5 text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20 rounded-lg transition-colors"
+        >
+          {t("common.refresh")}
+        </button>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return <PluginListSkeleton />;
+  }
+
+  if (plugins.length === 0) {
+    return (
+      <div className="flex flex-col items-center py-12 text-text-muted">
+        <div className="w-16 h-16 rounded-2xl bg-surface-0/20 flex items-center justify-center mb-4">
+          <Globe size={28} className="opacity-40" />
         </div>
-      ) : (
-        <div className="space-y-2">
-          {plugins.map((plugin) => {
-            const isInstalled = installedIds.has(plugin.id);
-            return (
-              <BrowsePluginCard
-                key={plugin.id}
-                plugin={plugin}
-                isInstalled={isInstalled}
-                loading={actionLoading === plugin.id}
-                onInstall={() => onInstall(plugin)}
-              />
-            );
-          })}
-        </div>
-      )}
+        <p className="text-sm font-medium text-text/60">{t("settings.plugins.noResults")}</p>
+        <p className="text-[11px] text-text-muted/60 mt-1">{t("settings.plugins.noResultsHint")}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {plugins.map((plugin) => {
+        const isInstalled = installedIds.has(plugin.id);
+        return (
+          <BrowsePluginCard
+            key={plugin.id}
+            plugin={plugin}
+            isInstalled={isInstalled}
+            loading={actionLoading === plugin.id}
+            onInstall={() => onInstall(plugin)}
+          />
+        );
+      })}
     </div>
   );
 }

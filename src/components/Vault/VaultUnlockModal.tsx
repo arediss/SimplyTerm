@@ -28,7 +28,7 @@ export function VaultUnlockModal({
   onUnlockWithPassword,
   onUnlockWithPin,
   onUnlockWithSecurityKey,
-}: VaultUnlockModalProps) {
+}: Readonly<VaultUnlockModalProps>) {
   const { t } = useTranslation();
   const hasPin = unlockMethods.includes('pin');
   const hasSecurityKey = unlockMethods.includes('security_key');

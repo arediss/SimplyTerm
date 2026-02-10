@@ -12,7 +12,7 @@ interface AppearanceSettingsProps {
   ) => void;
 }
 
-export default function AppearanceSettings({ settings, onChange }: AppearanceSettingsProps) {
+export default function AppearanceSettings({ settings, onChange }: Readonly<AppearanceSettingsProps>) {
   const { t } = useTranslation();
   const themes = getThemes();
 

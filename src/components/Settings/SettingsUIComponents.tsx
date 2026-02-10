@@ -1,14 +1,20 @@
 import { ChevronRight } from "lucide-react";
 
+function getTabClassName(isActive: boolean, isWarning: boolean): string {
+  if (!isActive) return "border-transparent text-text-muted hover:text-text/80";
+  if (isWarning) return "border-orange-400 text-orange-400";
+  return "border-accent text-text";
+}
+
 export function SubTabs<T extends string>({
   tabs,
   activeTab,
   onChange,
-}: {
+}: Readonly<{
   tabs: { id: T; label: string; icon?: React.ReactNode; variant?: "default" | "warning" }[];
   activeTab: T;
   onChange: (tab: T) => void;
-}) {
+}>) {
   return (
     <div className="flex gap-1 border-b border-surface-0/20">
       {tabs.map((tab) => {
@@ -21,12 +27,7 @@ export function SubTabs<T extends string>({
             onClick={() => onChange(tab.id)}
             className={`
               flex items-center gap-1.5 px-3 pb-2 text-xs font-medium transition-colors duration-200 border-b-2 -mb-px
-              ${isActive
-                ? isWarning
-                  ? "border-orange-400 text-orange-400"
-                  : "border-accent text-text"
-                : "border-transparent text-text-muted hover:text-text/80"
-              }
+              ${getTabClassName(isActive, isWarning)}
             `}
           >
             {tab.icon}
@@ -42,11 +43,11 @@ export function SettingGroup({
   title,
   description,
   children,
-}: {
+}: Readonly<{
   title: string;
   description: string;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <div className="space-y-3">
       <div>
@@ -64,13 +65,13 @@ export function SettingRow({
   title,
   description,
   children,
-}: {
+}: Readonly<{
   icon: React.ReactNode;
   iconClassName?: string;
   title: string;
   description: string;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <div className="flex items-center justify-between p-4 bg-surface-0/20 rounded-lg">
       <div className="flex items-center gap-3">
@@ -88,10 +89,10 @@ export function SettingRow({
 export function Toggle({
   checked,
   onChange,
-}: {
+}: Readonly<{
   checked: boolean;
   onChange: (checked: boolean) => void;
-}) {
+}>) {
   return (
     <button
       onClick={() => onChange(!checked)}
@@ -115,12 +116,12 @@ export function ThemeCard({
   active,
   colors,
   onClick,
-}: {
+}: Readonly<{
   name: string;
   active: boolean;
   colors: string[];
   onClick?: () => void;
-}) {
+}>) {
   return (
     <button
       onClick={onClick}
@@ -133,9 +134,9 @@ export function ThemeCard({
       `}
     >
       <div className="flex gap-1">
-        {colors.map((color, i) => (
+        {colors.map(color => (
           <div
-            key={i}
+            key={color}
             className="w-8 h-12 rounded-md first:rounded-l-lg last:rounded-r-lg"
             style={{ backgroundColor: color }}
           />
@@ -151,12 +152,12 @@ export function LinkButton({
   title,
   description,
   href,
-}: {
+}: Readonly<{
   icon: React.ReactNode;
   title: string;
   description: string;
   href: string;
-}) {
+}>) {
   return (
     <a
       href={href}

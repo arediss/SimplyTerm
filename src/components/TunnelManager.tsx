@@ -37,7 +37,13 @@ interface TunnelManagerProps {
 
 type TunnelType = "local" | "remote" | "dynamic";
 
-function TunnelManager({ isOpen, onClose, sessionId, sessionName, embedded = false }: TunnelManagerProps) {
+function getTunnelTypeLabel(type: TunnelType): string {
+  if (type === "local") return "Local (-L)";
+  if (type === "remote") return "Remote (-R)";
+  return "Dynamic (-D)";
+}
+
+function TunnelManager({ isOpen, onClose, sessionId, sessionName, embedded = false }: Readonly<TunnelManagerProps>) {
   const [tunnels, setTunnels] = useState<Tunnel[]>([]);
   const [error, setError] = useState<string | null>(null);
   
@@ -49,7 +55,7 @@ function TunnelManager({ isOpen, onClose, sessionId, sessionName, embedded = fal
   const [creating, setCreating] = useState(false);
 
   const isMountedRef = useRef(true);
-  useEffect(() => () => { isMountedRef.current = false; }, []);
+  useEffect(() => { isMountedRef.current = true; return () => { isMountedRef.current = false; }; }, []);
 
   const loadTunnels = useCallback(async () => {
     try {
@@ -64,7 +70,7 @@ function TunnelManager({ isOpen, onClose, sessionId, sessionName, embedded = fal
   // Load tunnels on mount and periodically
   useEffect(() => {
     if (!isOpen) return;
-    void loadTunnels();
+    loadTunnels();
     const interval = setInterval(loadTunnels, 2000);
     return () => clearInterval(interval);
   }, [isOpen, loadTunnels]);
@@ -78,9 +84,9 @@ function TunnelManager({ isOpen, onClose, sessionId, sessionName, embedded = fal
       await invoke("tunnel_create", {
         sessionId,
         tunnelType,
-        localPort: parseInt(localPort),
+        localPort: Number.parseInt(localPort),
         remoteHost: tunnelType === "dynamic" ? null : remoteHost || null,
-        remotePort: tunnelType === "dynamic" ? null : parseInt(remotePort) || null,
+        remotePort: tunnelType === "dynamic" ? null : Number.parseInt(remotePort) || null,
       });
       
       // Reset form
@@ -120,7 +126,7 @@ function TunnelManager({ isOpen, onClose, sessionId, sessionName, embedded = fal
     const k = 1024;
     const sizes = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
   };
 
   const getTunnelIcon = (type: TunnelType) => {
@@ -184,7 +190,7 @@ function TunnelManager({ isOpen, onClose, sessionId, sessionName, embedded = fal
                   }`}
                 >
                   {getTunnelIcon(type)}
-                  {type === "local" ? "Local (-L)" : type === "remote" ? "Remote (-R)" : "Dynamic (-D)"}
+                  {getTunnelTypeLabel(type)}
                 </button>
               ))}
             </div>
@@ -366,6 +372,7 @@ function TunnelManager({ isOpen, onClose, sessionId, sessionName, embedded = fal
       {/* Overlay */}
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        aria-hidden="true"
         onClick={onClose}
       />
 

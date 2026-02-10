@@ -26,7 +26,7 @@ export function CommandPalette({
   onClose,
   onExecuteCommand,
   onKeyDown,
-}: CommandPaletteProps) {
+}: Readonly<CommandPaletteProps>) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -55,19 +55,20 @@ export function CommandPalette({
       {/* Overlay */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        aria-hidden="true"
         onClick={onClose}
       />
 
       {/* Palette */}
-      <div
+      <dialog
+        open
         className="
-          relative w-full max-w-lg mx-4
+          relative w-full max-w-lg mx-4 p-0
           bg-mantle border border-surface-0/60 rounded-xl
           shadow-2xl shadow-black/50
           animate-scale-in
           overflow-hidden
         "
-        onKeyDown={onKeyDown}
       >
         {/* Search input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-surface-0/40">
@@ -77,6 +78,7 @@ export function CommandPalette({
             type="text"
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
+            onKeyDown={onKeyDown}
             placeholder={t("commandPalette.searchPlaceholder")}
             className="
               flex-1 bg-transparent text-text text-sm
@@ -130,7 +132,7 @@ export function CommandPalette({
             {t("commandPalette.close")}
           </span>
         </div>
-      </div>
+      </dialog>
     </div>
   );
 }

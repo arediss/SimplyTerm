@@ -8,7 +8,7 @@ interface ConnectionsSettingsProps {
   onClearAllSessions: () => void;
 }
 
-export default function ConnectionsSettings({ savedSessionsCount, onClearAllSessions }: ConnectionsSettingsProps) {
+export default function ConnectionsSettings({ savedSessionsCount, onClearAllSessions }: Readonly<ConnectionsSettingsProps>) {
   const { t } = useTranslation();
   const [confirmClear, setConfirmClear] = useState(false);
   const clearTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);

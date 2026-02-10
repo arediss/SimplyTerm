@@ -28,7 +28,7 @@ export function useSessions() {
   // Load on mount
   useEffect(() => {
     isMountedRef.current = true;
-    void loadSavedSessions();
+    loadSavedSessions();
     return () => {
       isMountedRef.current = false;
     };

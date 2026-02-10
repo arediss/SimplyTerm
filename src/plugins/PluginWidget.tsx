@@ -19,7 +19,7 @@ interface PluginWidgetProps {
   visible: boolean;
 }
 
-export function PluginWidget({ pluginId, panel, position, visible }: PluginWidgetProps) {
+export function PluginWidget({ pluginId, panel, position, visible }: Readonly<PluginWidgetProps>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
   const observerCleanupRef = useRef<(() => void) | null>(null);
@@ -83,7 +83,7 @@ export function PluginWidget({ pluginId, panel, position, visible }: PluginWidge
   const positionClass = position === 'floating-left' ? 'left-3' : 'right-3';
 
   return (
-    <div
+    <output
       className={`fixed bottom-3 ${positionClass} z-50`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -100,6 +100,6 @@ export function PluginWidget({ pluginId, panel, position, visible }: PluginWidge
           className="plugin-widget-content"
         />
       </div>
-    </div>
+    </output>
   );
 }

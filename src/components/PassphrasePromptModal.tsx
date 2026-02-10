@@ -15,7 +15,7 @@ export default function PassphrasePromptModal({
   keyName,
   onConfirm,
   onCancel,
-}: PassphrasePromptModalProps) {
+}: Readonly<PassphrasePromptModalProps>) {
   const { t } = useTranslation();
   const [passphrase, setPassphrase] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);

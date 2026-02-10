@@ -46,7 +46,19 @@ interface FileUploadedEvent {
   error?: string;
 }
 
-export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) {
+function getRowHighlight(entryPath: string, contextMenuPath?: string, selectedPath?: string): string {
+  if (contextMenuPath === entryPath) return "bg-blue/20 ring-1 ring-blue/40 ring-inset";
+  if (selectedPath === entryPath) return "bg-blue/10";
+  return "hover:bg-surface-0/30";
+}
+
+function getEditIndicator(status: string | undefined): { className: string; title: string } {
+  if (status === "uploading") return { className: "bg-yellow animate-pulse", title: "Uploading..." };
+  if (status === "error") return { className: "bg-red", title: "Upload failed" };
+  return { className: "bg-teal", title: "Watching for changes" };
+}
+
+export function SftpBrowser({ sessionId, initialPath = "/" }: Readonly<SftpBrowserProps>) {
   const [currentPath, setCurrentPath] = useState(initialPath);
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,7 +84,7 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
   } | null>(null);
 
   const isMountedRef = useRef(true);
-  useEffect(() => { return () => { isMountedRef.current = false; }; }, []);
+  useEffect(() => { isMountedRef.current = true; return () => { isMountedRef.current = false; }; }, []);
 
   const loadDirectory = useCallback(async (path: string) => {
     setLoading(true);
@@ -94,7 +106,7 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
   }, [sessionId]);
 
   useEffect(() => {
-    void loadDirectory(currentPath);
+    loadDirectory(currentPath);
   }, []);
 
   // Listen for file upload events
@@ -103,45 +115,36 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
     let unlistenFn: (() => void) | null = null;
     const pendingTimeouts = new Set<ReturnType<typeof setTimeout>>();
 
-    (async () => {
-      const unlisten = await listen<FileUploadedEvent>("sftp-file-uploaded", (event) => {
-        if (!isMounted) return;
-        const { session_id, remote_path, success, error } = event.payload;
-
-        // Only handle events for this session
-        if (session_id !== sessionId) return;
-
-        setEditingFiles((prev) => {
-          const newMap = new Map(prev);
-          const existing = newMap.get(remote_path);
-          if (existing) {
-            newMap.set(remote_path, {
-              ...existing,
-              status: success ? "synced" : "error",
-              error: error || undefined,
-            });
-          }
-          return newMap;
-        });
-
-        // Auto-clear synced status after 3 seconds
-        if (success) {
-          const t = setTimeout(() => {
-            pendingTimeouts.delete(t);
-            if (!isMounted) return;
-            setEditingFiles((prev) => {
-              const newMap = new Map(prev);
-              const existing = newMap.get(remote_path);
-              if (existing && existing.status === "synced") {
-                newMap.set(remote_path, { ...existing, status: "synced" });
-              }
-              return newMap;
-            });
-          }, 3000);
-          pendingTimeouts.add(t);
+    const updateFileStatus = (remotePath: string, status: "synced" | "error", error?: string) => {
+      setEditingFiles((prev) => {
+        const newMap = new Map(prev);
+        const existing = newMap.get(remotePath);
+        if (existing) {
+          newMap.set(remotePath, { ...existing, status, error });
         }
+        return newMap;
       });
+    };
 
+    const handleFileUploaded = (event: { payload: FileUploadedEvent }) => {
+      if (!isMounted) return;
+      const { session_id, remote_path, success, error } = event.payload;
+      if (session_id !== sessionId) return;
+
+      updateFileStatus(remote_path, success ? "synced" : "error", error);
+
+      if (success) {
+        const t = setTimeout(() => {
+          pendingTimeouts.delete(t);
+          if (!isMounted) return;
+          updateFileStatus(remote_path, "synced");
+        }, 3000);
+        pendingTimeouts.add(t);
+      }
+    };
+
+    (async () => {
+      const unlisten = await listen<FileUploadedEvent>("sftp-file-uploaded", handleFileUploaded);
       if (isMounted) {
         unlistenFn = unlisten;
       } else {
@@ -178,12 +181,12 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
         console.error("Failed to load editing files:", err);
       }
     };
-    void loadEditingFiles();
+    loadEditingFiles();
   }, [sessionId]);
 
   const handleNavigate = (entry: FileEntry) => {
     if (entry.is_dir) {
-      void loadDirectory(entry.path);
+      loadDirectory(entry.path);
       setSelectedEntry(null);
     }
   };
@@ -193,15 +196,15 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
     const parts = currentPath.split("/").filter(Boolean);
     parts.pop();
     const newPath = "/" + parts.join("/");
-    void loadDirectory(newPath || "/");
+    loadDirectory(newPath || "/");
   };
 
   const handleGoHome = () => {
-    void loadDirectory("/");
+    loadDirectory("/");
   };
 
   const handleRefresh = () => {
-    void loadDirectory(currentPath);
+    loadDirectory(currentPath);
   };
 
   const handleDelete = async (entry: FileEntry) => {
@@ -420,15 +423,17 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
 
       {/* File list */}
       <div className="flex-1 overflow-auto">
-        {loading && entries.length === 0 ? (
+        {loading && entries.length === 0 && (
           <div className="flex items-center justify-center h-full">
             <Loader2 size={24} className="animate-spin text-subtext-0" />
           </div>
-        ) : entries.length === 0 ? (
+        )}
+        {!loading && entries.length === 0 && (
           <div className="flex items-center justify-center h-full text-subtext-0 text-sm">
             Empty directory
           </div>
-        ) : (
+        )}
+        {entries.length > 0 && (
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-mantle text-subtext-0 text-xs">
               <tr>
@@ -443,11 +448,7 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
                   key={entry.path}
                   className={`
                     border-b border-surface-0/10 cursor-pointer
-                    ${contextMenu?.entry.path === entry.path
-                      ? "bg-blue/20 ring-1 ring-blue/40 ring-inset"
-                      : selectedEntry?.path === entry.path
-                      ? "bg-blue/10"
-                      : "hover:bg-surface-0/30"}
+                    ${getRowHighlight(entry.path, contextMenu?.entry.path, selectedEntry?.path)}
                   `}
                   onClick={() => setSelectedEntry(entry)}
                   onDoubleClick={() => handleNavigate(entry)}
@@ -479,7 +480,7 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              void handleRename();
+                              handleRename();
                             }}
                             className="p-1 rounded bg-green/20 text-green hover:bg-green/30 shrink-0"
                           >
@@ -498,24 +499,15 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
                       ) : (
                         <>
                           <span className="truncate">{entry.name}</span>
-                          {isEditing(entry.path) && (
-                            <span
-                              className={`ml-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${
-                                getEditStatus(entry.path) === "uploading"
-                                  ? "bg-yellow animate-pulse"
-                                  : getEditStatus(entry.path) === "error"
-                                  ? "bg-red"
-                                  : "bg-teal"
-                              }`}
-                              title={
-                                getEditStatus(entry.path) === "uploading"
-                                  ? "Uploading..."
-                                  : getEditStatus(entry.path) === "error"
-                                  ? "Upload failed"
-                                  : "Watching for changes"
-                              }
-                            />
-                          )}
+                          {isEditing(entry.path) && (() => {
+                            const indicator = getEditIndicator(getEditStatus(entry.path));
+                            return (
+                              <span
+                                className={`ml-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${indicator.className}`}
+                                title={indicator.title}
+                              />
+                            );
+                          })()}
                         </>
                       )}
                     </div>
@@ -538,16 +530,19 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
         <div
           className="fixed z-50 min-w-[160px] py-1 bg-crust rounded-lg border border-surface-0/50 shadow-xl"
           style={{
-            left: Math.min(contextMenu.x, window.innerWidth - 180),
-            top: Math.min(contextMenu.y, window.innerHeight - 200),
+            left: Math.min(contextMenu.x, globalThis.innerWidth - 180),
+            top: Math.min(contextMenu.y, globalThis.innerHeight - 200),
           }}
+          role="menu"
+          tabIndex={-1}
           onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => { if (e.key === 'Escape') setContextMenu(null); }}
         >
           {/* Edit externally (only for files) */}
           {!contextMenu.entry.is_dir && (
             <button
               onClick={() => {
-                void handleEditExternal(contextMenu.entry);
+                handleEditExternal(contextMenu.entry);
                 setContextMenu(null);
               }}
               className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-text hover:bg-surface-0/50 transition-colors text-left"
@@ -593,7 +588,7 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
           {/* Delete */}
           <button
             onClick={() => {
-              void handleDelete(contextMenu.entry);
+              handleDelete(contextMenu.entry);
               setContextMenu(null);
             }}
             className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-red hover:bg-red/10 transition-colors text-left"

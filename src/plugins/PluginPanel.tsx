@@ -18,7 +18,7 @@ interface PluginPanelProps {
   onClose?: () => void;
 }
 
-export function PluginPanel({ pluginId, panel, visible, onClose }: PluginPanelProps) {
+export function PluginPanel({ pluginId, panel, visible, onClose }: Readonly<PluginPanelProps>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
   const observerCleanupRef = useRef<(() => void) | null>(null);

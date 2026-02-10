@@ -8,7 +8,7 @@ interface PromptModalProps {
   onCancel: () => void;
 }
 
-function PromptModal({ isOpen, config, onConfirm, onCancel }: PromptModalProps) {
+function PromptModal({ isOpen, config, onConfirm, onCancel }: Readonly<PromptModalProps>) {
   const [value, setValue] = useState(config.defaultValue || "");
   const inputRef = useRef<HTMLInputElement>(null);
   const focusTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -32,11 +32,12 @@ function PromptModal({ isOpen, config, onConfirm, onCancel }: PromptModalProps) 
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") {
-      onCancel();
-    }
-  };
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEsc = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
+    document.addEventListener("keydown", handleEsc);
+    return () => document.removeEventListener("keydown", handleEsc);
+  }, [isOpen, onCancel]);
 
   if (!isOpen) return null;
 
@@ -45,14 +46,15 @@ function PromptModal({ isOpen, config, onConfirm, onCancel }: PromptModalProps) 
       {/* Backdrop */}
       <div
         className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm animate-fade-in"
+        aria-hidden="true"
         onClick={onCancel}
       />
 
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-        <div
-          className="bg-mantle border border-surface-0/50 rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto animate-scale-in"
-          onKeyDown={handleKeyDown}
+        <dialog
+          open
+          className="bg-mantle border border-surface-0/50 rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto animate-scale-in p-0"
         >
           <form onSubmit={handleSubmit}>
             {/* Header */}
@@ -93,7 +95,7 @@ function PromptModal({ isOpen, config, onConfirm, onCancel }: PromptModalProps) 
               </button>
             </div>
           </form>
-        </div>
+        </dialog>
       </div>
     </>
   );

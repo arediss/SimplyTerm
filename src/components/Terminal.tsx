@@ -33,7 +33,7 @@ const defaultTerminalSettings: TerminalSettings = {
 
 const RESIZE_DEBOUNCE_MS = 100;
 
-function Terminal({ sessionId, type, onExit, isActive = true, appTheme = "dark", settings }: TerminalProps) {
+function Terminal({ sessionId, type, onExit, isActive = true, appTheme = "dark", settings }: Readonly<TerminalProps>) {
   const terminalSettings = settings ?? defaultTerminalSettings;
   const { t } = useTranslation();
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -127,7 +127,7 @@ function Terminal({ sessionId, type, onExit, isActive = true, appTheme = "dark",
           isScrollingVisible = true;
         }
         if (scrollHideTimeout) clearTimeout(scrollHideTimeout);
-        scrollHideTimeout = window.setTimeout(() => {
+        scrollHideTimeout = globalThis.setTimeout(() => {
           xtermElement.classList.remove('is-scrolling');
           isScrollingVisible = false;
         }, 1500);
@@ -190,7 +190,7 @@ function Terminal({ sessionId, type, onExit, isActive = true, appTheme = "dark",
       }
     };
 
-    void setupSession();
+    setupSession();
 
     let resizeRafId: number | null = null;
     const handleResize = () => {
@@ -207,7 +207,7 @@ function Terminal({ sessionId, type, onExit, isActive = true, appTheme = "dark",
         clearTimeout(resizeTimeoutRef.current);
       }
 
-      resizeTimeoutRef.current = window.setTimeout(() => {
+      resizeTimeoutRef.current = globalThis.setTimeout(() => {
         const dims = fitAddonRef.current?.proposeDimensions();
         if (dims) {
           sendResize(dims.cols, dims.rows);
@@ -348,6 +348,7 @@ function Terminal({ sessionId, type, onExit, isActive = true, appTheme = "dark",
       <div
         ref={terminalRef}
         className="h-full w-full"
+        aria-hidden="true"
         onClick={handleClick}
       />
 

@@ -4,11 +4,16 @@ import { FormField } from "../FormField";
 import { Cable, RefreshCw } from "lucide-react";
 import type { SerialPortInfo } from "../../types";
 
+type DataBits = 5 | 6 | 7 | 8;
+type StopBits = 1 | 2;
+type Parity = "none" | "odd" | "even";
+type FlowControl = "none" | "hardware" | "software";
+
 const BAUD_RATES = [300, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600];
-const DATA_BITS: (5 | 6 | 7 | 8)[] = [5, 6, 7, 8];
-const STOP_BITS: (1 | 2)[] = [1, 2];
-const PARITY_OPTIONS: ("none" | "odd" | "even")[] = ["none", "odd", "even"];
-const FLOW_CONTROL_OPTIONS: ("none" | "hardware" | "software")[] = ["none", "hardware", "software"];
+const DATA_BITS: DataBits[] = [5, 6, 7, 8];
+const STOP_BITS: StopBits[] = [1, 2];
+const PARITY_OPTIONS: Parity[] = ["none", "odd", "even"];
+const FLOW_CONTROL_OPTIONS: FlowControl[] = ["none", "hardware", "software"];
 
 export interface SerialFormContentProps {
   name: string;
@@ -17,14 +22,14 @@ export interface SerialFormContentProps {
   setPort: (v: string) => void;
   baudRate: number;
   setBaudRate: (v: number) => void;
-  dataBits: 5 | 6 | 7 | 8;
-  setDataBits: (v: 5 | 6 | 7 | 8) => void;
-  stopBits: 1 | 2;
-  setStopBits: (v: 1 | 2) => void;
-  parity: "none" | "odd" | "even";
-  setParity: (v: "none" | "odd" | "even") => void;
-  flowControl: "none" | "hardware" | "software";
-  setFlowControl: (v: "none" | "hardware" | "software") => void;
+  dataBits: DataBits;
+  setDataBits: (v: DataBits) => void;
+  stopBits: StopBits;
+  setStopBits: (v: StopBits) => void;
+  parity: Parity;
+  setParity: (v: Parity) => void;
+  flowControl: FlowControl;
+  setFlowControl: (v: FlowControl) => void;
   availablePorts: SerialPortInfo[];
   isLoadingPorts: boolean;
   onRefreshPorts: () => void;
@@ -86,7 +91,7 @@ export const SerialFormContent = memo(function SerialFormContent(props: SerialFo
         <FormField label={t("connection.serial.baudRate")}>
           <select
             value={props.baudRate}
-            onChange={(e) => props.setBaudRate(parseInt(e.target.value))}
+            onChange={(e) => props.setBaudRate(Number.parseInt(e.target.value))}
             className="input-field"
           >
             {BAUD_RATES.map((rate) => (
@@ -99,7 +104,7 @@ export const SerialFormContent = memo(function SerialFormContent(props: SerialFo
         <FormField label={t("connection.serial.dataBits")}>
           <select
             value={props.dataBits}
-            onChange={(e) => props.setDataBits(parseInt(e.target.value) as 5 | 6 | 7 | 8)}
+            onChange={(e) => props.setDataBits(Number.parseInt(e.target.value) as DataBits)}
             className="input-field"
           >
             {DATA_BITS.map((bits) => (
@@ -116,7 +121,7 @@ export const SerialFormContent = memo(function SerialFormContent(props: SerialFo
         <FormField label={t("connection.serial.stopBits")}>
           <select
             value={props.stopBits}
-            onChange={(e) => props.setStopBits(parseInt(e.target.value) as 1 | 2)}
+            onChange={(e) => props.setStopBits(Number.parseInt(e.target.value) as StopBits)}
             className="input-field"
           >
             {STOP_BITS.map((bits) => (
@@ -129,7 +134,7 @@ export const SerialFormContent = memo(function SerialFormContent(props: SerialFo
         <FormField label={t("connection.serial.parity")}>
           <select
             value={props.parity}
-            onChange={(e) => props.setParity(e.target.value as "none" | "odd" | "even")}
+            onChange={(e) => props.setParity(e.target.value as Parity)}
             className="input-field"
           >
             {PARITY_OPTIONS.map((p) => (
@@ -147,7 +152,7 @@ export const SerialFormContent = memo(function SerialFormContent(props: SerialFo
           <select
             value={props.flowControl}
             onChange={(e) =>
-              props.setFlowControl(e.target.value as "none" | "hardware" | "software")
+              props.setFlowControl(e.target.value as FlowControl)
             }
             className="input-field"
           >

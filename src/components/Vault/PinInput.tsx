@@ -19,8 +19,8 @@ export function PinInput({
   error,
   disabled = false,
   autoFocus = true,
-}: PinInputProps) {
-  const [digits, setDigits] = useState<string[]>(Array(length).fill(''));
+}: Readonly<PinInputProps>) {
+  const [digits, setDigits] = useState<string[]>(new Array(length).fill(''));
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Focus first input on mount
@@ -33,14 +33,14 @@ export function PinInput({
   // Reset digits when error changes (wrong PIN)
   useEffect(() => {
     if (error) {
-      setDigits(Array(length).fill(''));
+      setDigits(new Array(length).fill(''));
       inputRefs.current[0]?.focus();
     }
   }, [error, length]);
 
   const handleChange = useCallback((index: number, value: string) => {
     // Only allow digits
-    const digit = value.replace(/\D/g, '').slice(-1);
+    const digit = value.replaceAll(/\D/g, '').slice(-1);
 
     const newDigits = [...digits];
     newDigits[index] = digit;
@@ -73,9 +73,9 @@ export function PinInput({
 
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     e.preventDefault();
-    const paste = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, length);
+    const paste = e.clipboardData.getData('text').replaceAll(/\D/g, '').slice(0, length);
     if (paste.length > 0) {
-      const newDigits = Array(length).fill('');
+      const newDigits = new Array(length).fill('');
       for (let i = 0; i < paste.length; i++) {
         newDigits[i] = paste[i];
       }
@@ -96,16 +96,16 @@ export function PinInput({
   return (
     <div className="flex flex-col items-center gap-4">
       <div className="flex gap-3">
-        {digits.map((digit, index) => (
+        {Array.from({ length }, (_, i) => i).map(pos => (
           <input
-            key={index}
-            ref={(el) => { inputRefs.current[index] = el; }}
+            key={pos}
+            ref={(el) => { inputRefs.current[pos] = el; }}
             type="password"
             inputMode="numeric"
             maxLength={1}
-            value={digit}
-            onChange={(e) => handleChange(index, e.target.value)}
-            onKeyDown={(e) => handleKeyDown(index, e)}
+            value={digits[pos]}
+            onChange={(e) => handleChange(pos, e.target.value)}
+            onKeyDown={(e) => handleKeyDown(pos, e)}
             onPaste={handlePaste}
             disabled={disabled}
             className={`
@@ -117,7 +117,7 @@ export function PinInput({
               transition-colors
               ${error ? 'border-error/50 animate-shake' : 'border-surface-0/50'}
             `}
-            aria-label={`PIN digit ${index + 1}`}
+            aria-label={`PIN digit ${pos + 1}`}
           />
         ))}
       </div>

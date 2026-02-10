@@ -37,7 +37,7 @@ export function NewConnectionModal({
   initialSerialConfig,
   initialConnectionType = "ssh",
   title,
-}: NewConnectionModalProps) {
+}: Readonly<NewConnectionModalProps>) {
   const { t } = useTranslation();
   const [connectionType, setConnectionType] = useState<ConnectionType>(initialConnectionType);
 

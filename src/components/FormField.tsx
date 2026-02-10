@@ -5,7 +5,7 @@ interface FormFieldProps {
   children: React.ReactNode;
 }
 
-export function FormField({ label, icon, action, children }: FormFieldProps) {
+export function FormField({ label, icon, action, children }: Readonly<FormFieldProps>) {
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
