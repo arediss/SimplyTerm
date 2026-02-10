@@ -32,11 +32,12 @@ function PromptModal({ isOpen, config, onConfirm, onCancel }: Readonly<PromptMod
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") {
-      onCancel();
-    }
-  };
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEsc = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
+    document.addEventListener("keydown", handleEsc);
+    return () => document.removeEventListener("keydown", handleEsc);
+  }, [isOpen, onCancel]);
 
   if (!isOpen) return null;
 
@@ -55,7 +56,7 @@ function PromptModal({ isOpen, config, onConfirm, onCancel }: Readonly<PromptMod
           open
           className="bg-mantle border border-surface-0/50 rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto animate-scale-in p-0"
         >
-          <form onSubmit={handleSubmit} onKeyDown={handleKeyDown}>
+          <form onSubmit={handleSubmit}>
             {/* Header */}
             <div className="px-6 pt-5 pb-4">
               <h2 className="text-lg font-semibold text-text">{config.title}</h2>
