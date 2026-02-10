@@ -994,4 +994,50 @@ export default {
     // Recherche: tooltip résultat suivant
     nextResult: "Suivant (Enter)",
   },
+
+  // ============================================
+  // SFTP - SftpBrowser.tsx
+  // ============================================
+  sftp: {
+    // Barre d'outils
+    home: "Accueil",
+    goUp: "Dossier parent",
+    refresh: "Actualiser",
+    newFolder: "Nouveau dossier",
+    newFolderPlaceholder: "Nom du dossier...",
+    // En-têtes de colonnes
+    colName: "Nom",
+    colSize: "Taille",
+    colModified: "Modifié",
+    // États vides
+    emptyDirectory: "Dossier vide",
+    allHidden: "Tous les fichiers sont masqués",
+    // Overlay glisser-déposer
+    dropToUpload: "Déposer les fichiers pour envoyer",
+    uploadTo: "Envoyer dans {{path}}",
+    uploading: "Envoi en cours",
+    // Menu contextuel
+    download: "Télécharger",
+    open: "Ouvrir",
+    editExternally: "Éditer en externe",
+    openInEditor: "Ouvrir dans l'éditeur",
+    copyPath: "Copier le chemin",
+    pathCopied: "Chemin copié",
+    rename: "Renommer",
+    watching: "suivi actif",
+    // Suppression
+    deleteTitle: "Supprimer {{type}}",
+    deleteConfirm: "Voulez-vous vraiment supprimer \"{{name}}\" ? Cette action est irréversible.",
+    // Toggle fichiers cachés
+    showHidden: "Afficher les fichiers cachés",
+    hideHidden: "Masquer les fichiers cachés",
+    // Barre de statut
+    connected: "Connecté",
+    items: "{{count}} éléments",
+    itemsHidden: "{{count}} éléments ({{hidden}} masqués)",
+    editing: "{{count}} en édition",
+    folder: "Dossier",
+    // Notification de téléchargement
+    downloaded: "{{name}} téléchargé",
+  },
 };

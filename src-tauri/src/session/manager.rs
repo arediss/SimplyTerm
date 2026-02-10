@@ -9,7 +9,7 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
 use super::traits::Session;
-use crate::connectors::SshConfig;
+use crate::connectors::{SshConfig, SftpPool, new_sftp_pool, disconnect_sftp};
 
 const BATCH_INTERVAL_MS: u64 = 16; // ~60fps
 const BATCH_MAX_SIZE: usize = 64 * 1024; // 64KB max before forced flush
@@ -23,6 +23,7 @@ pub struct SessionManager {
     sessions: Mutex<HashMap<String, Box<dyn Session>>>,
     ssh_configs: Mutex<HashMap<String, SshConfig>>,
     output_tx: Sender<OutputMessage>,
+    sftp_pool: SftpPool,
 }
 
 impl SessionManager {
@@ -33,6 +34,7 @@ impl SessionManager {
             sessions: Mutex::new(HashMap::new()),
             ssh_configs: Mutex::new(HashMap::new()),
             output_tx,
+            sftp_pool: new_sftp_pool(),
         });
 
         Self::spawn_batch_worker(app, output_rx);
@@ -82,6 +84,11 @@ impl SessionManager {
         self.output_tx.clone()
     }
 
+    /// Access the SFTP connection pool
+    pub fn sftp_pool(&self) -> &SftpPool {
+        &self.sftp_pool
+    }
+
     /// Registers a new session
     pub fn register(&self, session_id: String, session: Box<dyn Session>) {
         self.sessions.lock().insert(session_id, session);
@@ -116,6 +123,13 @@ impl SessionManager {
     pub fn close(&self, session_id: &str) -> Result<(), String> {
         // Also remove SSH config
         self.ssh_configs.lock().remove(session_id);
+
+        // Clean up SFTP pool entry for this session
+        let pool = self.sftp_pool.clone();
+        let sid = session_id.to_string();
+        tokio::spawn(async move {
+            disconnect_sftp(&pool, &sid).await;
+        });
 
         if let Some(session) = self.unregister(session_id) {
             session.close()

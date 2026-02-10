@@ -126,8 +126,9 @@ impl EditWatcher {
                     }
                 };
 
-                // Upload to remote
-                match sftp_write_file(&config, &remote_path, data).await {
+                // Upload to remote via pool
+                let pool = session_manager.sftp_pool();
+                match sftp_write_file(pool, &session_id, &config, &remote_path, data).await {
                     Ok(_) => {
                         println!("[EditWatcher] Uploaded {} -> {}", local_path.display(), remote_path);
 

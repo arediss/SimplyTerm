@@ -18,7 +18,7 @@ use connectors::{
     connect_ssh, finalize_cached_ssh, drop_cached_session, check_host_key_only,
     create_local_session,
     ssh_exec::{ssh_exec, get_server_stats, ServerStats}, SshAuth, SshConfig, SshConnectionResult,
-    HostKeyCheckResult, FileEntry, sftp_read_file,
+    HostKeyCheckResult, FileEntry, sftp_read_file, sftp_upload_file, disconnect_sftp,
     accept_pending_key, accept_and_update_pending_key, remove_pending_key,
     connect_telnet, connect_serial, list_serial_ports, SerialConfig, SerialPortInfo,
 };
@@ -346,8 +346,9 @@ async fn sftp_list(app: AppHandle, session_id: String, path: String) -> Result<V
         .session_manager
         .get_ssh_config(&session_id)
         .ok_or_else(|| "SSH session not found".to_string())?;
+    let pool = state.session_manager.sftp_pool();
 
-    connectors::sftp_list_dir(&config, &path).await
+    connectors::sftp_list_dir(pool, &session_id, &config, &path).await
 }
 
 #[tauri::command]
@@ -357,8 +358,9 @@ async fn sftp_read(app: AppHandle, session_id: String, path: String) -> Result<V
         .session_manager
         .get_ssh_config(&session_id)
         .ok_or_else(|| "SSH session not found".to_string())?;
+    let pool = state.session_manager.sftp_pool();
 
-    connectors::sftp_read_file(&config, &path).await
+    connectors::sftp_read_file(pool, &session_id, &config, &path).await
 }
 
 #[tauri::command]
@@ -368,8 +370,9 @@ async fn sftp_write(app: AppHandle, session_id: String, path: String, data: Vec<
         .session_manager
         .get_ssh_config(&session_id)
         .ok_or_else(|| "SSH session not found".to_string())?;
+    let pool = state.session_manager.sftp_pool();
 
-    connectors::sftp_write_file(&config, &path, data).await
+    connectors::sftp_write_file(pool, &session_id, &config, &path, data).await
 }
 
 #[tauri::command]
@@ -379,8 +382,9 @@ async fn sftp_remove(app: AppHandle, session_id: String, path: String, is_dir: b
         .session_manager
         .get_ssh_config(&session_id)
         .ok_or_else(|| "SSH session not found".to_string())?;
+    let pool = state.session_manager.sftp_pool();
 
-    connectors::sftp_delete(&config, &path, is_dir).await
+    connectors::sftp_delete(pool, &session_id, &config, &path, is_dir).await
 }
 
 #[tauri::command]
@@ -390,8 +394,9 @@ async fn sftp_rename(app: AppHandle, session_id: String, old_path: String, new_p
         .session_manager
         .get_ssh_config(&session_id)
         .ok_or_else(|| "SSH session not found".to_string())?;
+    let pool = state.session_manager.sftp_pool();
 
-    connectors::sftp_rename(&config, &old_path, &new_path).await
+    connectors::sftp_rename(pool, &session_id, &config, &old_path, &new_path).await
 }
 
 #[tauri::command]
@@ -401,8 +406,126 @@ async fn sftp_mkdir(app: AppHandle, session_id: String, path: String) -> Result<
         .session_manager
         .get_ssh_config(&session_id)
         .ok_or_else(|| "SSH session not found".to_string())?;
+    let pool = state.session_manager.sftp_pool();
 
-    connectors::sftp_mkdir(&config, &path).await
+    connectors::sftp_mkdir(pool, &session_id, &config, &path).await
+}
+
+/// Disconnect an SFTP pooled connection (called on unmount / tab close)
+#[tauri::command]
+async fn sftp_disconnect(app: AppHandle, session_id: String) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let pool = state.session_manager.sftp_pool();
+    disconnect_sftp(pool, &session_id).await;
+    Ok(())
+}
+
+/// Upload a file via SFTP with progress events
+#[tauri::command]
+async fn sftp_upload(
+    app: AppHandle,
+    session_id: String,
+    remote_path: String,
+    file_name: String,
+    data: Vec<u8>,
+    file_index: u32,
+    total_files: u32,
+) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let config = state
+        .session_manager
+        .get_ssh_config(&session_id)
+        .ok_or_else(|| "SSH session not found".to_string())?;
+    let pool = state.session_manager.sftp_pool();
+
+    sftp_upload_file(
+        pool,
+        &session_id,
+        &config,
+        &remote_path,
+        data,
+        file_name,
+        file_index,
+        total_files,
+        app.app_handle(),
+    )
+    .await
+}
+
+/// Download a file via SFTP to a local path chosen by the user
+#[tauri::command]
+async fn sftp_download(
+    app: AppHandle,
+    session_id: String,
+    remote_path: String,
+    local_path: String,
+) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let config = state
+        .session_manager
+        .get_ssh_config(&session_id)
+        .ok_or_else(|| "SSH session not found".to_string())?;
+    let pool = state.session_manager.sftp_pool();
+
+    // Read file from remote
+    let data = connectors::sftp_read_file(pool, &session_id, &config, &remote_path).await?;
+
+    // Write to chosen local path
+    std::fs::write(&local_path, &data)
+        .map_err(|e| format!("Failed to save file: {}", e))?;
+
+    Ok(())
+}
+
+/// Upload files from local paths via SFTP (used by native drag & drop)
+#[tauri::command]
+async fn sftp_upload_files(
+    app: AppHandle,
+    session_id: String,
+    remote_dir: String,
+    local_paths: Vec<String>,
+) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let config = state
+        .session_manager
+        .get_ssh_config(&session_id)
+        .ok_or_else(|| "SSH session not found".to_string())?;
+    let pool = state.session_manager.sftp_pool();
+
+    let total_files = local_paths.len() as u32;
+
+    for (i, local_path) in local_paths.iter().enumerate() {
+        let path = std::path::Path::new(local_path);
+        let file_name = path
+            .file_name()
+            .ok_or_else(|| format!("Invalid file path: {}", local_path))?
+            .to_string_lossy()
+            .to_string();
+
+        let data = std::fs::read(local_path)
+            .map_err(|e| format!("Failed to read file {}: {}", file_name, e))?;
+
+        let remote_path = if remote_dir == "/" {
+            format!("/{}", file_name)
+        } else {
+            format!("{}/{}", remote_dir, file_name)
+        };
+
+        sftp_upload_file(
+            pool,
+            &session_id,
+            &config,
+            &remote_path,
+            data,
+            file_name,
+            i as u32,
+            total_files,
+            app.app_handle(),
+        )
+        .await?;
+    }
+
+    Ok(())
 }
 
 /// Response for sftp_edit_external command
@@ -425,11 +548,13 @@ async fn sftp_edit_external(
         .get_ssh_config(&session_id)
         .ok_or_else(|| "SSH session not found".to_string())?;
 
+    let pool = state.session_manager.sftp_pool();
+
     // Get local path for this file
     let local_path = edit_watcher::get_local_edit_path(&session_id, &remote_path)?;
 
     // Download the file
-    let content = sftp_read_file(&config, &remote_path).await?;
+    let content = sftp_read_file(pool, &session_id, &config, &remote_path).await?;
 
     // Write to local file
     std::fs::write(&local_path, &content)
@@ -1805,6 +1930,7 @@ async fn plugin_api_http_request(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
@@ -1886,6 +2012,10 @@ pub fn run() {
             sftp_remove,
             sftp_rename,
             sftp_mkdir,
+            sftp_disconnect,
+            sftp_upload,
+            sftp_upload_files,
+            sftp_download,
             sftp_edit_external,
             sftp_stop_editing,
             sftp_get_editing_files,

@@ -26,6 +26,17 @@
   --color-warning: #E8C878;
   --color-error: #E88B8B;
 
+  /* Palette colors for icons, badges, file types */
+  --color-yellow: #E8C878;
+  --color-green: #9CD68D;
+  --color-blue: #7DA6E8;
+  --color-purple: #C4A7E7;
+  --color-orange: #E8A870;
+  --color-red: #E88B8B;
+  --color-pink: #E8A0BF;
+  --color-teal: #7DD6C0;
+  --color-cyan: #7DC8E8;
+
   --color-border-soft: rgba(255, 245, 235, 0.06);
   --color-border-strong: rgba(255, 245, 235, 0.12);
 
