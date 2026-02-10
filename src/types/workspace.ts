@@ -1,5 +1,4 @@
-import { SshConnectionConfig } from "./index";
-import { TelnetConnectionConfig, SerialConnectionConfig } from "./index";
+import { SshConnectionConfig, TelnetConnectionConfig, SerialConnectionConfig } from "./index";
 
 // ============================================================================
 // Workspace Tree Types

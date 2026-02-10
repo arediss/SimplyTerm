@@ -1,9 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, memo, lazy, Suspense } from "react";
 import { useTranslation } from "react-i18next";
 import { Palette, Terminal, Link2, Info, Shield, Puzzle } from "lucide-react";
-import { pluginManager } from "../../plugins";
-import { PluginSettingsPanel } from "../../plugins";
-import type { SettingsPanelRegistration } from "../../plugins";
+import { pluginManager, PluginSettingsPanel, type SettingsPanelRegistration } from "../../plugins";
 import type { AppSettings } from "../../types";
 import {
   AppearanceSettings,
@@ -30,11 +28,11 @@ const SettingsSectionButton = memo(function SettingsSectionButton({
   section,
   isActive,
   onSelect,
-}: {
+}: Readonly<{
   section: { id: SettingsSection; label: string; icon: React.ReactNode };
   isActive: boolean;
   onSelect: (id: SettingsSection) => void;
-}) {
+}>) {
   const handleClick = useCallback(() => onSelect(section.id), [section.id, onSelect]);
   return (
     <button
@@ -58,7 +56,7 @@ export default function SettingsTab({
   onSettingsChange,
   savedSessionsCount,
   onClearAllSessions,
-}: SettingsTabProps) {
+}: Readonly<SettingsTabProps>) {
   const { t } = useTranslation();
   const [activeSection, setActiveSection] = useState<SettingsSection>("appearance");
   const [pluginPanels, setPluginPanels] = useState<Map<string, { pluginId: string; panel: SettingsPanelRegistration }>>(
