@@ -565,12 +565,13 @@ const SavedSessionItem = memo(function SavedSessionItem({
 
   return (
     <>
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={isConnecting ? -1 : 0}
         onClick={isConnecting ? undefined : handleConnect}
+        onKeyDown={isConnecting ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleConnect(); } }}
         onContextMenu={isConnecting ? undefined : handleContextMenu}
-        disabled={isConnecting}
-        className={`group/session w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left bg-transparent border-none ${
+        className={`group/session w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left ${
           isConnecting
             ? "bg-accent/10 cursor-wait"
             : "hover:bg-white/5 cursor-pointer"
@@ -604,7 +605,7 @@ const SavedSessionItem = memo(function SavedSessionItem({
             <FolderOpen size={14} />
           </button>
         )}
-      </button>
+      </div>
 
       {/* Context Menu - rendered via Portal to escape transform context */}
       {contextMenu && createPortal(
