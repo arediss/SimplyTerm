@@ -733,8 +733,7 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: Readonly<SftpBrows
             </button>
           </div>
         );
-      })()
-      )}
+      })()}
 
       {/* New folder dialog */}
       {showNewFolderDialog && (
