@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { getErrorMessage } from "../utils";
 import {
   X,
   ArrowLeftRight,
@@ -47,23 +48,26 @@ function TunnelManager({ isOpen, onClose, sessionId, sessionName, embedded = fal
   const [remotePort, setRemotePort] = useState("");
   const [creating, setCreating] = useState(false);
 
-  // Load tunnels on mount and periodically
-  useEffect(() => {
-    if (isOpen) {
-      loadTunnels();
-      const interval = setInterval(loadTunnels, 2000);
-      return () => clearInterval(interval);
-    }
-  }, [isOpen, sessionId]);
+  const isMountedRef = useRef(true);
+  useEffect(() => () => { isMountedRef.current = false; }, []);
 
-  const loadTunnels = async () => {
+  const loadTunnels = useCallback(async () => {
     try {
       const result = await invoke<Tunnel[]>("tunnel_list", { sessionId });
+      if (!isMountedRef.current) return;
       setTunnels(result);
     } catch (err) {
       console.error("Failed to load tunnels:", err);
     }
-  };
+  }, [sessionId]);
+
+  // Load tunnels on mount and periodically
+  useEffect(() => {
+    if (!isOpen) return;
+    loadTunnels();
+    const interval = setInterval(loadTunnels, 2000);
+    return () => clearInterval(interval);
+  }, [isOpen, loadTunnels]);
 
   const createTunnel = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,7 +91,7 @@ function TunnelManager({ isOpen, onClose, sessionId, sessionName, embedded = fal
       // Reload tunnels
       await loadTunnels();
     } catch (err) {
-      setError(String(err));
+      setError(getErrorMessage(err));
     } finally {
       setCreating(false);
     }
@@ -173,7 +177,7 @@ function TunnelManager({ isOpen, onClose, sessionId, sessionName, embedded = fal
                   key={type}
                   type="button"
                   onClick={() => setTunnelType(type)}
-                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-colors ${
                     tunnelType === type
                       ? "bg-surface-0 text-text shadow-sm"
                       : "text-text-muted hover:text-text"

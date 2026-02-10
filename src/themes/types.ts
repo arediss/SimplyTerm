@@ -114,14 +114,3 @@ export interface Theme {
   terminal: TerminalColors;
 }
 
-/** Theme registry for managing available themes */
-export interface ThemeRegistry {
-  /** Get all registered themes */
-  getThemes(): Theme[];
-  /** Get a theme by ID */
-  getTheme(id: string): Theme | undefined;
-  /** Register a new theme (for plugins) */
-  registerTheme(theme: Theme): void;
-  /** Unregister a theme */
-  unregisterTheme(id: string): void;
-}

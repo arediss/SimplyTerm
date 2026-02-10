@@ -64,7 +64,6 @@
     -moz-osx-font-smoothing: grayscale;
     user-select: none;
     -webkit-user-select: none;
-    transition: background 0.3s ease, color 0.3s ease;
   }
 
   ::-webkit-scrollbar {
@@ -157,38 +156,8 @@
 }
 
 @layer components {
-  .drag-region {
-    -webkit-app-region: drag;
-  }
-
   .no-drag {
     -webkit-app-region: no-drag;
-  }
-
-  /* Glass morphism effect */
-  .glass {
-    background: var(--color-glass);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--color-glass-border);
-  }
-
-  .glass-subtle {
-    background: var(--color-glass-subtle);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-  }
-
-  /* Floating shadow for tabs */
-  .float-shadow {
-    box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.6),
-      0 2px 8px -2px rgba(0, 0, 0, 0.4);
-  }
-
-  /* Light variant shadow */
-  [data-theme-variant="light"] .float-shadow {
-    box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.15),
-      0 2px 8px -2px rgba(0, 0, 0, 0.1);
   }
 
   /* Input field */
@@ -201,7 +170,7 @@
     color: var(--color-text);
     font-size: 0.8125rem;
     outline: none;
-    transition: all 0.2s ease;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
   }
 
   .input-field::placeholder {
@@ -256,17 +225,6 @@
     }
   }
 
-  @keyframes float-up {
-    from {
-      opacity: 0;
-      transform: translateY(8px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
   .animate-slide-in {
     animation: slide-in-left 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
@@ -283,8 +241,20 @@
     animation: scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  .animate-float-up {
-    animation: float-up 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  /* Split handle dragging - applied to body to prevent cursor flicker */
+  .split-dragging-h {
+    cursor: row-resize !important;
+    user-select: none !important;
+  }
+
+  .split-dragging-v {
+    cursor: col-resize !important;
+    user-select: none !important;
+  }
+
+  /* Split pane sizing via CSS custom property — avoids inline style recalc on drag */
+  .split-pane {
+    flex: 0 0 var(--split-size);
   }
 
   /* Hide scrollbar but keep functionality */
@@ -295,5 +265,17 @@
 
   .hide-scrollbar::-webkit-scrollbar {
     display: none;
+  }
+}
+
+/* Accessibility: reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

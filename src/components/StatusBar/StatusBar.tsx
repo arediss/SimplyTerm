@@ -6,9 +6,10 @@
  * Can be enabled in settings when plugins need to display widgets.
  */
 
+import { memo } from "react";
 import type { StatusBarProps, StatusBarItem } from "./types";
 
-export function StatusBar({ visible, items = [] }: StatusBarProps) {
+export const StatusBar = memo(function StatusBar({ visible, items = [] }: StatusBarProps) {
   if (!visible) {
     return null;
   }
@@ -55,9 +56,9 @@ export function StatusBar({ visible, items = [] }: StatusBarProps) {
       </div>
     </div>
   );
-}
+});
 
-function StatusBarSection({ items }: { items: StatusBarItem[] }) {
+const StatusBarSection = memo(function StatusBarSection({ items }: { items: StatusBarItem[] }) {
   if (items.length === 0) return null;
 
   return (
@@ -72,7 +73,7 @@ function StatusBarSection({ items }: { items: StatusBarItem[] }) {
       ))}
     </>
   );
-}
+});
 
 function StatusBarItemRenderer({ item }: { item: StatusBarItem }) {
   const content = (

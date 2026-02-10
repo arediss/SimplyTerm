@@ -12,7 +12,7 @@ import { monokaiTheme } from "./monokai";
 import { creamTheme } from "./cream";
 
 // Re-export types
-export type { Theme, ThemeMeta, ThemeColors, TerminalColors, ThemeRegistry } from "./types";
+export type { Theme, ThemeMeta, ThemeColors, TerminalColors } from "./types";
 
 // Theme registry (singleton)
 const themes: Map<string, Theme> = new Map();

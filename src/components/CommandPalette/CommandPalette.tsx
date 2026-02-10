@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useCallback, memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Search } from "lucide-react";
 import { Command } from "./types";
@@ -97,12 +97,13 @@ export function CommandPalette({
             </div>
           ) : (
             filteredCommands.map((command, index) => (
-              <CommandItem
+              <CommandItemWrapper
                 key={command.id}
                 command={command}
+                index={index}
                 isSelected={index === selectedIndex}
-                onSelect={() => onSelectedIndexChange(index)}
-                onExecute={() => onExecuteCommand(command)}
+                onSelectedIndexChange={onSelectedIndexChange}
+                onExecuteCommand={onExecuteCommand}
               />
             ))
           )}
@@ -133,3 +134,29 @@ export function CommandPalette({
     </div>
   );
 }
+
+// Wrapper to avoid inline closures per command in .map()
+const CommandItemWrapper = memo(function CommandItemWrapper({
+  command,
+  index,
+  isSelected,
+  onSelectedIndexChange,
+  onExecuteCommand,
+}: {
+  command: Command;
+  index: number;
+  isSelected: boolean;
+  onSelectedIndexChange: (index: number) => void;
+  onExecuteCommand: (command: Command) => void;
+}) {
+  const handleSelect = useCallback(() => onSelectedIndexChange(index), [index, onSelectedIndexChange]);
+  const handleExecute = useCallback(() => onExecuteCommand(command), [command, onExecuteCommand]);
+  return (
+    <CommandItem
+      command={command}
+      isSelected={isSelected}
+      onSelect={handleSelect}
+      onExecute={handleExecute}
+    />
+  );
+});

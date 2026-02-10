@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { getVersion } from "@tauri-apps/api/app";
+import { getErrorMessage } from "../../utils";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import {
@@ -33,6 +34,7 @@ export default function AboutSettings() {
   const { t } = useTranslation();
   const [appVersion, setAppVersion] = useState<string>("...");
   const [copied, setCopied] = useState(false);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   // Update state
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
@@ -45,10 +47,18 @@ export default function AboutSettings() {
     getVersion().then(setAppVersion).catch(() => setAppVersion("?"));
   }, []);
 
+  // Cleanup copy feedback timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    };
+  }, []);
+
   const handleCopyVersion = () => {
     navigator.clipboard.writeText(`SimplyTerm v${appVersion}`);
     setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    copyTimeoutRef.current = setTimeout(() => setCopied(false), 1500);
   };
 
   const handleCheckUpdate = useCallback(async () => {
@@ -67,7 +77,7 @@ export default function AboutSettings() {
         setUpdateStatus("up-to-date");
       }
     } catch (err) {
-      setUpdateError(err instanceof Error ? err.message : String(err));
+      setUpdateError(getErrorMessage(err));
       setUpdateStatus("error");
     }
   }, []);
@@ -91,7 +101,7 @@ export default function AboutSettings() {
 
       setUpdateStatus("ready");
     } catch (err) {
-      setUpdateError(err instanceof Error ? err.message : String(err));
+      setUpdateError(getErrorMessage(err));
       setUpdateStatus("error");
     }
   }, [updateInfo]);
@@ -272,8 +282,8 @@ export default function AboutSettings() {
               {/* Progress bar */}
               <div className="h-1.5 bg-crust/60 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-accent rounded-full transition-all duration-300 ease-out"
-                  style={{ width: `${downloadTotal > 0 ? progressPercent : 100}%` }}
+                  className="h-full w-full bg-accent rounded-full transition-transform duration-300 ease-out origin-left"
+                  style={{ transform: `scaleX(${downloadTotal > 0 ? progressPercent / 100 : 1})` }}
                 />
               </div>
             </div>

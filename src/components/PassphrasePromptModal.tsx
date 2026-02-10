@@ -19,12 +19,17 @@ export default function PassphrasePromptModal({
   const { t } = useTranslation();
   const [passphrase, setPassphrase] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const focusTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   useEffect(() => {
     if (isOpen) {
       setPassphrase("");
-      setTimeout(() => inputRef.current?.focus(), 100);
+      if (focusTimeoutRef.current) clearTimeout(focusTimeoutRef.current);
+      focusTimeoutRef.current = setTimeout(() => inputRef.current?.focus(), 100);
     }
+    return () => {
+      if (focusTimeoutRef.current) clearTimeout(focusTimeoutRef.current);
+    };
   }, [isOpen]);
 
   const handleSubmit = (e: React.FormEvent) => {

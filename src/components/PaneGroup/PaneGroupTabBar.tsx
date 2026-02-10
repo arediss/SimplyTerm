@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, forwardRef } from "react";
+import { useState, useRef, useEffect, useCallback, forwardRef, memo } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Plus, X, ChevronDown, Terminal, ArrowLeftRight, Columns2, Rows2, XCircle } from "lucide-react";
@@ -71,6 +71,14 @@ export function PaneGroupTabBar({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [contextMenu]);
 
+  const handleDropdownToggle = useCallback(() => {
+    if (!isDropdownOpen && dropdownButtonRef.current) {
+      const rect = dropdownButtonRef.current.getBoundingClientRect();
+      setDropdownPosition({ x: rect.left, y: rect.bottom + 4 });
+    }
+    setIsDropdownOpen(prev => !prev);
+  }, [isDropdownOpen]);
+
   const handleTabBarContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     setContextMenu({ x: e.clientX, y: e.clientY });
@@ -103,13 +111,7 @@ export function PaneGroupTabBar({
         <div className="w-px h-4 bg-surface-0/30" />
         <button
           ref={dropdownButtonRef}
-          onClick={() => {
-            if (!isDropdownOpen && dropdownButtonRef.current) {
-              const rect = dropdownButtonRef.current.getBoundingClientRect();
-              setDropdownPosition({ x: rect.left, y: rect.bottom + 4 });
-            }
-            setIsDropdownOpen(!isDropdownOpen);
-          }}
+          onClick={handleDropdownToggle}
           className={`w-7 h-7 flex items-center justify-center rounded-r transition-colors ${
             isDropdownOpen
               ? "bg-surface-0/50 text-text"
@@ -124,13 +126,13 @@ export function PaneGroupTabBar({
       {/* Tabs scrollable */}
       <div className="flex-1 flex items-center gap-0.5 px-1.5 overflow-x-auto hide-scrollbar">
         {tabs.map((tab) => (
-          <TabPill
+          <TabPillWrapper
             key={tab.id}
             tab={tab}
             isActive={tab.id === activeTabId}
             typeColor={getTabTypeColor(tab.type)}
-            onSelect={() => onTabSelect(tab.id)}
-            onClose={() => onTabClose(tab.id)}
+            onTabSelect={onTabSelect}
+            onTabClose={onTabClose}
           />
         ))}
       </div>
@@ -154,7 +156,7 @@ export function PaneGroupTabBar({
         <div
           ref={contextMenuRef}
           className="fixed z-[100] min-w-[180px] bg-crust/95 backdrop-blur-xl border border-surface-0/50 rounded-xl shadow-xl py-1.5 overflow-hidden"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
+          style={{ transform: `translate3d(${contextMenu.x}px, ${contextMenu.y}px, 0)`, left: 0, top: 0 }}
           onClick={(e) => e.stopPropagation()}
         >
           <button
@@ -190,6 +192,20 @@ export function PaneGroupTabBar({
 // TabPill
 // ---------------------------------------------------------------------------
 
+interface TabPillWrapperProps {
+  tab: PaneGroupTab;
+  isActive: boolean;
+  typeColor: string;
+  onTabSelect: (tabId: string) => void;
+  onTabClose: (tabId: string) => void;
+}
+
+const TabPillWrapper = memo(function TabPillWrapper({ tab, isActive, typeColor, onTabSelect, onTabClose }: TabPillWrapperProps) {
+  const handleSelect = useCallback(() => onTabSelect(tab.id), [tab.id, onTabSelect]);
+  const handleClose = useCallback(() => onTabClose(tab.id), [tab.id, onTabClose]);
+  return <TabPill tab={tab} isActive={isActive} typeColor={typeColor} onSelect={handleSelect} onClose={handleClose} />;
+});
+
 interface TabPillProps {
   tab: PaneGroupTab;
   isActive: boolean;
@@ -198,14 +214,14 @@ interface TabPillProps {
   onClose: () => void;
 }
 
-function TabPill({ tab, isActive, typeColor, onSelect, onClose }: TabPillProps) {
+const TabPill = memo(function TabPill({ tab, isActive, typeColor, onSelect, onClose }: TabPillProps) {
   const [isHovered, setIsHovered] = useState(false);
 
   return (
     <div
       className={`
         group flex items-center gap-2 pl-2.5 pr-1.5 py-1.5 rounded-lg cursor-pointer
-        transition-all duration-150 shrink-0
+        transition-colors duration-150 shrink-0
         ${isActive
           ? "bg-surface-0/50 text-text"
           : "text-text-muted hover:text-text-secondary hover:bg-surface-0/25"
@@ -220,7 +236,7 @@ function TabPill({ tab, isActive, typeColor, onSelect, onClose }: TabPillProps) 
       <button
         className={`
           w-3.5 h-3.5 flex items-center justify-center rounded shrink-0
-          transition-all duration-100
+          transition-[colors,opacity] duration-100
           ${isActive || isHovered
             ? "opacity-50 hover:opacity-100 hover:bg-white/10"
             : "opacity-0 w-0 overflow-hidden"
@@ -232,7 +248,7 @@ function TabPill({ tab, isActive, typeColor, onSelect, onClose }: TabPillProps) 
       </button>
     </div>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // QuickConnectDropdown
@@ -296,7 +312,7 @@ const QuickConnectDropdown = forwardRef<HTMLDivElement, QuickConnectDropdownProp
     <div
       ref={ref}
       className="fixed w-52 bg-crust/95 backdrop-blur-xl border border-surface-0/50 rounded-xl shadow-xl overflow-hidden z-50"
-      style={{ left: position.x, top: position.y }}
+      style={{ transform: `translate3d(${position.x}px, ${position.y}px, 0)`, left: 0, top: 0 }}
     >
       <div className="p-1.5">
         <button

@@ -7,7 +7,7 @@ export type SshConnectionResult =
   | { type: "Connected" }
   | { type: "HostKeyCheck"; cache_id: string } & HostKeyCheckResult;
 
-export interface HostKeyVerification {
+interface HostKeyVerification {
   hostKeyResult: HostKeyCheckResult | null;
   isHostKeyModalOpen: boolean;
   hostKeyLoading: boolean;

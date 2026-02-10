@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Monitor, Trash2 } from "lucide-react";
 import { SettingGroup } from "./SettingsUIComponents";
@@ -11,13 +11,23 @@ interface ConnectionsSettingsProps {
 export default function ConnectionsSettings({ savedSessionsCount, onClearAllSessions }: ConnectionsSettingsProps) {
   const { t } = useTranslation();
   const [confirmClear, setConfirmClear] = useState(false);
+  const clearTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
+
+  // Cleanup confirm-clear timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (clearTimeoutRef.current) clearTimeout(clearTimeoutRef.current);
+    };
+  }, []);
+
   const handleClearAll = () => {
     if (confirmClear) {
       onClearAllSessions();
       setConfirmClear(false);
     } else {
       setConfirmClear(true);
-      setTimeout(() => setConfirmClear(false), 3000);
+      if (clearTimeoutRef.current) clearTimeout(clearTimeoutRef.current);
+      clearTimeoutRef.current = setTimeout(() => setConfirmClear(false), 3000);
     }
   };
 

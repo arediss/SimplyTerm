@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useRef, memo } from "react";
 import type { WorkspaceNode, PaneGroup as PaneGroupType } from "../types/workspace";
 
 import { PaneGroupComponent } from "./PaneGroup";
@@ -12,23 +12,29 @@ interface WorkspaceSplitProps {
   onTabClose: (tabId: string) => void;
   onFocusGroup: (groupId: string) => void;
   onResizeSplit: (splitId: string, newSizes: number[]) => void;
-  onNewConnection: () => void;
-  onLocalTerminal: () => void;
-  onToggleTunnelSidebar: () => void;
-  isTunnelSidebarOpen: boolean;
-  activeTunnelCount: number;
-  onSplitVertical: () => void;
-  onSplitHorizontal: () => void;
   onClosePane: (groupId: string) => void;
-  // Content renderers passed through to PaneGroup
-  renderTerminal: (ptySessionId: string, isActive: boolean, type: string) => React.ReactNode;
-  renderSftp: (sessionId: string) => React.ReactNode;
-  renderTunnel: (sessionId: string, sessionName: string) => React.ReactNode;
-  renderSettings: () => React.ReactNode;
-  renderEmpty: () => React.ReactNode;
 }
 
-export function WorkspaceSplit({
+/** Wrapper to avoid inline closures on SplitHandle */
+const SplitHandleWithIndex = memo(function SplitHandleWithIndex({
+  index,
+  direction,
+  onDrag,
+  onDragStart,
+}: {
+  index: number;
+  direction: "horizontal" | "vertical";
+  onDrag: (index: number, delta: number) => void;
+  onDragStart: () => void;
+}) {
+  const handleDrag = useCallback(
+    (delta: number) => onDrag(index, delta),
+    [index, onDrag]
+  );
+  return <SplitHandle direction={direction} onDrag={handleDrag} onDragStart={onDragStart} />;
+});
+
+export const WorkspaceSplit = memo(function WorkspaceSplit({
   node,
   groups,
   focusedGroupId,
@@ -36,58 +42,43 @@ export function WorkspaceSplit({
   onTabClose,
   onFocusGroup,
   onResizeSplit,
-  onNewConnection,
-  onLocalTerminal,
-  onToggleTunnelSidebar,
-  isTunnelSidebarOpen,
-  activeTunnelCount,
-  onSplitVertical,
-  onSplitHorizontal,
   onClosePane,
-  renderTerminal,
-  renderSftp,
-  renderTunnel,
-  renderSettings,
-  renderEmpty,
 }: WorkspaceSplitProps) {
-  // Leaf node — render the PaneGroup
-  if (node.type === "group") {
-    const group = groups.get(node.id);
-    if (!group) return <div className="w-full h-full bg-base" />;
+  // Cached container dimension — set once at drag start, used on every drag move
+  const cachedTotalSize = useRef(0);
 
-    return (
-      <PaneGroupComponent
-        group={group}
-        isFocused={node.id === focusedGroupId}
-        onTabSelect={(tabId) => onTabSelect(node.id, tabId)}
-        onTabClose={onTabClose}
-        onFocus={() => onFocusGroup(node.id)}
-        onNewConnection={onNewConnection}
-        onLocalTerminal={onLocalTerminal}
-        onToggleTunnelSidebar={onToggleTunnelSidebar}
-        isTunnelSidebarOpen={isTunnelSidebarOpen}
-        activeTunnelCount={activeTunnelCount}
-        onSplitVertical={onSplitVertical}
-        onSplitHorizontal={onSplitHorizontal}
-        onClosePane={() => onClosePane(node.id)}
-        renderTerminal={renderTerminal}
-        renderSftp={renderSftp}
-        renderTunnel={renderTunnel}
-        renderSettings={renderSettings}
-        renderEmpty={renderEmpty}
-      />
-    );
-  }
+  // Stable callbacks for PaneGroupComponent (avoids inline closures)
+  const handleGroupTabSelect = useCallback(
+    (tabId: string) => onTabSelect(node.id, tabId),
+    [node.id, onTabSelect]
+  );
+  const handleGroupFocus = useCallback(
+    () => onFocusGroup(node.id),
+    [node.id, onFocusGroup]
+  );
+  const handleGroupClosePane = useCallback(
+    () => onClosePane(node.id),
+    [node.id, onClosePane]
+  );
 
-  // Split node — render children with handles
-  const { direction, children, sizes } = node;
+  // Split-specific data (safe to read even for group nodes — just unused)
+  const { direction, children, sizes } = node.type === "split"
+    ? node
+    : { direction: "horizontal" as const, children: [] as WorkspaceNode[], sizes: [] as number[] };
+
+  // Cache the container dimension once when a drag begins (avoids layout thrashing on every mousemove)
+  const handleDragStart = useCallback(() => {
+    const container = document.getElementById(`wsplit-${node.id}`);
+    if (!container) return;
+    cachedTotalSize.current =
+      direction === "horizontal" ? container.clientHeight : container.clientWidth;
+  }, [node.id, direction]);
 
   const handleDrag = useCallback(
     (index: number, delta: number) => {
-      const container = document.getElementById(`wsplit-${node.id}`);
-      if (!container) return;
+      const totalSize = cachedTotalSize.current;
+      if (totalSize === 0) return;
 
-      const totalSize = direction === "horizontal" ? container.clientHeight : container.clientWidth;
       const deltaPercent = (delta / totalSize) * 100;
       const minSize = 10;
 
@@ -101,8 +92,27 @@ export function WorkspaceSplit({
 
       onResizeSplit(node.id, normalized);
     },
-    [node.id, sizes, direction, onResizeSplit]
+    [node.id, sizes, onResizeSplit]
   );
+
+  // Leaf node — render the PaneGroup
+  if (node.type === "group") {
+    const group = groups.get(node.id);
+    if (!group) return <div className="w-full h-full bg-base" />;
+
+    return (
+      <PaneGroupComponent
+        group={group}
+        isFocused={node.id === focusedGroupId}
+        onTabSelect={handleGroupTabSelect}
+        onTabClose={onTabClose}
+        onFocus={handleGroupFocus}
+        onClosePane={handleGroupClosePane}
+      />
+    );
+  }
+
+  // Split node — render children with handles
 
   return (
     <div
@@ -112,10 +122,8 @@ export function WorkspaceSplit({
       {children.map((child, index) => (
         <div key={child.id} className="contents">
           <div
-            style={{
-              [direction === "horizontal" ? "height" : "width"]: `${sizes[index]}%`,
-            }}
-            className="overflow-hidden"
+            className="split-pane overflow-hidden"
+            style={{ "--split-size": `${sizes[index]}%` } as React.CSSProperties}
           >
             <WorkspaceSplit
               node={child}
@@ -125,27 +133,20 @@ export function WorkspaceSplit({
               onTabClose={onTabClose}
               onFocusGroup={onFocusGroup}
               onResizeSplit={onResizeSplit}
-              onNewConnection={onNewConnection}
-              onLocalTerminal={onLocalTerminal}
-              onToggleTunnelSidebar={onToggleTunnelSidebar}
-              isTunnelSidebarOpen={isTunnelSidebarOpen}
-              activeTunnelCount={activeTunnelCount}
-              onSplitVertical={onSplitVertical}
-              onSplitHorizontal={onSplitHorizontal}
               onClosePane={onClosePane}
-              renderTerminal={renderTerminal}
-              renderSftp={renderSftp}
-              renderTunnel={renderTunnel}
-              renderSettings={renderSettings}
-              renderEmpty={renderEmpty}
             />
           </div>
 
           {index < children.length - 1 && (
-            <SplitHandle direction={direction} onDrag={(delta) => handleDrag(index, delta)} />
+            <SplitHandleWithIndex
+              index={index}
+              direction={direction}
+              onDrag={handleDrag}
+              onDragStart={handleDragStart}
+            />
           )}
         </div>
       ))}
     </div>
   );
-}
+});

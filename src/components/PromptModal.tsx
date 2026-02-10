@@ -11,13 +11,18 @@ interface PromptModalProps {
 function PromptModal({ isOpen, config, onConfirm, onCancel }: PromptModalProps) {
   const [value, setValue] = useState(config.defaultValue || "");
   const inputRef = useRef<HTMLInputElement>(null);
+  const focusTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   useEffect(() => {
     if (isOpen) {
       setValue(config.defaultValue || "");
       // Focus input after a short delay to allow animation
-      setTimeout(() => inputRef.current?.focus(), 100);
+      if (focusTimeoutRef.current) clearTimeout(focusTimeoutRef.current);
+      focusTimeoutRef.current = setTimeout(() => inputRef.current?.focus(), 100);
     }
+    return () => {
+      if (focusTimeoutRef.current) clearTimeout(focusTimeoutRef.current);
+    };
   }, [isOpen, config.defaultValue]);
 
   const handleSubmit = (e: React.FormEvent) => {

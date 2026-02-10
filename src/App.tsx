@@ -1,35 +1,41 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import Sidebar from "./components/Sidebar";
 import HeaderBar from "./components/HeaderBar";
 import TerminalPane from "./components/TerminalPane";
 import Modal from "./components/Modal";
-import HostKeyModal from "./components/HostKeyModal";
-import { SshConnectionConfig } from "./components/ConnectionForm";
-import NewConnectionModal from "./components/NewConnectionModal";
+import { SshConnectionConfig } from "./types";
 import { CommandPalette, useCommandPalette, CommandHandlers, CommandContext } from "./components/CommandPalette";
 import { StatusBar, type StatusBarItem } from "./components/StatusBar";
-import { PluginHost, pluginManager, type SessionInfo, type ModalConfig, type NotificationType, type PromptConfig } from "./plugins";
-import { check as checkUpdate } from "@tauri-apps/plugin-updater";
+import { pluginManager, type SessionInfo, type ModalConfig, type NotificationType, type PromptConfig } from "./plugins";
+const PluginHost = lazy(() => import("./plugins/PluginHost").then(m => ({ default: m.PluginHost })));
+// plugin-updater is lazy-imported in the auto-check useEffect below
 import type { HeaderActionItem } from "./plugins/PluginManager";
-import PromptModal from "./components/PromptModal";
-import PassphrasePromptModal from "./components/PassphrasePromptModal";
-import PluginModal from "./components/PluginModal";
-import { SftpBrowser } from "./components/SftpBrowser";
-import { VaultSetupModal, VaultUnlockModal } from "./components/Vault";
-import TunnelManager from "./components/TunnelManager";
-import TunnelSidebar from "./components/TunnelSidebar";
+const SftpBrowser = lazy(() => import("./components/SftpBrowser").then(m => ({ default: m.SftpBrowser })));
+const TunnelManager = lazy(() => import("./components/TunnelManager"));
+const TunnelSidebar = lazy(() => import("./components/TunnelSidebar"));
 import { WorkspaceSplit } from "./components/WorkspaceSplit";
-import SettingsTab from "./components/Settings/SettingsTab";
+import { WorkspaceActionsContext, type WorkspaceActions } from "./components/PaneGroup/WorkspaceActionsContext";
 import EmptyPaneSessions from "./components/EmptyPaneSessions";
+
+// Lazy-loaded modals and settings (only shown on user action)
+const HostKeyModal = lazy(() => import("./components/HostKeyModal"));
+const NewConnectionModal = lazy(() => import("./components/NewConnectionModal"));
+const PromptModal = lazy(() => import("./components/PromptModal"));
+const PassphrasePromptModal = lazy(() => import("./components/PassphrasePromptModal"));
+const PluginModal = lazy(() => import("./components/PluginModal"));
+const SettingsTab = lazy(() => import("./components/Settings/SettingsTab"));
+const VaultSetupModal = lazy(() => import("./components/Vault/VaultSetupModal"));
+const VaultUnlockModal = lazy(() => import("./components/Vault/VaultUnlockModal"));
 import { useSessions, useAppSettings, useVaultFlow, useHostKeyVerification, useWorkspace } from "./hooks";
 import type { SshConnectionResult } from "./hooks";
-import { SavedSession, TelnetConnectionConfig, SerialConnectionConfig, SshKeyProfile } from "./types";
+import { SavedSession, TelnetConnectionConfig, SerialConnectionConfig, SshKeyProfile, ConnectionType } from "./types";
 import type { PaneGroupTab } from "./types/workspace";
-import { ConnectionType } from "./components/ConnectionTypeSelector";
 import { generateSessionId, expandHomeDir, isModifierPressed } from "./utils";
 import { applyTheme } from "./themes";
+
+const noop = () => {};
 
 function App() {
   const { t } = useTranslation();
@@ -586,6 +592,13 @@ function App() {
     }
   };
 
+  // Dismiss save modal
+  const handleDismissSaveModal = useCallback(() => {
+    setIsSaveModalOpen(false);
+    setPendingSaveConfig(null);
+    setEditingSessionId(null);
+  }, []);
+
   // Save session
   const handleSaveSession = async () => {
     if (!pendingSaveConfig) return;
@@ -742,13 +755,45 @@ function App() {
     }
   };
 
+  // ============================================================================
+  // Stable handler refs (ref pattern for complex handlers with many deps)
+  // ============================================================================
+
+  const handleOpenSftpTabRef = useRef(handleOpenSftpTab);
+  handleOpenSftpTabRef.current = handleOpenSftpTab;
+  const stableHandleOpenSftpTab = useCallback((s: SavedSession) => handleOpenSftpTabRef.current(s), []);
+
+  const handleOpenTunnelTabRef = useRef(handleOpenTunnelTab);
+  handleOpenTunnelTabRef.current = handleOpenTunnelTab;
+  const stableHandleOpenTunnelTab = useCallback((s: SavedSession) => handleOpenTunnelTabRef.current(s), []);
+
+  const handleConnectToSavedSessionRef = useRef(handleConnectToSavedSession);
+  handleConnectToSavedSessionRef.current = handleConnectToSavedSession;
+  const stableHandleConnectToSavedSession = useCallback((s: SavedSession) => handleConnectToSavedSessionRef.current(s), []);
+
+  const handleEditSavedSessionRef = useRef(handleEditSavedSession);
+  handleEditSavedSessionRef.current = handleEditSavedSession;
+  const stableHandleEditSavedSession = useCallback((s: SavedSession) => handleEditSavedSessionRef.current(s), []);
+
+  const handleSshConnectRef = useRef(handleSshConnect);
+  handleSshConnectRef.current = handleSshConnect;
+  const stableHandleSshConnect = useCallback((c: SshConnectionConfig) => handleSshConnectRef.current(c), []);
+
+  const handleTelnetConnectRef = useRef(handleTelnetConnect);
+  handleTelnetConnectRef.current = handleTelnetConnect;
+  const stableHandleTelnetConnect = useCallback((c: TelnetConnectionConfig) => handleTelnetConnectRef.current(c), []);
+
+  const handleSerialConnectRef = useRef(handleSerialConnect);
+  handleSerialConnectRef.current = handleSerialConnect;
+  const stableHandleSerialConnect = useCallback((c: SerialConnectionConfig) => handleSerialConnectRef.current(c), []);
+
   // Plugin connectSsh
   const handlePluginConnectSsh = useCallback((config: { host: string; port: number; username: string; name?: string }) => {
     const saved = savedSessions.find(
       s => s.host === config.host && s.port === config.port && s.username === config.username
     );
     if (saved) {
-      handleConnectToSavedSession(saved);
+      stableHandleConnectToSavedSession(saved);
     } else {
       setInitialConnectionConfig({
         name: config.name || `${config.username}@${config.host}`,
@@ -761,7 +806,7 @@ function App() {
       setIsConnectionModalOpen(true);
       setOpenSidebar("none");
     }
-  }, [savedSessions, handleConnectToSavedSession]);
+  }, [savedSessions, stableHandleConnectToSavedSession]);
 
   // ============================================================================
   // Tab close handler
@@ -774,6 +819,17 @@ function App() {
       pluginManager.notifySessionDisconnect(closedTab.ptySessionId);
     }
   }, [workspace]);
+
+  const handleOpenConnectionModal = useCallback(() => {
+    setConnectionError(undefined);
+    setInitialConnectionConfig(null);
+    setInitialTelnetConfig(null);
+    setInitialSerialConfig(null);
+    setConnectionType("ssh");
+    setEditingSessionId(null);
+    setIsConnectionModalOpen(true);
+    setOpenSidebar("none");
+  }, [setConnectionError]);
 
   // ============================================================================
   // Keyboard shortcuts
@@ -844,17 +900,6 @@ function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [workspace, handleNewLocalTab, handleCloseTab]);
 
-  const handleOpenConnectionModal = () => {
-    setConnectionError(undefined);
-    setInitialConnectionConfig(null);
-    setInitialTelnetConfig(null);
-    setInitialSerialConfig(null);
-    setConnectionType("ssh");
-    setEditingSessionId(null);
-    setIsConnectionModalOpen(true);
-    setOpenSidebar("none");
-  };
-
   // ============================================================================
   // Command Palette
   // ============================================================================
@@ -863,23 +908,33 @@ function App() {
   const activeTab = focusedGroup?.tabs.find((t) => t.id === focusedGroup.activeTabId);
   const allTabs = workspace.getAllTabs();
 
+  // Ref to track notification timeout for cleanup
+  const notifTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
+
+  // Ref to avoid identity-based deps on activeTab (created fresh each render by .find())
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+
   const commandHandlers: CommandHandlers = useMemo(
     () => ({
       newSshConnection: handleOpenConnectionModal,
       closeTab: () => {
-        if (activeTab) handleCloseTab(activeTab.id);
+        const tab = activeTabRef.current;
+        if (tab) handleCloseTab(tab.id);
       },
       duplicateTab: () => {
-        if (activeTab?.sshConfig) {
-          setInitialConnectionConfig(activeTab.sshConfig);
+        const tab = activeTabRef.current;
+        if (tab?.sshConfig) {
+          setInitialConnectionConfig(tab.sshConfig);
           setIsConnectionModalOpen(true);
         }
       },
       renameTab: () => {
-        if (activeTab) {
-          const newName = window.prompt("Enter new tab name:", activeTab.title);
+        const tab = activeTabRef.current;
+        if (tab) {
+          const newName = window.prompt("Enter new tab name:", tab.title);
           if (newName && newName.trim()) {
-            workspace.renameTab(activeTab.id, newName.trim());
+            workspace.renameTab(tab.id, newName.trim());
           }
         }
       },
@@ -894,29 +949,32 @@ function App() {
       prevTab: () => workspace.cycleFocusedGroupTab("prev"),
       openSettings: () => workspace.openSettings(),
       openSftp: () => {
-        if (activeTab?.type === "ssh" && activeTab.sshConfig) {
+        const tab = activeTabRef.current;
+        if (tab?.type === "ssh" && tab.sshConfig) {
           const matchingSaved = savedSessions.find(
             (s) =>
-              s.host === activeTab.sshConfig?.host &&
-              s.username === activeTab.sshConfig?.username
+              s.host === tab.sshConfig?.host &&
+              s.username === tab.sshConfig?.username
           );
           if (matchingSaved) {
-            handleOpenSftpTab(matchingSaved);
+            stableHandleOpenSftpTab(matchingSaved);
           }
         }
       },
     }),
-    [activeTab, allTabs.length, savedSessions, handleCloseTab, workspace, handleOpenSftpTab]
+    [savedSessions, handleCloseTab, workspace, stableHandleOpenSftpTab]
   );
 
+  const activeTabId = activeTab?.id;
+  const activeTabType = activeTab?.type;
   const commandContext: CommandContext = useMemo(
     () => ({
-      hasActiveTab: !!activeTab,
+      hasActiveTab: !!activeTabId,
       hasMultipleTabs: allTabs.length > 1,
       hasMultiplePanes: workspace.groups.size > 1,
-      isActiveTabSsh: activeTab?.type === "ssh",
+      isActiveTabSsh: activeTabType === "ssh",
     }),
-    [activeTab, allTabs.length, workspace.groups.size]
+    [activeTabId, activeTabType, allTabs.length, workspace.groups.size]
   );
 
   const commandPalette = useCommandPalette({
@@ -937,17 +995,19 @@ function App() {
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, [commandPalette.toggle]);
 
-  // Auto-check for updates on startup
+  // Auto-check for updates on startup (lazy-loads plugin-updater)
   useEffect(() => {
     const timer = setTimeout(() => {
-      checkUpdate()
+      import("@tauri-apps/plugin-updater")
+        .then(({ check }) => check())
         .then((update) => {
           if (update) {
             setNotification({
               message: t("settings.about.updateAvailable") + ` v${update.version}`,
               type: "info",
             });
-            setTimeout(() => setNotification(null), 5000);
+            if (notifTimeoutRef.current) clearTimeout(notifTimeoutRef.current);
+            notifTimeoutRef.current = setTimeout(() => setNotification(null), 5000);
           }
         })
         .catch(() => {});
@@ -961,7 +1021,8 @@ function App() {
 
   const handleShowNotification = useCallback((message: string, type: NotificationType) => {
     setNotification({ message, type });
-    setTimeout(() => setNotification(null), 3000);
+    if (notifTimeoutRef.current) clearTimeout(notifTimeoutRef.current);
+    notifTimeoutRef.current = setTimeout(() => setNotification(null), 3000);
   }, []);
 
   const handleShowModal = useCallback((config: ModalConfig): Promise<unknown> => {
@@ -1050,6 +1111,173 @@ function App() {
   }, []);
 
   // ============================================================================
+  // Stable workspace callbacks for WorkspaceSplit
+  // ============================================================================
+
+  const handleTabSelect = useCallback(
+    (groupId: string, tabId: string) => workspace.selectTab(groupId, tabId),
+    [workspace.selectTab]
+  );
+  const handleFocusGroup = useCallback(
+    (groupId: string) => workspace.focusGroup(groupId),
+    [workspace.focusGroup]
+  );
+  const handleResizeSplit = useCallback(
+    (splitId: string, sizes: number[]) => workspace.resizeSplitNode(splitId, sizes),
+    [workspace.resizeSplitNode]
+  );
+  const handleToggleTunnelSidebar = useCallback(
+    () => setOpenSidebar((prev) => prev === "tunnel" ? "none" : "tunnel"),
+    []
+  );
+  const handleSplitVertical = useCallback(
+    () => workspace.splitFocusedGroup("vertical"),
+    [workspace.splitFocusedGroup]
+  );
+  const handleSplitHorizontal = useCallback(
+    () => workspace.splitFocusedGroup("horizontal"),
+    [workspace.splitFocusedGroup]
+  );
+  const handleClosePane = useCallback(
+    (groupId: string) => {
+      const closedTabs = workspace.closeGroup(groupId);
+      for (const tab of closedTabs) {
+        if (tab.ptySessionId) {
+          invoke("close_pty_session", { sessionId: tab.ptySessionId }).catch(console.error);
+          pluginManager.notifySessionDisconnect(tab.ptySessionId);
+        }
+      }
+    },
+    [workspace.closeGroup]
+  );
+
+  // Memoized render functions (consumed via WorkspaceActionsContext)
+  const terminalTheme = appSettings.appearance?.theme ?? "dark";
+  const terminalSettings = appSettings.terminal;
+
+  const renderTerminal = useCallback(
+    (ptySessionId: string, isActive: boolean, type: string) => (
+      <TerminalPane
+        key={ptySessionId}
+        sessionId={ptySessionId}
+        type={type === "ssh" ? "ssh" : "local"}
+        isActive={isActive}
+        appTheme={terminalTheme}
+        terminalSettings={terminalSettings}
+      />
+    ),
+    [terminalTheme, terminalSettings]
+  );
+
+  const renderSftp = useCallback(
+    (sessionId: string) => (
+      <Suspense fallback={null}>
+        <SftpBrowser key={sessionId} sessionId={sessionId} initialPath="/" />
+      </Suspense>
+    ),
+    []
+  );
+
+  const renderTunnel = useCallback(
+    (sessionId: string, sessionName: string) => (
+      <Suspense fallback={null}>
+        <div className="w-full h-full flex items-center justify-center bg-base p-6">
+          <div className="w-full max-w-2xl h-full">
+            <TunnelManager
+              isOpen={true}
+              onClose={noop}
+              sessionId={sessionId}
+              sessionName={sessionName}
+              embedded={true}
+            />
+          </div>
+        </div>
+      </Suspense>
+    ),
+    []
+  );
+
+  const renderSettings = useCallback(
+    () => (
+      <Suspense fallback={null}>
+        <SettingsTab
+          settings={appSettings}
+          onSettingsChange={handleSettingsChange}
+          savedSessionsCount={savedSessions.length}
+          onClearAllSessions={clearAllSavedSessions}
+        />
+      </Suspense>
+    ),
+    [appSettings, handleSettingsChange, savedSessions.length, clearAllSavedSessions]
+  );
+
+  const renderEmpty = useCallback(
+    () => (
+      <EmptyPaneSessions
+        savedSessions={savedSessions}
+        connectingSessionId={connectingSessionId}
+        onConnect={stableHandleConnectToSavedSession}
+        onNewConnection={handleOpenConnectionModal}
+        onLocalTerminal={handleNewLocalTab}
+      />
+    ),
+    [savedSessions, connectingSessionId, stableHandleConnectToSavedSession, handleOpenConnectionModal, handleNewLocalTab]
+  );
+
+  // WorkspaceActionsContext value — global actions + render fns shared by all pane groups
+  const workspaceActions: WorkspaceActions = useMemo(() => ({
+    onNewConnection: handleOpenConnectionModal,
+    onLocalTerminal: handleNewLocalTab,
+    onToggleTunnelSidebar: handleToggleTunnelSidebar,
+    isTunnelSidebarOpen,
+    activeTunnelCount,
+    onSplitVertical: handleSplitVertical,
+    onSplitHorizontal: handleSplitHorizontal,
+    renderTerminal,
+    renderSftp,
+    renderTunnel,
+    renderSettings,
+    renderEmpty,
+  }), [
+    handleOpenConnectionModal, handleNewLocalTab, handleToggleTunnelSidebar,
+    isTunnelSidebarOpen, activeTunnelCount,
+    handleSplitVertical, handleSplitHorizontal,
+    renderTerminal, renderSftp, renderTunnel, renderSettings, renderEmpty,
+  ]);
+
+  // ============================================================================
+  // Stable callbacks for render props
+  // ============================================================================
+
+  const handleToggleSidebar = useCallback(() => {
+    if (sidebarPinned) {
+      handleToggleSidebarPin();
+    } else {
+      setOpenSidebar(prev => prev === "menu" ? "none" : "menu");
+    }
+  }, [sidebarPinned, handleToggleSidebarPin]);
+
+  const handleOpenSettingsTab = useCallback(() => workspace.openSettings(), [workspace]);
+
+  const handleVaultToggle = useCallback(
+    () => vault.status?.isUnlocked ? lockVault() : openVaultUnlock(),
+    [vault.status?.isUnlocked, lockVault, openVaultUnlock]
+  );
+
+  const handleCloseSidebar = useCallback(() => setOpenSidebar("none"), []);
+
+  const handleCloseConnectionModal = useCallback(() => {
+    setIsConnectionModalOpen(false);
+    setInitialConnectionConfig(null);
+    setInitialTelnetConfig(null);
+    setInitialSerialConfig(null);
+    setConnectionError(undefined);
+    setEditingSessionId(null);
+    setPendingSftpSession(null);
+    setConnectionType("ssh");
+  }, []);
+
+  // ============================================================================
   // Render
   // ============================================================================
 
@@ -1057,19 +1285,13 @@ function App() {
     <div className="relative h-screen bg-terminal overflow-hidden">
       {/* Header bar (simplified, no tab pills) */}
       <HeaderBar
-        onToggleSidebar={() => {
-          if (sidebarPinned) {
-            handleToggleSidebarPin(); // Unpin
-          } else {
-            setOpenSidebar(openSidebar === "menu" ? "none" : "menu");
-          }
-        }}
+        onToggleSidebar={handleToggleSidebar}
         isSidebarOpen={isSidebarOpen}
-        onOpenSettings={() => workspace.openSettings()}
+        onOpenSettings={handleOpenSettingsTab}
         headerActions={headerActions}
         vaultExists={vault.status?.exists}
         vaultUnlocked={vault.status?.isUnlocked}
-        onVaultToggle={() => vault.status?.isUnlocked ? lockVault() : openVaultUnlock()}
+        onVaultToggle={handleVaultToggle}
       />
 
       {/* Main area: pinned sidebar + workspace */}
@@ -1078,89 +1300,33 @@ function App() {
         {sidebarPinned && (
           <Sidebar
             isOpen={true}
-            onClose={() => {}}
+            onClose={noop}
             mode="pinned"
             onTogglePin={handleToggleSidebarPin}
             savedSessions={savedSessions}
             connectingSessionId={connectingSessionId}
-            onSavedSessionConnect={handleConnectToSavedSession}
-            onSavedSessionEdit={handleEditSavedSession}
+            onSavedSessionConnect={stableHandleConnectToSavedSession}
+            onSavedSessionEdit={stableHandleEditSavedSession}
             onSavedSessionDelete={handleDeleteSavedSession}
-            onSavedSessionSftp={handleOpenSftpTab}
-            onSavedSessionTunnel={handleOpenTunnelTab}
+            onSavedSessionSftp={stableHandleOpenSftpTab}
+            onSavedSessionTunnel={stableHandleOpenTunnelTab}
           />
         )}
 
         {/* Workspace area */}
         <div className="flex-1 overflow-hidden m-1.5 mt-0 rounded-xl">
+          <WorkspaceActionsContext.Provider value={workspaceActions}>
             <WorkspaceSplit
               node={workspace.tree}
               groups={workspace.groups}
               focusedGroupId={workspace.focusedGroupId}
-              onTabSelect={(groupId, tabId) => workspace.selectTab(groupId, tabId)}
+              onTabSelect={handleTabSelect}
               onTabClose={handleCloseTab}
-              onFocusGroup={(groupId) => workspace.focusGroup(groupId)}
-              onResizeSplit={(splitId, sizes) => workspace.resizeSplitNode(splitId, sizes)}
-              onNewConnection={handleOpenConnectionModal}
-              onLocalTerminal={handleNewLocalTab}
-              onToggleTunnelSidebar={() => setOpenSidebar(openSidebar === "tunnel" ? "none" : "tunnel")}
-              isTunnelSidebarOpen={isTunnelSidebarOpen}
-              activeTunnelCount={activeTunnelCount}
-              onSplitVertical={() => workspace.splitFocusedGroup("vertical")}
-              onSplitHorizontal={() => workspace.splitFocusedGroup("horizontal")}
-              onClosePane={(groupId) => {
-                const closedTabs = workspace.closeGroup(groupId);
-                for (const tab of closedTabs) {
-                  if (tab.ptySessionId) {
-                    invoke("close_pty_session", { sessionId: tab.ptySessionId }).catch(console.error);
-                    pluginManager.notifySessionDisconnect(tab.ptySessionId);
-                  }
-                }
-              }}
-              renderTerminal={(ptySessionId, isActive, type) => (
-                <TerminalPane
-                  key={ptySessionId}
-                  sessionId={ptySessionId}
-                  type={type === "ssh" ? "ssh" : "local"}
-                  isActive={isActive}
-                  appTheme={appSettings.appearance?.theme ?? "dark"}
-                  terminalSettings={appSettings.terminal}
-                />
-              )}
-              renderSftp={(sessionId) => (
-                <SftpBrowser key={sessionId} sessionId={sessionId} initialPath="/" />
-              )}
-              renderTunnel={(sessionId, sessionName) => (
-                <div className="w-full h-full flex items-center justify-center bg-base p-6">
-                  <div className="w-full max-w-2xl h-full">
-                    <TunnelManager
-                      isOpen={true}
-                      onClose={() => {}}
-                      sessionId={sessionId}
-                      sessionName={sessionName}
-                      embedded={true}
-                    />
-                  </div>
-                </div>
-              )}
-              renderSettings={() => (
-                <SettingsTab
-                  settings={appSettings}
-                  onSettingsChange={handleSettingsChange}
-                  savedSessionsCount={savedSessions.length}
-                  onClearAllSessions={clearAllSavedSessions}
-                />
-              )}
-              renderEmpty={() => (
-                <EmptyPaneSessions
-                  savedSessions={savedSessions}
-                  connectingSessionId={connectingSessionId}
-                  onConnect={handleConnectToSavedSession}
-                  onNewConnection={handleOpenConnectionModal}
-                  onLocalTerminal={handleNewLocalTab}
-                />
-              )}
+              onFocusGroup={handleFocusGroup}
+              onResizeSplit={handleResizeSplit}
+              onClosePane={handleClosePane}
             />
+          </WorkspaceActionsContext.Provider>
         </div>
       </div>
 
@@ -1168,52 +1334,43 @@ function App() {
       {!sidebarPinned && (
         <Sidebar
           isOpen={openSidebar === "menu"}
-          onClose={() => setOpenSidebar("none")}
+          onClose={handleCloseSidebar}
           mode="overlay"
           onTogglePin={handleToggleSidebarPin}
           savedSessions={savedSessions}
           connectingSessionId={connectingSessionId}
-          onSavedSessionConnect={handleConnectToSavedSession}
-          onSavedSessionEdit={handleEditSavedSession}
+          onSavedSessionConnect={stableHandleConnectToSavedSession}
+          onSavedSessionEdit={stableHandleEditSavedSession}
           onSavedSessionDelete={handleDeleteSavedSession}
-          onSavedSessionSftp={handleOpenSftpTab}
-          onSavedSessionTunnel={handleOpenTunnelTab}
+          onSavedSessionSftp={stableHandleOpenSftpTab}
+          onSavedSessionTunnel={stableHandleOpenTunnelTab}
         />
       )}
 
       {/* Connection Modal */}
-      <NewConnectionModal
-        isOpen={isConnectionModalOpen}
-        onClose={() => {
-          setIsConnectionModalOpen(false);
-          setInitialConnectionConfig(null);
-          setInitialTelnetConfig(null);
-          setInitialSerialConfig(null);
-          setConnectionError(undefined);
-          setEditingSessionId(null);
-          setPendingSftpSession(null);
-          setConnectionType("ssh");
-        }}
-        onSshConnect={handleSshConnect}
-        onTelnetConnect={handleTelnetConnect}
-        onSerialConnect={handleSerialConnect}
-        isConnecting={isConnecting}
-        error={connectionError}
-        initialSshConfig={initialConnectionConfig}
-        initialTelnetConfig={initialTelnetConfig}
-        initialSerialConfig={initialSerialConfig}
-        initialConnectionType={connectionType}
-        title={editingSessionId ? t('app.editConnection') : (pendingSftpSession ? t('app.sftpConnection') : undefined)}
-      />
+      {isConnectionModalOpen && (
+        <Suspense fallback={null}>
+          <NewConnectionModal
+            isOpen={isConnectionModalOpen}
+            onClose={handleCloseConnectionModal}
+            onSshConnect={stableHandleSshConnect}
+            onTelnetConnect={stableHandleTelnetConnect}
+            onSerialConnect={stableHandleSerialConnect}
+            isConnecting={isConnecting}
+            error={connectionError}
+            initialSshConfig={initialConnectionConfig}
+            initialTelnetConfig={initialTelnetConfig}
+            initialSerialConfig={initialSerialConfig}
+            initialConnectionType={connectionType}
+            title={editingSessionId ? t('app.editConnection') : (pendingSftpSession ? t('app.sftpConnection') : undefined)}
+          />
+        </Suspense>
+      )}
 
       {/* Save Session Modal */}
       <Modal
         isOpen={isSaveModalOpen}
-        onClose={() => {
-          setIsSaveModalOpen(false);
-          setPendingSaveConfig(null);
-          setEditingSessionId(null);
-        }}
+        onClose={handleDismissSaveModal}
         title={editingSessionId ? t('app.updateConnection') : t('app.saveConnection')}
         width="sm"
       >
@@ -1234,11 +1391,7 @@ function App() {
           )}
           <div className="flex gap-3">
             <button
-              onClick={() => {
-                setIsSaveModalOpen(false);
-                setPendingSaveConfig(null);
-                setEditingSessionId(null);
-              }}
+              onClick={handleDismissSaveModal}
               className="flex-1 py-2.5 bg-surface-0/50 text-text-secondary text-sm rounded-lg hover:bg-surface-0 transition-colors"
             >
               {t('app.noThanks')}
@@ -1254,27 +1407,35 @@ function App() {
       </Modal>
 
       {/* Host Key Verification Modal */}
-      <HostKeyModal
-        isOpen={isHostKeyModalOpen}
-        result={hostKeyResult}
-        onAccept={handleHostKeyAccept}
-        onReject={handleHostKeyReject}
-        isLoading={hostKeyLoading}
-      />
+      {isHostKeyModalOpen && (
+        <Suspense fallback={null}>
+          <HostKeyModal
+            isOpen={isHostKeyModalOpen}
+            result={hostKeyResult}
+            onAccept={handleHostKeyAccept}
+            onReject={handleHostKeyReject}
+            isLoading={hostKeyLoading}
+          />
+        </Suspense>
+      )}
 
       {/* Passphrase Prompt Modal */}
-      <PassphrasePromptModal
-        isOpen={!!passphrasePrompt}
-        keyName={passphrasePrompt?.keyName || ""}
-        onConfirm={(passphrase) => {
-          passphrasePrompt?.resolve(passphrase);
-          setPassphrasePrompt(null);
-        }}
-        onCancel={() => {
-          passphrasePrompt?.resolve(null);
-          setPassphrasePrompt(null);
-        }}
-      />
+      {!!passphrasePrompt && (
+        <Suspense fallback={null}>
+          <PassphrasePromptModal
+            isOpen={!!passphrasePrompt}
+            keyName={passphrasePrompt?.keyName || ""}
+            onConfirm={(passphrase) => {
+              passphrasePrompt?.resolve(passphrase);
+              setPassphrasePrompt(null);
+            }}
+            onCancel={() => {
+              passphrasePrompt?.resolve(null);
+              setPassphrasePrompt(null);
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* Command Palette */}
       <CommandPalette
@@ -1290,24 +1451,28 @@ function App() {
       />
 
       {/* Tunnel Sidebar (standalone tunnels) */}
-      <TunnelSidebar
-        isOpen={isTunnelSidebarOpen}
-        onClose={() => setOpenSidebar("none")}
-        savedSessions={savedSessions}
-        onTunnelCountChange={setActiveTunnelCount}
-      />
+      <Suspense fallback={null}>
+        <TunnelSidebar
+          isOpen={isTunnelSidebarOpen}
+          onClose={handleCloseSidebar}
+          savedSessions={savedSessions}
+          onTunnelCountChange={setActiveTunnelCount}
+        />
+      </Suspense>
 
-      {/* Plugin Host */}
-      <PluginHost
-        onShowNotification={handleShowNotification}
-        onShowModal={handleShowModal}
-        onShowPrompt={handleShowPrompt}
-        getSessions={getSessions}
-        getActiveSession={getActiveSessionInfo}
-        onStatusBarItemsChanged={handleStatusBarItemsChanged}
-        onHeaderActionsChanged={handleHeaderActionsChanged}
-        onConnectSsh={handlePluginConnectSsh}
-      />
+      {/* Plugin Host (lazy-loaded) */}
+      <Suspense fallback={null}>
+        <PluginHost
+          onShowNotification={handleShowNotification}
+          onShowModal={handleShowModal}
+          onShowPrompt={handleShowPrompt}
+          getSessions={getSessions}
+          getActiveSession={getActiveSessionInfo}
+          onStatusBarItemsChanged={handleStatusBarItemsChanged}
+          onHeaderActionsChanged={handleHeaderActionsChanged}
+          onConnectSsh={handlePluginConnectSsh}
+        />
+      </Suspense>
 
       {/* Plugin Notification Toast */}
       {notification && (
@@ -1326,41 +1491,57 @@ function App() {
       )}
 
       {/* Plugin Prompt Modal */}
-      <PromptModal
-        isOpen={!!promptModal}
-        config={promptModal?.config || { title: '' }}
-        onConfirm={handlePromptConfirm}
-        onCancel={handlePromptCancel}
-      />
+      {!!promptModal && (
+        <Suspense fallback={null}>
+          <PromptModal
+            isOpen={!!promptModal}
+            config={promptModal?.config || { title: '' }}
+            onConfirm={handlePromptConfirm}
+            onCancel={handlePromptCancel}
+          />
+        </Suspense>
+      )}
 
       {/* Plugin Modal */}
-      <PluginModal
-        isOpen={!!pluginModal}
-        config={pluginModal?.config || { title: '', content: '' }}
-        onButtonClick={handleModalButtonClick}
-        onClose={handleModalClose}
-      />
+      {!!pluginModal && (
+        <Suspense fallback={null}>
+          <PluginModal
+            isOpen={!!pluginModal}
+            config={pluginModal?.config || { title: '', content: '' }}
+            onButtonClick={handleModalButtonClick}
+            onClose={handleModalClose}
+          />
+        </Suspense>
+      )}
 
       {/* Vault Setup Modal */}
-      <VaultSetupModal
-        isOpen={showVaultSetup}
-        onClose={closeVaultSetup}
-        onSetup={handleVaultSetup}
-        onSkip={handleVaultSetupSkip}
-        canSkip={true}
-      />
+      {showVaultSetup && (
+        <Suspense fallback={null}>
+          <VaultSetupModal
+            isOpen={showVaultSetup}
+            onClose={closeVaultSetup}
+            onSetup={handleVaultSetup}
+            onSkip={handleVaultSetupSkip}
+            canSkip={true}
+          />
+        </Suspense>
+      )}
 
       {/* Vault Unlock Modal */}
-      <VaultUnlockModal
-        isOpen={showVaultUnlock}
-        onClose={closeVaultUnlock}
-        unlockMethods={vault.status?.unlockMethods || []}
-        pinAttemptsRemaining={vault.status?.pinAttemptsRemaining}
-        pinLength={vault.status?.pinLength}
-        onUnlockWithPassword={vault.unlockWithPassword}
-        onUnlockWithPin={vault.unlockWithPin}
-        onUnlockWithSecurityKey={vault.unlockWithSecurityKey}
-      />
+      {showVaultUnlock && (
+        <Suspense fallback={null}>
+          <VaultUnlockModal
+            isOpen={showVaultUnlock}
+            onClose={closeVaultUnlock}
+            unlockMethods={vault.status?.unlockMethods || []}
+            pinAttemptsRemaining={vault.status?.pinAttemptsRemaining}
+            pinLength={vault.status?.pinLength}
+            onUnlockWithPassword={vault.unlockWithPassword}
+            onUnlockWithPin={vault.unlockWithPin}
+            onUnlockWithSecurityKey={vault.unlockWithSecurityKey}
+          />
+        </Suspense>
+      )}
 
       {/* Status Bar */}
       <StatusBar visible={statusBarVisible} items={statusBarItems} />

@@ -114,7 +114,7 @@ export function PinInput({
               text-text placeholder-text-muted/30
               focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent
               disabled:opacity-50 disabled:cursor-not-allowed
-              transition-all
+              transition-colors
               ${error ? 'border-error/50 animate-shake' : 'border-surface-0/50'}
             `}
             aria-label={`PIN digit ${index + 1}`}

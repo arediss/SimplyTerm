@@ -1,3 +1,4 @@
+import { memo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Monitor, Plus, Terminal, Loader2 } from "lucide-react";
 import type { SavedSession } from "../types";
@@ -10,7 +11,7 @@ interface EmptyPaneSessionsProps {
   onLocalTerminal: () => void;
 }
 
-export default function EmptyPaneSessions({
+export default memo(function EmptyPaneSessions({
   savedSessions,
   connectingSessionId,
   onConnect,
@@ -47,42 +48,64 @@ export default function EmptyPaneSessions({
               {t("sidebar.allSessions")}
             </h3>
             <div className="space-y-1.5">
-              {savedSessions.map((session) => {
-                const isConnecting = connectingSessionId === session.id;
-                const isDisabled = !!connectingSessionId;
-                return (
-                  <button
-                    key={session.id}
-                    onClick={() => !isDisabled && onConnect(session)}
-                    disabled={isDisabled}
-                    className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-colors text-left group ${
-                      isConnecting
-                        ? "bg-accent/10 cursor-wait"
-                        : isDisabled
-                          ? "opacity-50 cursor-not-allowed"
-                          : "hover:bg-surface-0/30 cursor-pointer"
-                    }`}
-                  >
-                    {isConnecting ? (
-                      <Loader2 size={16} className="text-accent shrink-0 animate-spin" />
-                    ) : (
-                      <Monitor size={16} className="text-accent shrink-0" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className={`text-sm font-medium truncate ${isConnecting ? "text-accent" : "text-text"}`}>
-                        {session.name}
-                      </div>
-                      <div className="text-[11px] text-text-muted truncate">
-                        {isConnecting ? t("sidebar.connecting") : `${session.username}@${session.host}:${session.port}`}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
+              {savedSessions.map((session) => (
+                <EmptyPaneSessionItem
+                  key={session.id}
+                  session={session}
+                  isConnecting={connectingSessionId === session.id}
+                  isDisabled={!!connectingSessionId}
+                  onConnect={onConnect}
+                />
+              ))}
             </div>
           </>
         )}
       </div>
     </div>
   );
-}
+});
+
+const EmptyPaneSessionItem = memo(function EmptyPaneSessionItem({
+  session,
+  isConnecting,
+  isDisabled,
+  onConnect,
+}: {
+  session: SavedSession;
+  isConnecting: boolean;
+  isDisabled: boolean;
+  onConnect: (session: SavedSession) => void;
+}) {
+  const { t } = useTranslation();
+  const handleClick = useCallback(() => {
+    if (!isDisabled) onConnect(session);
+  }, [isDisabled, onConnect, session]);
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={isDisabled}
+      className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-lg transition-colors text-left group ${
+        isConnecting
+          ? "bg-accent/10 cursor-wait"
+          : isDisabled
+            ? "opacity-50 cursor-not-allowed"
+            : "hover:bg-surface-0/30 cursor-pointer"
+      }`}
+    >
+      {isConnecting ? (
+        <Loader2 size={16} className="text-accent shrink-0 animate-spin" />
+      ) : (
+        <Monitor size={16} className="text-accent shrink-0" />
+      )}
+      <div className="flex-1 min-w-0">
+        <div className={`text-sm font-medium truncate ${isConnecting ? "text-accent" : "text-text"}`}>
+          {session.name}
+        </div>
+        <div className="text-[11px] text-text-muted truncate">
+          {isConnecting ? t("sidebar.connecting") : `${session.username}@${session.host}:${session.port}`}
+        </div>
+      </div>
+    </button>
+  );
+});
