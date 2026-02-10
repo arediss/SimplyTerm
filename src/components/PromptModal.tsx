@@ -45,6 +45,7 @@ function PromptModal({ isOpen, config, onConfirm, onCancel }: PromptModalProps) 
       {/* Backdrop */}
       <div
         className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm animate-fade-in"
+        role="presentation"
         onClick={onCancel}
       />
 
@@ -52,6 +53,7 @@ function PromptModal({ isOpen, config, onConfirm, onCancel }: PromptModalProps) 
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div
           className="bg-mantle border border-surface-0/50 rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto animate-scale-in"
+          role="dialog"
           onKeyDown={handleKeyDown}
         >
           <form onSubmit={handleSubmit}>

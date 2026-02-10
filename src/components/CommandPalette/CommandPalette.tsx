@@ -55,6 +55,7 @@ export function CommandPalette({
       {/* Overlay */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        role="presentation"
         onClick={onClose}
       />
 
@@ -67,6 +68,7 @@ export function CommandPalette({
           animate-scale-in
           overflow-hidden
         "
+        role="dialog"
         onKeyDown={onKeyDown}
       >
         {/* Search input */}

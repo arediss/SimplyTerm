@@ -66,6 +66,8 @@ export function SplitHandle({ direction, onDrag, onDragStart }: SplitHandleProps
   return (
     <div
       ref={handleRef}
+      role="separator"
+      tabIndex={0}
       onMouseDown={handleMouseDown}
       className={`
         ${direction === "horizontal" ? "h-1 cursor-row-resize" : "w-1 cursor-col-resize"}

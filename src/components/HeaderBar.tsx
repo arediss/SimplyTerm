@@ -84,6 +84,7 @@ export default function HeaderBar({
   return (
     <div
       className="absolute top-0 left-0 right-0 z-20 h-10"
+      role="toolbar"
       onMouseDown={(e) => {
         if (e.buttons === 1 && !(e.target as HTMLElement).closest(".no-drag")) {
           if (e.detail === 2) {

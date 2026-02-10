@@ -85,6 +85,7 @@ export function PluginWidget({ pluginId, panel, position, visible }: PluginWidge
   return (
     <div
       className={`fixed bottom-3 ${positionClass} z-50`}
+      role="status"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >

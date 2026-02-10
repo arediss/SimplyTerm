@@ -348,6 +348,7 @@ function Terminal({ sessionId, type, onExit, isActive = true, appTheme = "dark",
       <div
         ref={terminalRef}
         className="h-full w-full"
+        role="presentation"
         onClick={handleClick}
       />
 

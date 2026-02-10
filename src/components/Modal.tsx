@@ -44,6 +44,7 @@ function Modal({ isOpen, onClose, title, children, width = "md" }: ModalProps) {
       {/* Overlay */}
       <div
         className="absolute inset-0 bg-black/70"
+        role="presentation"
         onClick={onClose}
       />
 

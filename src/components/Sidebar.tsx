@@ -256,6 +256,7 @@ const Sidebar = memo(function Sidebar({
         className={`fixed inset-0 top-10 z-30 bg-black/40 transition-opacity duration-200 ${
           isAnimating ? "opacity-100" : "opacity-0"
         }`}
+        role="presentation"
         onClick={onClose}
       />
 
@@ -608,6 +609,7 @@ const SavedSessionItem = memo(function SavedSessionItem({
         <div
           className="fixed z-[100] min-w-[160px] bg-crust border border-surface-0/50 rounded-lg shadow-xl py-1"
           style={{ transform: `translate3d(${contextMenu.x}px, ${contextMenu.y}px, 0)`, left: 0, top: 0 }}
+          role="menu"
           onClick={(e) => e.stopPropagation()}
         >
           <button
