@@ -24,7 +24,7 @@ export default function InstalledPluginsTab({
   onUninstall,
   onUpdate,
   onRefresh,
-}: InstalledPluginsTabProps) {
+}: Readonly<InstalledPluginsTabProps>) {
   const { t } = useTranslation();
   const updatableCount = updates.length;
 

@@ -18,7 +18,7 @@ export function PaneGroupContent({
   renderTunnel,
   renderSettings,
   renderEmpty,
-}: PaneGroupContentProps) {
+}: Readonly<PaneGroupContentProps>) {
   if (!tab) return <>{renderEmpty()}</>;
 
   switch (tab.type) {

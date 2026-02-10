@@ -6,7 +6,7 @@ interface SplitHandleProps {
   onDragStart?: () => void;
 }
 
-export function SplitHandle({ direction, onDrag, onDragStart }: SplitHandleProps) {
+export function SplitHandle({ direction, onDrag, onDragStart }: Readonly<SplitHandleProps>) {
   const handleRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const startPos = useRef(0);

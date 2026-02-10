@@ -38,7 +38,7 @@ export default function BrowsePluginsTab({
   onCategoryChange,
   onInstall,
   onRefresh,
-}: BrowsePluginsTabProps) {
+}: Readonly<BrowsePluginsTabProps>) {
   const { t } = useTranslation();
 
   return (

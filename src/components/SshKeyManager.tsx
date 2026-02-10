@@ -9,7 +9,7 @@ interface SshKeyManagerProps {
   isVaultUnlocked: boolean;
 }
 
-export default function SshKeyManager({ isVaultUnlocked }: SshKeyManagerProps) {
+export default function SshKeyManager({ isVaultUnlocked }: Readonly<SshKeyManagerProps>) {
   const { t } = useTranslation();
   const { keys, createKey, updateKey, deleteKey } = useSshKeys();
   const [showForm, setShowForm] = useState(false);
@@ -184,6 +184,7 @@ export default function SshKeyManager({ isVaultUnlocked }: SshKeyManagerProps) {
             className="absolute inset-0 bg-black/70"
             role="presentation"
             onClick={() => !isDeleting && setConfirmDeleteKey(null)}
+            onKeyDown={(e) => { if (e.key === 'Escape' && !isDeleting) setConfirmDeleteKey(null); }}
           />
           <div className="relative bg-crust border border-surface-0/50 rounded-xl shadow-2xl w-[360px] animate-scale-in">
             <div className="p-5">

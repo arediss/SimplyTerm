@@ -27,14 +27,14 @@ export function InstalledPluginCard({
   onToggle,
   onUninstall,
   onUpdate,
-}: {
+}: Readonly<{
   plugin: PluginManifest;
   update?: PluginUpdate;
   loading: boolean;
   onToggle: () => void;
   onUninstall: () => void;
   onUpdate?: () => void;
-}) {
+}>) {
   const { t } = useTranslation();
 
   return (
@@ -124,12 +124,12 @@ export function BrowsePluginCard({
   isInstalled,
   loading,
   onInstall,
-}: {
+}: Readonly<{
   plugin: RegistryPlugin;
   isInstalled: boolean;
   loading: boolean;
   onInstall: () => void;
-}) {
+}>) {
   const { t } = useTranslation();
 
   return (
@@ -205,7 +205,7 @@ export function BrowsePluginCard({
   );
 }
 
-export function PluginListSkeleton({ count = 3 }: { count?: number }) {
+export function PluginListSkeleton({ count = 3 }: Readonly<{ count?: number }>) {
   return (
     <div className="space-y-2 animate-pulse">
       {Array.from({ length: count }, (_, i) => i).map(n => (

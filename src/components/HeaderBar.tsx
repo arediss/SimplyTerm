@@ -24,7 +24,7 @@ export default function HeaderBar({
   vaultExists,
   vaultUnlocked,
   onVaultToggle,
-}: HeaderBarProps) {
+}: Readonly<HeaderBarProps>) {
   const { t } = useTranslation();
   const [isMaximized, setIsMaximized] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);

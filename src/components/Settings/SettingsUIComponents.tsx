@@ -10,11 +10,11 @@ export function SubTabs<T extends string>({
   tabs,
   activeTab,
   onChange,
-}: {
+}: Readonly<{
   tabs: { id: T; label: string; icon?: React.ReactNode; variant?: "default" | "warning" }[];
   activeTab: T;
   onChange: (tab: T) => void;
-}) {
+}>) {
   return (
     <div className="flex gap-1 border-b border-surface-0/20">
       {tabs.map((tab) => {
@@ -43,11 +43,11 @@ export function SettingGroup({
   title,
   description,
   children,
-}: {
+}: Readonly<{
   title: string;
   description: string;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <div className="space-y-3">
       <div>
@@ -65,13 +65,13 @@ export function SettingRow({
   title,
   description,
   children,
-}: {
+}: Readonly<{
   icon: React.ReactNode;
   iconClassName?: string;
   title: string;
   description: string;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <div className="flex items-center justify-between p-4 bg-surface-0/20 rounded-lg">
       <div className="flex items-center gap-3">
@@ -89,10 +89,10 @@ export function SettingRow({
 export function Toggle({
   checked,
   onChange,
-}: {
+}: Readonly<{
   checked: boolean;
   onChange: (checked: boolean) => void;
-}) {
+}>) {
   return (
     <button
       onClick={() => onChange(!checked)}
@@ -116,12 +116,12 @@ export function ThemeCard({
   active,
   colors,
   onClick,
-}: {
+}: Readonly<{
   name: string;
   active: boolean;
   colors: string[];
   onClick?: () => void;
-}) {
+}>) {
   return (
     <button
       onClick={onClick}
@@ -152,12 +152,12 @@ export function LinkButton({
   title,
   description,
   href,
-}: {
+}: Readonly<{
   icon: React.ReactNode;
   title: string;
   description: string;
   href: string;
-}) {
+}>) {
   return (
     <a
       href={href}

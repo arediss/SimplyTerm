@@ -20,7 +20,7 @@ export default function DeveloperPluginsTab({
   actionLoading,
   onToggle,
   onRefresh,
-}: DeveloperPluginsTabProps) {
+}: Readonly<DeveloperPluginsTabProps>) {
   const { t } = useTranslation();
   const { settings, updateSettings } = useAppSettings();
   const [scanning, setScanning] = useState(false);

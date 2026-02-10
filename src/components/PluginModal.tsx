@@ -14,7 +14,7 @@ const BUTTON_STYLES = {
   danger: "bg-error/20 text-error hover:bg-error/30",
 } as const;
 
-function PluginModal({ isOpen, config, onButtonClick, onClose }: PluginModalProps) {
+function PluginModal({ isOpen, config, onButtonClick, onClose }: Readonly<PluginModalProps>) {
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -46,6 +46,7 @@ function PluginModal({ isOpen, config, onButtonClick, onClose }: PluginModalProp
         className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm animate-fade-in"
         role="presentation"
         onClick={onClose}
+        onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
       />
 
       {/* Modal */}

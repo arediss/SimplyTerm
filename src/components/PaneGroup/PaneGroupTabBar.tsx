@@ -34,7 +34,7 @@ export function PaneGroupTabBar({
   onSplitVertical,
   onSplitHorizontal,
   onClosePane,
-}: PaneGroupTabBarProps) {
+}: Readonly<PaneGroupTabBarProps>) {
   const { t } = useTranslation();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState<{ x: number; y: number } | null>(null);
@@ -159,6 +159,7 @@ export function PaneGroupTabBar({
           style={{ transform: `translate3d(${contextMenu.x}px, ${contextMenu.y}px, 0)`, left: 0, top: 0 }}
           role="menu"
           onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => { if (e.key === 'Escape') setContextMenu(null); }}
         >
           <button
             onClick={() => { onSplitVertical(); setContextMenu(null); }}
@@ -232,6 +233,7 @@ const TabPill = memo(function TabPill({ tab, isActive, typeColor, onSelect, onCl
       tabIndex={0}
       aria-selected={isActive}
       onClick={onSelect}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >

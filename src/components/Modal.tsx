@@ -17,7 +17,7 @@ interface ModalProps {
   width?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl";
 }
 
-function Modal({ isOpen, onClose, title, children, width = "md" }: ModalProps) {
+function Modal({ isOpen, onClose, title, children, width = "md" }: Readonly<ModalProps>) {
   const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -46,6 +46,7 @@ function Modal({ isOpen, onClose, title, children, width = "md" }: ModalProps) {
         className="absolute inset-0 bg-black/70"
         role="presentation"
         onClick={onClose}
+        onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
       />
 
       {/* Modal with floating title */}

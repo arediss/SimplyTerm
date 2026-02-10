@@ -35,7 +35,7 @@ function getPinStepInfo(
   return t('vault.setup.pinInfoConfirm');
 }
 
-export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = true }: VaultSetupModalProps) {
+export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = true }: Readonly<VaultSetupModalProps>) {
   const { t } = useTranslation();
   const [step, setStep] = useState<SetupStep>('intro');
   const [masterPassword, setMasterPassword] = useState('');
@@ -272,22 +272,7 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
               </p>
             </div>
 
-            {!enablePin ? (
-              <div className="flex flex-col gap-3">
-                <button
-                  onClick={() => setEnablePin(true)}
-                  className="w-full py-3 bg-accent text-crust font-medium rounded-xl hover:bg-accent-hover transition-colors"
-                >
-                  {t('vault.setup.setupPin')}
-                </button>
-                <button
-                  onClick={handlePinSkip}
-                  className="w-full py-3 bg-surface-0/50 text-text-secondary font-medium rounded-xl hover:bg-surface-0 transition-colors"
-                >
-                  {t('vault.setup.skipStep')}
-                </button>
-              </div>
-            ) : (
+            {enablePin ? (
               <div className="flex flex-col items-center gap-4">
                 <PinInput
                   key={pinStep}
@@ -301,6 +286,21 @@ export function VaultSetupModal({ isOpen, onClose, onSetup, onSkip, canSkip = tr
                   className="text-sm text-text-muted hover:text-text transition-colors"
                 >
                   {t('common.cancel')}
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => setEnablePin(true)}
+                  className="w-full py-3 bg-accent text-crust font-medium rounded-xl hover:bg-accent-hover transition-colors"
+                >
+                  {t('vault.setup.setupPin')}
+                </button>
+                <button
+                  onClick={handlePinSkip}
+                  className="w-full py-3 bg-surface-0/50 text-text-secondary font-medium rounded-xl hover:bg-surface-0 transition-colors"
+                >
+                  {t('vault.setup.skipStep')}
                 </button>
               </div>
             )}

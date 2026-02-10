@@ -19,7 +19,7 @@ interface PluginWidgetProps {
   visible: boolean;
 }
 
-export function PluginWidget({ pluginId, panel, position, visible }: PluginWidgetProps) {
+export function PluginWidget({ pluginId, panel, position, visible }: Readonly<PluginWidgetProps>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
   const observerCleanupRef = useRef<(() => void) | null>(null);

@@ -26,7 +26,7 @@ export function CommandPalette({
   onClose,
   onExecuteCommand,
   onKeyDown,
-}: CommandPaletteProps) {
+}: Readonly<CommandPaletteProps>) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -57,6 +57,7 @@ export function CommandPalette({
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         role="presentation"
         onClick={onClose}
+        onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
       />
 
       {/* Palette */}

@@ -75,7 +75,7 @@ const StatusBarSection = memo(function StatusBarSection({ items }: { items: Stat
   );
 });
 
-function StatusBarItemRenderer({ item }: { item: StatusBarItem }) {
+function StatusBarItemRenderer({ item }: Readonly<{ item: StatusBarItem }>) {
   const content = (
     <span className="text-subtext-0 tabular-nums tracking-tight">{item.content}</span>
   );

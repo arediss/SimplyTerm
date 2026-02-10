@@ -42,6 +42,7 @@ export const PaneGroupComponent = memo(function PaneGroupComponent({
       style={{ backgroundColor: "var(--color-panel)" }}
       role="group"
       onClick={onFocus}
+      onKeyDown={onFocus}
     >
       {/* Tab bar */}
       <PaneGroupTabBar

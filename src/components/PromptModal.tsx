@@ -8,7 +8,7 @@ interface PromptModalProps {
   onCancel: () => void;
 }
 
-function PromptModal({ isOpen, config, onConfirm, onCancel }: PromptModalProps) {
+function PromptModal({ isOpen, config, onConfirm, onCancel }: Readonly<PromptModalProps>) {
   const [value, setValue] = useState(config.defaultValue || "");
   const inputRef = useRef<HTMLInputElement>(null);
   const focusTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -47,6 +47,7 @@ function PromptModal({ isOpen, config, onConfirm, onCancel }: PromptModalProps) 
         className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm animate-fade-in"
         role="presentation"
         onClick={onCancel}
+        onKeyDown={(e) => { if (e.key === 'Escape') onCancel(); }}
       />
 
       {/* Modal */}

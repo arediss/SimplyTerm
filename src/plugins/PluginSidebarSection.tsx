@@ -18,7 +18,7 @@ interface PluginSidebarSectionProps {
 /**
  * Single plugin sidebar section
  */
-function PluginSidebarSection({ pluginId, section }: PluginSidebarSectionProps) {
+function PluginSidebarSection({ pluginId, section }: Readonly<PluginSidebarSectionProps>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cleanupRef = useRef<(() => void) | void>(undefined);
   const [isCollapsed, setIsCollapsed] = useState(section.config.defaultCollapsed ?? false);
@@ -67,6 +67,7 @@ function PluginSidebarSection({ pluginId, section }: PluginSidebarSectionProps) 
         role={isCollapsible ? "button" : undefined}
         tabIndex={isCollapsible ? 0 : undefined}
         onClick={() => isCollapsible && setIsCollapsed(!isCollapsed)}
+        onKeyDown={isCollapsible ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsCollapsed(!isCollapsed); } } : undefined}
       >
         {isCollapsible && (
           <span className="text-text-muted">

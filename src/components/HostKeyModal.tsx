@@ -36,7 +36,7 @@ function HostKeyModal({
   onAccept,
   onReject,
   isLoading = false,
-}: HostKeyModalProps) {
+}: Readonly<HostKeyModalProps>) {
   const { t } = useTranslation();
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -69,6 +69,7 @@ function HostKeyModal({
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         role="presentation"
         onClick={() => !isLoading && onReject()}
+        onKeyDown={(e) => { if (e.key === 'Escape' && !isLoading) onReject(); }}
       />
 
       {/* Modal */}

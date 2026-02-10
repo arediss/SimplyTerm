@@ -16,7 +16,7 @@ interface PluginSettingsPanelProps {
 /**
  * Single plugin settings panel content renderer
  */
-export function PluginSettingsPanel({ pluginId, panel }: PluginSettingsPanelProps) {
+export function PluginSettingsPanel({ pluginId, panel }: Readonly<PluginSettingsPanelProps>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cleanupRef = useRef<(() => void) | void>(undefined);
 

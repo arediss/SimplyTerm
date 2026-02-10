@@ -40,7 +40,7 @@ export function PluginHost({
   onStatusBarItemsChanged,
   onHeaderActionsChanged,
   onConnectSsh,
-}: PluginHostProps) {
+}: Readonly<PluginHostProps>) {
   const [panels, setPanels] = useState<Map<string, PanelEntry>>(new Map());
   const [visiblePanels, setVisiblePanels] = useState<Set<string>>(new Set());
 
