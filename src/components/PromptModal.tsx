@@ -54,9 +54,8 @@ function PromptModal({ isOpen, config, onConfirm, onCancel }: Readonly<PromptMod
         <dialog
           open
           className="bg-mantle border border-surface-0/50 rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto animate-scale-in p-0"
-          onKeyDown={handleKeyDown}
         >
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} onKeyDown={handleKeyDown}>
             {/* Header */}
             <div className="px-6 pt-5 pb-4">
               <h2 className="text-lg font-semibold text-text">{config.title}</h2>

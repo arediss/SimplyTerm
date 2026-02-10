@@ -69,7 +69,6 @@ export function CommandPalette({
           animate-scale-in
           overflow-hidden
         "
-        onKeyDown={onKeyDown}
       >
         {/* Search input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-surface-0/40">
@@ -79,6 +78,7 @@ export function CommandPalette({
             type="text"
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
+            onKeyDown={onKeyDown}
             placeholder={t("commandPalette.searchPlaceholder")}
             className="
               flex-1 bg-transparent text-text text-sm

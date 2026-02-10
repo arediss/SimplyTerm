@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef } from "react";
 import type { ModalConfig } from "../plugins";
 
 interface PluginModalProps {
@@ -24,14 +24,12 @@ function PluginModal({ isOpen, config, onButtonClick, onClose }: Readonly<Plugin
     }
   }, [isOpen, config.content]);
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    },
-    [onClose]
-  );
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEsc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handleEsc);
+    return () => document.removeEventListener("keydown", handleEsc);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -53,7 +51,6 @@ function PluginModal({ isOpen, config, onButtonClick, onClose }: Readonly<Plugin
         <dialog
           open
           className="bg-mantle border border-surface-0/50 rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto animate-scale-in p-0"
-          onKeyDown={handleKeyDown}
         >
           {/* Header */}
           <div className="px-6 pt-5 pb-4">
