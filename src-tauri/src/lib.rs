@@ -1938,7 +1938,7 @@ pub fn run() {
 
             // Plugins are stored with the app (removed with app uninstall)
             // In dev mode: uses project root/plugins
-            // In production: uses app installation directory/plugins
+            // In production: uses app data directory (writable, survives updates)
             let plugins_base_dir = if cfg!(debug_assertions) {
                 // In dev mode, use CARGO_MANIFEST_DIR (src-tauri/) and go up one level to project root
                 let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -1946,9 +1946,9 @@ pub fn run() {
                     .map(|p| p.to_path_buf())
                     .unwrap_or(manifest_dir)
             } else {
-                // In production, use the resource directory (app install folder)
-                app.path().resource_dir()
-                    .expect("Failed to get resource directory")
+                // In production, use app data dir (writable on all platforms including AppImage)
+                app.path().app_data_dir()
+                    .expect("Failed to get app data directory")
             };
 
             let plugin_manager = Arc::new(
