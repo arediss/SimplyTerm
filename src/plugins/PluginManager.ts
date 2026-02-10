@@ -285,6 +285,17 @@ export class PluginManager {
     }
   }
 
+  private removeEntriesByPlugin<T extends { pluginId: string }>(map: Map<string, T>, pluginId: string): boolean {
+    let changed = false;
+    for (const [itemId, entry] of map) {
+      if (entry.pluginId === pluginId) {
+        map.delete(itemId);
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
   /**
    * Unload a plugin
    */
@@ -366,26 +377,12 @@ export class PluginManager {
     });
 
     // Remove registered status bar items for this plugin
-    let statusBarChanged = false;
-    for (const [itemId, entry] of this.registeredStatusBarItems) {
-      if (entry.pluginId === id) {
-        this.registeredStatusBarItems.delete(itemId);
-        statusBarChanged = true;
-      }
-    }
-    if (statusBarChanged) {
+    if (this.removeEntriesByPlugin(this.registeredStatusBarItems, id)) {
       this.notifyStatusBarChanged();
     }
 
     // Remove registered header actions for this plugin
-    let headerActionsChanged = false;
-    for (const [itemId, entry] of this.registeredHeaderActions) {
-      if (entry.pluginId === id) {
-        this.registeredHeaderActions.delete(itemId);
-        headerActionsChanged = true;
-      }
-    }
-    if (headerActionsChanged) {
+    if (this.removeEntriesByPlugin(this.registeredHeaderActions, id)) {
       this.notifyHeaderActionsChanged();
     }
 
