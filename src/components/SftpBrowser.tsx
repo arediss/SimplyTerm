@@ -132,6 +132,27 @@ function getEditIndicator(status: string | undefined): { className: string; titl
   return { className: "bg-teal", title: "Watching for changes" };
 }
 
+const TOOLBAR_BTN = "p-1.5 rounded hover:bg-surface-0/50 text-text-muted hover:text-text transition-colors";
+const CTX_MENU_BTN = "w-full flex items-center gap-2 px-3 py-1.5 text-sm text-text hover:bg-surface-0/50 transition-colors text-left";
+
+function ContextMenuItem({ icon: Icon, label, onClick, iconClassName = "text-text-muted", className, disabled, children }: Readonly<{
+  icon: React.ComponentType<{ size: number; className?: string }>;
+  label: string;
+  onClick: () => void;
+  iconClassName?: string;
+  className?: string;
+  disabled?: boolean;
+  children?: React.ReactNode;
+}>) {
+  return (
+    <button onClick={onClick} className={className ?? CTX_MENU_BTN} disabled={disabled}>
+      <Icon size={14} className={iconClassName} />
+      <span>{label}</span>
+      {children}
+    </button>
+  );
+}
+
 export function SftpBrowser({ sessionId, initialPath = "/" }: Readonly<SftpBrowserProps>) {
   const { t } = useTranslation();
   const [currentPath, setCurrentPath] = useState(initialPath);
@@ -630,34 +651,17 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: Readonly<SftpBrows
 
       {/* Toolbar */}
       <div className="flex items-center gap-1 px-2 py-1.5 border-b border-surface-0/30">
-        <button
-          onClick={handleGoHome}
-          className="p-1.5 rounded hover:bg-surface-0/50 text-text-muted hover:text-text transition-colors"
-          title={t("sftp.home")}
-        >
+        <button onClick={handleGoHome} className={TOOLBAR_BTN} title={t("sftp.home")}>
           <Home size={14} />
         </button>
-        <button
-          onClick={handleGoUp}
-          className="p-1.5 rounded hover:bg-surface-0/50 text-text-muted hover:text-text transition-colors"
-          title={t("sftp.goUp")}
-          disabled={currentPath === "/"}
-        >
+        <button onClick={handleGoUp} className={TOOLBAR_BTN} title={t("sftp.goUp")} disabled={currentPath === "/"}>
           <ArrowUp size={14} />
         </button>
-        <button
-          onClick={handleRefresh}
-          className="p-1.5 rounded hover:bg-surface-0/50 text-text-muted hover:text-text transition-colors"
-          title={t("sftp.refresh")}
-        >
+        <button onClick={handleRefresh} className={TOOLBAR_BTN} title={t("sftp.refresh")}>
           <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
         </button>
         <div className="w-px h-4 bg-surface-0/30 mx-1" />
-        <button
-          onClick={() => setShowNewFolderDialog(true)}
-          className="p-1.5 rounded hover:bg-surface-0/50 text-text-muted hover:text-text transition-colors"
-          title={t("sftp.newFolder")}
-        >
+        <button onClick={() => setShowNewFolderDialog(true)} className={TOOLBAR_BTN} title={t("sftp.newFolder")}>
           <FolderPlus size={14} />
         </button>
         <button
@@ -714,21 +718,22 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: Readonly<SftpBrows
       )}
 
       {/* Error message */}
-      {error && (
-        <div className={`px-3 py-2 border-b text-xs flex items-center gap-2 ${
-          error.startsWith("Permission denied")
-            ? "bg-yellow/10 border-yellow/20 text-yellow"
-            : "bg-red/10 border-red/20 text-red"
-        }`}>
-          {error.startsWith("Permission denied")
-            ? <ShieldAlert size={13} className="shrink-0" />
-            : <AlertTriangle size={13} className="shrink-0" />
-          }
-          <span className="flex-1">{error}</span>
-          <button onClick={() => setError(null)} className="p-0.5 hover:bg-surface-0/30 rounded shrink-0">
-            <X size={12} />
-          </button>
-        </div>
+      {error && (() => {
+        const isPermDenied = error.startsWith("Permission denied");
+        const ErrorIcon = isPermDenied ? ShieldAlert : AlertTriangle;
+        const colorClasses = isPermDenied
+          ? "bg-yellow/10 border-yellow/20 text-yellow"
+          : "bg-red/10 border-red/20 text-red";
+        return (
+          <div className={`px-3 py-2 border-b text-xs flex items-center gap-2 ${colorClasses}`}>
+            <ErrorIcon size={13} className="shrink-0" />
+            <span className="flex-1">{error}</span>
+            <button onClick={() => setError(null)} className="p-0.5 hover:bg-surface-0/30 rounded shrink-0">
+              <X size={12} />
+            </button>
+          </div>
+        );
+      })()
       )}
 
       {/* New folder dialog */}
@@ -890,88 +895,61 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: Readonly<SftpBrows
         >
           {/* Edit externally (only for files) */}
           {!contextMenu.entry.is_dir && (
-            <button
-              onClick={() => {
-                handleEditExternal(contextMenu.entry);
-                setContextMenu(null);
-              }}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-text hover:bg-surface-0/50 transition-colors text-left"
+            <ContextMenuItem
+              icon={ExternalLink}
+              iconClassName={isEditing(contextMenu.entry.path) ? "text-teal" : "text-text-muted"}
+              label={isEditing(contextMenu.entry.path) ? t("sftp.openInEditor") : t("sftp.editExternally")}
+              onClick={() => { handleEditExternal(contextMenu.entry); setContextMenu(null); }}
               disabled={getEditStatus(contextMenu.entry.path) === "uploading"}
             >
-              <ExternalLink size={14} className={isEditing(contextMenu.entry.path) ? "text-teal" : "text-text-muted"} />
-              <span>{isEditing(contextMenu.entry.path) ? t("sftp.openInEditor") : t("sftp.editExternally")}</span>
               {isEditing(contextMenu.entry.path) && (
                 <span className="ml-auto text-xs text-teal">{t("sftp.watching")}</span>
               )}
-            </button>
+            </ContextMenuItem>
           )}
 
           {/* Download (files only) */}
           {!contextMenu.entry.is_dir && (
-            <button
-              onClick={() => {
-                handleDownload(contextMenu.entry);
-                setContextMenu(null);
-              }}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-text hover:bg-surface-0/50 transition-colors text-left"
-            >
-              <Download size={14} className="text-text-muted" />
-              <span>{t("sftp.download", "Download")}</span>
-            </button>
+            <ContextMenuItem
+              icon={Download}
+              label={t("sftp.download", "Download")}
+              onClick={() => { handleDownload(contextMenu.entry); setContextMenu(null); }}
+            />
           )}
 
           {/* Open folder */}
           {contextMenu.entry.is_dir && (
-            <button
-              onClick={() => {
-                handleNavigate(contextMenu.entry);
-                setContextMenu(null);
-              }}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-text hover:bg-surface-0/50 transition-colors text-left"
-            >
-              <Folder size={14} className="text-yellow" />
-              <span>{t("sftp.open", "Open")}</span>
-            </button>
+            <ContextMenuItem
+              icon={Folder}
+              iconClassName="text-yellow"
+              label={t("sftp.open", "Open")}
+              onClick={() => { handleNavigate(contextMenu.entry); setContextMenu(null); }}
+            />
           )}
 
           <div className="my-1 border-t border-surface-0/30" />
 
           {/* Copy path */}
-          <button
-            onClick={() => {
-              handleCopyPath(contextMenu.entry);
-              setContextMenu(null);
-            }}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-text hover:bg-surface-0/50 transition-colors text-left"
-          >
-            <Copy size={14} className="text-text-muted" />
-            <span>{t("sftp.copyPath", "Copy path")}</span>
-          </button>
+          <ContextMenuItem
+            icon={Copy}
+            label={t("sftp.copyPath", "Copy path")}
+            onClick={() => { handleCopyPath(contextMenu.entry); setContextMenu(null); }}
+          />
 
           {/* Rename */}
-          <button
-            onClick={() => {
-              setRenamingEntry(contextMenu.entry);
-              setRenameValue(contextMenu.entry.name);
-              setContextMenu(null);
-            }}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-text hover:bg-surface-0/50 transition-colors text-left"
-          >
-            <Edit3 size={14} className="text-text-muted" />
-            <span>{t("sftp.rename")}</span>
-          </button>
+          <ContextMenuItem
+            icon={Edit3}
+            label={t("sftp.rename")}
+            onClick={() => { setRenamingEntry(contextMenu.entry); setRenameValue(contextMenu.entry.name); setContextMenu(null); }}
+          />
 
           {/* Delete */}
-          <button
-            onClick={() => {
-              handleDeleteRequest(contextMenu.entry);
-              setContextMenu(null);
-            }}
+          <ContextMenuItem
+            icon={Trash2}
+            label={t("common.delete", "Delete")}
             className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-red hover:bg-red/10 transition-colors text-left"
-          >
-            <Trash2 size={14} />
-            <span>{t("common.delete", "Delete")}</span>
-          </button>
+            onClick={() => { handleDeleteRequest(contextMenu.entry); setContextMenu(null); }}
+          />
         </div>,
         document.body,
       )}
