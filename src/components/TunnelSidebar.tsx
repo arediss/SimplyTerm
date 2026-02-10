@@ -146,7 +146,7 @@ export default function TunnelSidebar({
       }
 
       // Generate unique session ID
-      const sshSessionId = `tunnel-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const sshSessionId = `tunnel-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 
       // Expand ~ in key path
       let keyPath = session.key_path;

@@ -2,9 +2,13 @@
  * Platform detection utilities for keyboard shortcuts
  */
 
-// Detect if running on macOS
+// Detect if running on macOS (using userAgent instead of deprecated navigator.platform)
 export const isMac = typeof navigator !== 'undefined' &&
-  /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+  /Macintosh|Mac OS|iPod|iPhone|iPad/.test(navigator.userAgent);
+
+// Detect if running on Windows
+export const isWindows = typeof navigator !== 'undefined' &&
+  /Windows/.test(navigator.userAgent);
 
 // Get the modifier key symbol based on platform
 export const modifierKey = isMac ? '⌘' : 'Ctrl';
