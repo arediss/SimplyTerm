@@ -28,6 +28,10 @@ jobs:
             label: Windows
             rust-target: ''
             args: ''
+          - os: ubuntu-22.04
+            label: Linux
+            rust-target: ''
+            args: ''
           - os: self-hosted
             label: macOS
             runner-labels: '["self-hosted", "macOS", "ARM64"]'
@@ -43,21 +47,28 @@ jobs:
 
       # --- Windows + GitHub-hosted setup ---
       - name: Setup Node.js
-        if: matrix.os == 'windows-latest'
+        if: matrix.os != 'self-hosted'
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
           cache: 'npm'
 
       - name: Setup Rust
-        if: matrix.os == 'windows-latest'
+        if: matrix.os != 'self-hosted'
         uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
 
       - name: Rust cache
-        if: matrix.os == 'windows-latest'
+        if: matrix.os != 'self-hosted'
         uses: Swatinem/rust-cache@ad397744b0d591a723ab90405b7247fac0e6b8db # v2
         with:
           workspaces: src-tauri
+
+      # --- Linux: Install system dependencies ---
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
 
       # --- macOS: Import Apple Developer Certificate ---
       - name: Import Apple Developer Certificate
