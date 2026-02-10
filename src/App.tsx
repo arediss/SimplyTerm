@@ -8,10 +8,9 @@ import Modal from "./components/Modal";
 import { SshConnectionConfig } from "./types";
 import { CommandPalette, useCommandPalette, CommandHandlers, CommandContext } from "./components/CommandPalette";
 import { StatusBar, type StatusBarItem } from "./components/StatusBar";
-import { pluginManager, type SessionInfo, type ModalConfig, type NotificationType, type PromptConfig } from "./plugins";
+import { pluginManager, type SessionInfo, type ModalConfig, type NotificationType, type PromptConfig, type HeaderActionItem } from "./plugins";
 const PluginHost = lazy(() => import("./plugins/PluginHost").then(m => ({ default: m.PluginHost })));
 // plugin-updater is lazy-imported in the auto-check useEffect below
-import type { HeaderActionItem } from "./plugins";
 const SftpBrowser = lazy(() => import("./components/SftpBrowser").then(m => ({ default: m.SftpBrowser })));
 const TunnelManager = lazy(() => import("./components/TunnelManager"));
 const TunnelSidebar = lazy(() => import("./components/TunnelSidebar"));
@@ -30,8 +29,7 @@ const VaultSetupModal = lazy(() => import("./components/Vault/VaultSetupModal"))
 const VaultUnlockModal = lazy(() => import("./components/Vault/VaultUnlockModal"));
 import { useSessions, useAppSettings, useVaultFlow, useHostKeyVerification, useWorkspace } from "./hooks";
 import type { SshConnectionResult } from "./hooks";
-import { SavedSession, TelnetConnectionConfig, SerialConnectionConfig, SshKeyProfile, ConnectionType } from "./types";
-import type { PaneGroupTab } from "./types";
+import { SavedSession, TelnetConnectionConfig, SerialConnectionConfig, SshKeyProfile, ConnectionType, type PaneGroupTab } from "./types";
 import { generateSessionId, expandHomeDir, isModifierPressed } from "./utils";
 import { applyTheme } from "./themes";
 
@@ -876,8 +874,8 @@ function App() {
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    globalThis.addEventListener("keydown", handleKeyDown);
+    return () => globalThis.removeEventListener("keydown", handleKeyDown);
   }, [workspace, handleNewLocalTab, handleCloseTab, handleOpenConnectionModal]);
 
   // ============================================================================
@@ -912,7 +910,7 @@ function App() {
       renameTab: () => {
         const tab = activeTabRef.current;
         if (tab) {
-          const newName = window.prompt("Enter new tab name:", tab.title);
+          const newName = globalThis.prompt("Enter new tab name:", tab.title);
           if (newName?.trim()) {
             workspace.renameTab(tab.id, newName.trim());
           }
@@ -971,8 +969,8 @@ function App() {
       }
     };
 
-    window.addEventListener("keydown", handleGlobalKeyDown);
-    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+    globalThis.addEventListener("keydown", handleGlobalKeyDown);
+    return () => globalThis.removeEventListener("keydown", handleGlobalKeyDown);
   }, [commandPalette.toggle]);
 
   // Auto-check for updates on startup (lazy-loads plugin-updater)

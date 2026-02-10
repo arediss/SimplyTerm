@@ -58,7 +58,7 @@ function getEditIndicator(status: string | undefined): { className: string; titl
   return { className: "bg-teal", title: "Watching for changes" };
 }
 
-export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) {
+export function SftpBrowser({ sessionId, initialPath = "/" }: Readonly<SftpBrowserProps>) {
   const [currentPath, setCurrentPath] = useState(initialPath);
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -530,11 +530,12 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
         <div
           className="fixed z-50 min-w-[160px] py-1 bg-crust rounded-lg border border-surface-0/50 shadow-xl"
           style={{
-            left: Math.min(contextMenu.x, window.innerWidth - 180),
-            top: Math.min(contextMenu.y, window.innerHeight - 200),
+            left: Math.min(contextMenu.x, globalThis.innerWidth - 180),
+            top: Math.min(contextMenu.y, globalThis.innerHeight - 200),
           }}
           role="menu"
           onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => { if (e.key === 'Escape') setContextMenu(null); }}
         >
           {/* Edit externally (only for files) */}
           {!contextMenu.entry.is_dir && (

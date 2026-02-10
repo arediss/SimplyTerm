@@ -258,6 +258,7 @@ const Sidebar = memo(function Sidebar({
         }`}
         role="presentation"
         onClick={onClose}
+        onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
       />
 
       {/* Sidebar panel - flottant */}
@@ -507,11 +508,11 @@ const SavedSessionItem = memo(function SavedSessionItem({
 
     // Listen for plugin-triggered re-renders (e.g., after tag assignment changes)
     const handleDecoratorChanged = () => renderDecorators();
-    window.addEventListener('plugin-decorators-changed', handleDecoratorChanged);
+    globalThis.addEventListener('plugin-decorators-changed', handleDecoratorChanged);
 
     return () => {
       unsubscribe();
-      window.removeEventListener('plugin-decorators-changed', handleDecoratorChanged);
+      globalThis.removeEventListener('plugin-decorators-changed', handleDecoratorChanged);
       cleanups.forEach(fn => fn());
     };
   }, [session.id]);
@@ -520,7 +521,7 @@ const SavedSessionItem = memo(function SavedSessionItem({
     e.preventDefault();
     e.stopPropagation();
     // Fermer tous les autres context menus
-    window.dispatchEvent(new CustomEvent("closeContextMenus"));
+    globalThis.dispatchEvent(new CustomEvent("closeContextMenus"));
     setContextMenu({ x: e.clientX, y: e.clientY });
   };
 
@@ -555,11 +556,11 @@ const SavedSessionItem = memo(function SavedSessionItem({
     const handleCloseAll = () => closeContextMenu();
 
     document.addEventListener("click", handleClick);
-    window.addEventListener("closeContextMenus", handleCloseAll);
+    globalThis.addEventListener("closeContextMenus", handleCloseAll);
 
     return () => {
       document.removeEventListener("click", handleClick);
-      window.removeEventListener("closeContextMenus", handleCloseAll);
+      globalThis.removeEventListener("closeContextMenus", handleCloseAll);
     };
   }, []);
 
@@ -567,7 +568,10 @@ const SavedSessionItem = memo(function SavedSessionItem({
     <>
       <div
         onClick={isConnecting ? undefined : handleConnect}
+        onKeyDown={isConnecting ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleConnect(); } }}
         onContextMenu={isConnecting ? undefined : handleContextMenu}
+        role="button"
+        tabIndex={isConnecting ? -1 : 0}
         className={`group/session w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left ${
           isConnecting
             ? "bg-accent/10 cursor-wait"
@@ -611,6 +615,7 @@ const SavedSessionItem = memo(function SavedSessionItem({
           style={{ transform: `translate3d(${contextMenu.x}px, ${contextMenu.y}px, 0)`, left: 0, top: 0 }}
           role="menu"
           onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => { if (e.key === 'Escape') closeContextMenu(); }}
         >
           <button
             onClick={() => { handleConnect(); closeContextMenu(); }}

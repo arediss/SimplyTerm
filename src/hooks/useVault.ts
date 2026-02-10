@@ -36,7 +36,7 @@ export function useVault() {
       let active = true;
 
       // Check for auto-lock every 10 seconds
-      autoLockIntervalRef.current = window.setInterval(async () => {
+      autoLockIntervalRef.current = globalThis.setInterval(async () => {
         if (!active) return;
         try {
           const locked = await invoke<boolean>('check_vault_auto_lock');
