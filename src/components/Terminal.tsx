@@ -190,7 +190,7 @@ function Terminal({ sessionId, type, onExit, isActive = true, appTheme = "dark",
       }
     };
 
-    setupSession();
+    void setupSession();
 
     let resizeRafId: number | null = null;
     const handleResize = () => {

@@ -25,7 +25,7 @@ export function useAppSettings() {
         }
       }
     };
-    loadSettings();
+    void loadSettings();
     return () => {
       active = false;
     };

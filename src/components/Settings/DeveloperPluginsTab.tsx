@@ -62,7 +62,7 @@ export default function DeveloperPluginsTab({
         ...settings,
         developer: { enabled: true, devPluginsPath: devPath },
       };
-      updateSettings(updated);
+      void updateSettings(updated);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

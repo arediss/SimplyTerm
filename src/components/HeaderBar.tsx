@@ -87,7 +87,7 @@ export default function HeaderBar({
       onMouseDown={(e) => {
         if (e.buttons === 1 && !(e.target as HTMLElement).closest(".no-drag")) {
           if (e.detail === 2) {
-            handleMaximize();
+            void handleMaximize();
           } else {
             getCurrentWindow().startDragging();
           }

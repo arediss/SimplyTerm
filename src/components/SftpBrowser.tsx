@@ -94,7 +94,7 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
   }, [sessionId]);
 
   useEffect(() => {
-    loadDirectory(currentPath);
+    void loadDirectory(currentPath);
   }, []);
 
   // Listen for file upload events
@@ -178,12 +178,12 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
         console.error("Failed to load editing files:", err);
       }
     };
-    loadEditingFiles();
+    void loadEditingFiles();
   }, [sessionId]);
 
   const handleNavigate = (entry: FileEntry) => {
     if (entry.is_dir) {
-      loadDirectory(entry.path);
+      void loadDirectory(entry.path);
       setSelectedEntry(null);
     }
   };
@@ -193,15 +193,15 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
     const parts = currentPath.split("/").filter(Boolean);
     parts.pop();
     const newPath = "/" + parts.join("/");
-    loadDirectory(newPath || "/");
+    void loadDirectory(newPath || "/");
   };
 
   const handleGoHome = () => {
-    loadDirectory("/");
+    void loadDirectory("/");
   };
 
   const handleRefresh = () => {
-    loadDirectory(currentPath);
+    void loadDirectory(currentPath);
   };
 
   const handleDelete = async (entry: FileEntry) => {
@@ -399,7 +399,7 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
             className="flex-1 bg-crust px-2 py-1 rounded text-sm text-text placeholder:text-subtext-0 outline-none focus:ring-1 focus:ring-blue/50"
             autoFocus
             onKeyDown={(e) => {
-              if (e.key === "Enter") handleCreateFolder();
+              if (e.key === "Enter") void handleCreateFolder();
               if (e.key === "Escape") setShowNewFolderDialog(false);
             }}
           />
@@ -472,14 +472,14 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
                             onDoubleClick={(e) => e.stopPropagation()}
                             onKeyDown={(e) => {
                               e.stopPropagation();
-                              if (e.key === "Enter") handleRename();
+                              if (e.key === "Enter") void handleRename();
                               if (e.key === "Escape") setRenamingEntry(null);
                             }}
                           />
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleRename();
+                              void handleRename();
                             }}
                             className="p-1 rounded bg-green/20 text-green hover:bg-green/30 shrink-0"
                           >
@@ -547,7 +547,7 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
           {!contextMenu.entry.is_dir && (
             <button
               onClick={() => {
-                handleEditExternal(contextMenu.entry);
+                void handleEditExternal(contextMenu.entry);
                 setContextMenu(null);
               }}
               className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-text hover:bg-surface-0/50 transition-colors text-left"
@@ -593,7 +593,7 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
           {/* Delete */}
           <button
             onClick={() => {
-              handleDelete(contextMenu.entry);
+              void handleDelete(contextMenu.entry);
               setContextMenu(null);
             }}
             className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-red hover:bg-red/10 transition-colors text-left"

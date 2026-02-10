@@ -93,7 +93,7 @@ function App() {
 
   const handleToggleSidebarPin = useCallback(() => {
     const newPinned = !sidebarPinned;
-    handleSettingsChange({
+    void handleSettingsChange({
       ...appSettings,
       ui: { ...appSettings.ui, sidebarPinned: newPinned },
     });
