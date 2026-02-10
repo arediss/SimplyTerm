@@ -72,7 +72,7 @@ const Sidebar = memo(function Sidebar({
 
   // Subscribe to plugin sidebar view changes
   useEffect(() => {
-    const unsubscribe = pluginManager.subscribe((event) => {
+    return pluginManager.subscribe((event) => {
       if (event.type === 'sidebar-view:register' || event.type === 'sidebar-view:unregister') {
         setPluginViews(new Map(pluginManager.registeredSidebarViews));
       }
@@ -81,8 +81,6 @@ const Sidebar = memo(function Sidebar({
         setActiveTab((prev) => prev === event.viewId ? 'all' : prev);
       }
     });
-
-    return unsubscribe;
   }, []);
 
   // Build tabs list
@@ -470,13 +468,11 @@ const SavedSessionItem = memo(function SavedSessionItem({
 
     updateItems();
 
-    const unsubscribe = pluginManager.subscribe((event) => {
+    return pluginManager.subscribe((event) => {
       if (event.type === 'context-menu:register' || event.type === 'context-menu:unregister') {
         updateItems();
       }
     });
-
-    return unsubscribe;
   }, []);
 
   // Session decorators (e.g., tag pills from plugins)
