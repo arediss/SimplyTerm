@@ -94,7 +94,7 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
   }, [sessionId]);
 
   useEffect(() => {
-    void loadDirectory(currentPath);
+    loadDirectory(currentPath);
   }, []);
 
   // Listen for file upload events
@@ -178,12 +178,12 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
         console.error("Failed to load editing files:", err);
       }
     };
-    void loadEditingFiles();
+    loadEditingFiles();
   }, [sessionId]);
 
   const handleNavigate = (entry: FileEntry) => {
     if (entry.is_dir) {
-      void loadDirectory(entry.path);
+      loadDirectory(entry.path);
       setSelectedEntry(null);
     }
   };
@@ -193,15 +193,15 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
     const parts = currentPath.split("/").filter(Boolean);
     parts.pop();
     const newPath = "/" + parts.join("/");
-    void loadDirectory(newPath || "/");
+    loadDirectory(newPath || "/");
   };
 
   const handleGoHome = () => {
-    void loadDirectory("/");
+    loadDirectory("/");
   };
 
   const handleRefresh = () => {
-    void loadDirectory(currentPath);
+    loadDirectory(currentPath);
   };
 
   const handleDelete = async (entry: FileEntry) => {
@@ -479,7 +479,7 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              void handleRename();
+                              handleRename();
                             }}
                             className="p-1 rounded bg-green/20 text-green hover:bg-green/30 shrink-0"
                           >
@@ -547,7 +547,7 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
           {!contextMenu.entry.is_dir && (
             <button
               onClick={() => {
-                void handleEditExternal(contextMenu.entry);
+                handleEditExternal(contextMenu.entry);
                 setContextMenu(null);
               }}
               className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-text hover:bg-surface-0/50 transition-colors text-left"
@@ -593,7 +593,7 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: SftpBrowserProps) 
           {/* Delete */}
           <button
             onClick={() => {
-              void handleDelete(contextMenu.entry);
+              handleDelete(contextMenu.entry);
               setContextMenu(null);
             }}
             className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-red hover:bg-red/10 transition-colors text-left"

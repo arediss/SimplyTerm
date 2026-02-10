@@ -64,7 +64,7 @@ function TunnelManager({ isOpen, onClose, sessionId, sessionName, embedded = fal
   // Load tunnels on mount and periodically
   useEffect(() => {
     if (!isOpen) return;
-    void loadTunnels();
+    loadTunnels();
     const interval = setInterval(loadTunnels, 2000);
     return () => clearInterval(interval);
   }, [isOpen, loadTunnels]);

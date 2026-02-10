@@ -40,7 +40,7 @@ export function useVaultFlow() {
 
   const handleVaultSetupSkip = useCallback(() => {
     // Persist the skip choice in settings
-    void updateSettings({
+    updateSettings({
       ...settings,
       security: { ...settings.security, vaultSetupSkipped: true },
     });

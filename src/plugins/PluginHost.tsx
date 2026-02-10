@@ -180,7 +180,7 @@ export function usePlugins() {
   }, []);
 
   useEffect(() => {
-    void refresh();
+    refresh();
   }, [refresh]);
 
   const enablePlugin = useCallback(async (id: string) => {

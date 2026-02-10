@@ -102,7 +102,7 @@ export default function TunnelSidebar({
 
   useEffect(() => {
     if (!isOpen) return;
-    void loadTunnels();
+    loadTunnels();
     const interval = setInterval(loadTunnels, 5000);
     return () => clearInterval(interval);
   }, [isOpen, loadTunnels]);
