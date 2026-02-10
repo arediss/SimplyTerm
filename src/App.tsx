@@ -198,6 +198,53 @@ function App() {
     }
   };
 
+  // Helper: resolve SSH keys, register session, and open tab
+  const registerSshAndOpenTab = async (
+    saved: SavedSession,
+    credentials: { password: string | null; key_passphrase: string | null },
+    tabType: "sftp" | "tunnel",
+    titlePrefix: string,
+  ) => {
+    const sessionId = generateSessionId(tabType);
+
+    let keyPath: string | null = null;
+    let keyPassphrase: string | null = null;
+
+    if (saved.ssh_key_id && saved.auth_type === "key") {
+      const resolved = await resolveSshKey(saved.ssh_key_id);
+      if (!resolved) return;
+      keyPath = (await expandHomeDir(resolved.keyPath)) || null;
+      keyPassphrase = resolved.passphrase;
+    } else if (saved.auth_type === "key") {
+      keyPath = (await expandHomeDir(saved.key_path)) || null;
+      keyPassphrase = credentials.key_passphrase;
+    }
+
+    await invoke("register_sftp_session", {
+      sessionId,
+      host: saved.host,
+      port: saved.port,
+      username: saved.username,
+      password: saved.auth_type === "password" ? credentials.password : null,
+      keyPath,
+      keyPassphrase,
+    });
+
+    workspace.addTabToFocusedGroup({
+      type: tabType,
+      title: `${titlePrefix} - ${saved.name}`,
+      sessionId,
+      sshConfig: {
+        name: saved.name,
+        host: saved.host,
+        port: saved.port,
+        username: saved.username,
+        authType: saved.auth_type,
+        keyPath: saved.key_path,
+      },
+    });
+  };
+
   // ============================================================================
   // Connection handlers
   // ============================================================================
@@ -239,48 +286,9 @@ function App() {
         return;
       }
 
-      const performSftpConnection = async () => {
-        const sessionId = generateSessionId("sftp");
-
-        let keyPath: string | null = null;
-        let keyPassphrase: string | null = null;
-
-        if (saved.ssh_key_id && saved.auth_type === "key") {
-          const resolved = await resolveSshKey(saved.ssh_key_id);
-          if (!resolved) return;
-          keyPath = (await expandHomeDir(resolved.keyPath)) || null;
-          keyPassphrase = resolved.passphrase;
-        } else if (saved.auth_type === "key") {
-          keyPath = (await expandHomeDir(saved.key_path)) || null;
-          keyPassphrase = credentials.key_passphrase;
-        }
-
-        await invoke("register_sftp_session", {
-          sessionId,
-          host: saved.host,
-          port: saved.port,
-          username: saved.username,
-          password: saved.auth_type === "password" ? credentials.password : null,
-          keyPath,
-          keyPassphrase,
-        });
-
-        workspace.addTabToFocusedGroup({
-          type: "sftp",
-          title: `SFTP - ${saved.name}`,
-          sessionId,
-          sshConfig: {
-            name: saved.name,
-            host: saved.host,
-            port: saved.port,
-            username: saved.username,
-            authType: saved.auth_type,
-            keyPath: saved.key_path,
-          },
-        });
-      };
-
-      await checkHostKeyBeforeConnect(saved.host, saved.port, performSftpConnection);
+      await checkHostKeyBeforeConnect(saved.host, saved.port, () =>
+        registerSshAndOpenTab(saved, credentials, "sftp", "SFTP")
+      );
     } catch (error) {
       console.error("Failed to open SFTP tab:", error);
     }
@@ -304,48 +312,9 @@ function App() {
       const needsPassword = saved.auth_type === "password" && !credentials.password;
       if (needsPassword) return;
 
-      const performTunnelConnection = async () => {
-        const sessionId = generateSessionId("tunnel");
-
-        let keyPath: string | null = null;
-        let keyPassphrase: string | null = null;
-
-        if (saved.ssh_key_id && saved.auth_type === "key") {
-          const resolved = await resolveSshKey(saved.ssh_key_id);
-          if (!resolved) return;
-          keyPath = (await expandHomeDir(resolved.keyPath)) || null;
-          keyPassphrase = resolved.passphrase;
-        } else if (saved.auth_type === "key") {
-          keyPath = (await expandHomeDir(saved.key_path)) || null;
-          keyPassphrase = credentials.key_passphrase;
-        }
-
-        await invoke("register_sftp_session", {
-          sessionId,
-          host: saved.host,
-          port: saved.port,
-          username: saved.username,
-          password: saved.auth_type === "password" ? credentials.password : null,
-          keyPath,
-          keyPassphrase,
-        });
-
-        workspace.addTabToFocusedGroup({
-          type: "tunnel",
-          title: `Tunnels - ${saved.name}`,
-          sessionId,
-          sshConfig: {
-            name: saved.name,
-            host: saved.host,
-            port: saved.port,
-            username: saved.username,
-            authType: saved.auth_type,
-            keyPath: saved.key_path,
-          },
-        });
-      };
-
-      await checkHostKeyBeforeConnect(saved.host, saved.port, performTunnelConnection);
+      await checkHostKeyBeforeConnect(saved.host, saved.port, () =>
+        registerSshAndOpenTab(saved, credentials, "tunnel", "Tunnels")
+      );
     } catch (error) {
       console.error("Failed to open Tunnel tab:", error);
     }
