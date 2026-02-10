@@ -256,9 +256,8 @@ const Sidebar = memo(function Sidebar({
         className={`fixed inset-0 top-10 z-30 bg-black/40 transition-opacity duration-200 ${
           isAnimating ? "opacity-100" : "opacity-0"
         }`}
-        role="presentation"
+        aria-hidden="true"
         onClick={onClose}
-        onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
       />
 
       {/* Sidebar panel - flottant */}
@@ -566,13 +565,12 @@ const SavedSessionItem = memo(function SavedSessionItem({
 
   return (
     <>
-      <div
+      <button
+        type="button"
         onClick={isConnecting ? undefined : handleConnect}
-        onKeyDown={isConnecting ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleConnect(); } }}
         onContextMenu={isConnecting ? undefined : handleContextMenu}
-        role="button"
-        tabIndex={isConnecting ? -1 : 0}
-        className={`group/session w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left ${
+        disabled={isConnecting}
+        className={`group/session w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left bg-transparent border-none ${
           isConnecting
             ? "bg-accent/10 cursor-wait"
             : "hover:bg-white/5 cursor-pointer"
@@ -606,7 +604,7 @@ const SavedSessionItem = memo(function SavedSessionItem({
             <FolderOpen size={14} />
           </button>
         )}
-      </div>
+      </button>
 
       {/* Context Menu - rendered via Portal to escape transform context */}
       {contextMenu && createPortal(
@@ -614,6 +612,7 @@ const SavedSessionItem = memo(function SavedSessionItem({
           className="fixed z-[100] min-w-[160px] bg-crust border border-surface-0/50 rounded-lg shadow-xl py-1"
           style={{ transform: `translate3d(${contextMenu.x}px, ${contextMenu.y}px, 0)`, left: 0, top: 0 }}
           role="menu"
+          tabIndex={-1}
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => { if (e.key === 'Escape') closeContextMenu(); }}
         >

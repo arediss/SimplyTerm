@@ -98,7 +98,7 @@ export function PaneGroupTabBar({
   };
 
   return (
-    <div className="flex items-center h-10" role="tablist" onContextMenu={handleTabBarContextMenu}>
+    <div className="flex items-center h-10" role="tablist" tabIndex={0} onContextMenu={handleTabBarContextMenu}>
       {/* New tab split button */}
       <div className="flex items-center shrink-0 ml-1.5" ref={dropdownRef}>
         <button
@@ -158,6 +158,7 @@ export function PaneGroupTabBar({
           className="fixed z-[100] min-w-[180px] bg-crust/95 backdrop-blur-xl border border-surface-0/50 rounded-xl shadow-xl py-1.5 overflow-hidden"
           style={{ transform: `translate3d(${contextMenu.x}px, ${contextMenu.y}px, 0)`, left: 0, top: 0 }}
           role="menu"
+          tabIndex={-1}
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => { if (e.key === 'Escape') setContextMenu(null); }}
         >

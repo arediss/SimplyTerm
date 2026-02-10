@@ -44,18 +44,16 @@ function PluginModal({ isOpen, config, onButtonClick, onClose }: Readonly<Plugin
       {/* Backdrop */}
       <div
         className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm animate-fade-in"
-        role="presentation"
+        aria-hidden="true"
         onClick={onClose}
-        onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
       />
 
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-        <div
-          className="bg-mantle border border-surface-0/50 rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto animate-scale-in"
-          role="dialog"
+        <dialog
+          open
+          className="bg-mantle border border-surface-0/50 rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto animate-scale-in p-0"
           onKeyDown={handleKeyDown}
-          tabIndex={-1}
         >
           {/* Header */}
           <div className="px-6 pt-5 pb-4">
@@ -86,7 +84,7 @@ function PluginModal({ isOpen, config, onButtonClick, onClose }: Readonly<Plugin
               </button>
             ))}
           </div>
-        </div>
+        </dialog>
       </div>
     </>
   );

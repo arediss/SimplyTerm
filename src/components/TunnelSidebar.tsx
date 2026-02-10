@@ -238,9 +238,8 @@ export default function TunnelSidebar({
         className={`fixed inset-0 top-10 z-30 bg-black/40 transition-opacity duration-200 ${
           isAnimating ? "opacity-100" : "opacity-0"
         }`}
-        role="presentation"
+        aria-hidden="true"
         onClick={onClose}
-        onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
       />
 
       {/* Sidebar panel - flottant à gauche */}

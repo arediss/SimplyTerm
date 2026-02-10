@@ -182,9 +182,8 @@ export default function SshKeyManager({ isVaultUnlocked }: Readonly<SshKeyManage
         <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in">
           <div
             className="absolute inset-0 bg-black/70"
-            role="presentation"
+            aria-hidden="true"
             onClick={() => !isDeleting && setConfirmDeleteKey(null)}
-            onKeyDown={(e) => { if (e.key === 'Escape' && !isDeleting) setConfirmDeleteKey(null); }}
           />
           <div className="relative bg-crust border border-surface-0/50 rounded-xl shadow-2xl w-[360px] animate-scale-in">
             <div className="p-5">

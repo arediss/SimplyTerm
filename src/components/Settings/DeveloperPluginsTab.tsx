@@ -127,14 +127,14 @@ function DevPluginsList({
   actionLoading,
   onToggle,
   t,
-}: {
+}: Readonly<{
   loading: boolean;
   plugins: PluginManifest[];
   devPath: string;
   actionLoading: string | null;
   onToggle: (plugin: PluginManifest) => void;
   t: (key: string, opts?: Record<string, unknown>) => string;
-}) {
+}>) {
   if (loading) {
     return <PluginListSkeleton count={2} />;
   }

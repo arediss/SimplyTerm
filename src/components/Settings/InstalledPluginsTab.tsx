@@ -86,7 +86,7 @@ function InstalledPluginsList({
   onUninstall,
   onUpdate,
   t,
-}: {
+}: Readonly<{
   loading: boolean;
   plugins: PluginManifest[];
   updates: PluginUpdate[];
@@ -95,7 +95,7 @@ function InstalledPluginsList({
   onUninstall: (plugin: PluginManifest) => void;
   onUpdate: (update: PluginUpdate) => void;
   t: (key: string, opts?: Record<string, unknown>) => string;
-}) {
+}>) {
   if (loading) {
     return <PluginListSkeleton />;
   }

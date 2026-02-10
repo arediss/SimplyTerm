@@ -44,9 +44,8 @@ function Modal({ isOpen, onClose, title, children, width = "md" }: Readonly<Moda
       {/* Overlay */}
       <div
         className="absolute inset-0 bg-black/70"
-        role="presentation"
+        aria-hidden="true"
         onClick={onClose}
-        onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
       />
 
       {/* Modal with floating title */}

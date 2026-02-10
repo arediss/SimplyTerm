@@ -22,14 +22,14 @@ export interface SerialFormContentProps {
   setPort: (v: string) => void;
   baudRate: number;
   setBaudRate: (v: number) => void;
-  dataBits: 5 | 6 | 7 | 8;
-  setDataBits: (v: 5 | 6 | 7 | 8) => void;
-  stopBits: 1 | 2;
-  setStopBits: (v: 1 | 2) => void;
-  parity: "none" | "odd" | "even";
-  setParity: (v: "none" | "odd" | "even") => void;
-  flowControl: "none" | "hardware" | "software";
-  setFlowControl: (v: "none" | "hardware" | "software") => void;
+  dataBits: DataBits;
+  setDataBits: (v: DataBits) => void;
+  stopBits: StopBits;
+  setStopBits: (v: StopBits) => void;
+  parity: Parity;
+  setParity: (v: Parity) => void;
+  flowControl: FlowControl;
+  setFlowControl: (v: FlowControl) => void;
   availablePorts: SerialPortInfo[];
   isLoadingPorts: boolean;
   onRefreshPorts: () => void;
@@ -104,7 +104,7 @@ export const SerialFormContent = memo(function SerialFormContent(props: SerialFo
         <FormField label={t("connection.serial.dataBits")}>
           <select
             value={props.dataBits}
-            onChange={(e) => props.setDataBits(Number.parseInt(e.target.value) as 5 | 6 | 7 | 8)}
+            onChange={(e) => props.setDataBits(Number.parseInt(e.target.value) as DataBits)}
             className="input-field"
           >
             {DATA_BITS.map((bits) => (
@@ -121,7 +121,7 @@ export const SerialFormContent = memo(function SerialFormContent(props: SerialFo
         <FormField label={t("connection.serial.stopBits")}>
           <select
             value={props.stopBits}
-            onChange={(e) => props.setStopBits(Number.parseInt(e.target.value) as 1 | 2)}
+            onChange={(e) => props.setStopBits(Number.parseInt(e.target.value) as StopBits)}
             className="input-field"
           >
             {STOP_BITS.map((bits) => (
@@ -134,7 +134,7 @@ export const SerialFormContent = memo(function SerialFormContent(props: SerialFo
         <FormField label={t("connection.serial.parity")}>
           <select
             value={props.parity}
-            onChange={(e) => props.setParity(e.target.value as "none" | "odd" | "even")}
+            onChange={(e) => props.setParity(e.target.value as Parity)}
             className="input-field"
           >
             {PARITY_OPTIONS.map((p) => (
@@ -152,7 +152,7 @@ export const SerialFormContent = memo(function SerialFormContent(props: SerialFo
           <select
             value={props.flowControl}
             onChange={(e) =>
-              props.setFlowControl(e.target.value as "none" | "hardware" | "software")
+              props.setFlowControl(e.target.value as FlowControl)
             }
             className="input-field"
           >

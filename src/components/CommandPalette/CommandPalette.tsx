@@ -55,21 +55,20 @@ export function CommandPalette({
       {/* Overlay */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        role="presentation"
+        aria-hidden="true"
         onClick={onClose}
-        onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
       />
 
       {/* Palette */}
-      <div
+      <dialog
+        open
         className="
-          relative w-full max-w-lg mx-4
+          relative w-full max-w-lg mx-4 p-0
           bg-mantle border border-surface-0/60 rounded-xl
           shadow-2xl shadow-black/50
           animate-scale-in
           overflow-hidden
         "
-        role="dialog"
         onKeyDown={onKeyDown}
       >
         {/* Search input */}
@@ -133,7 +132,7 @@ export function CommandPalette({
             {t("commandPalette.close")}
           </span>
         </div>
-      </div>
+      </dialog>
     </div>
   );
 }

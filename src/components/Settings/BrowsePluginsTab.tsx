@@ -98,7 +98,7 @@ function BrowsePluginsResults({
   onRefresh,
   onInstall,
   t,
-}: {
+}: Readonly<{
   error: string | null;
   loading: boolean;
   plugins: RegistryPlugin[];
@@ -107,7 +107,7 @@ function BrowsePluginsResults({
   onRefresh: () => void;
   onInstall: (plugin: RegistryPlugin) => void;
   t: (key: string) => string;
-}) {
+}>) {
   if (error) {
     return (
       <div className="flex flex-col items-center py-12 text-text-muted">
@@ -115,7 +115,7 @@ function BrowsePluginsResults({
           <AlertCircle size={28} className="text-error/60" />
         </div>
         <p className="text-sm font-medium text-error/80">{t("settings.plugins.registryError")}</p>
-        {error && <p className="text-[10px] text-text-muted/60 mt-1.5 max-w-[280px] text-center break-all">{error}</p>}
+        <p className="text-[10px] text-text-muted/60 mt-1.5 max-w-[280px] text-center break-all">{error}</p>
         <button
           onClick={onRefresh}
           className="mt-4 px-4 py-1.5 text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20 rounded-lg transition-colors"

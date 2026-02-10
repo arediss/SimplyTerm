@@ -29,7 +29,7 @@ export default function AuthenticationSection({ vault }: Readonly<Authentication
 
 // --- PIN Management ---
 
-function PinSection({ vault }: AuthenticationSectionProps) {
+function PinSection({ vault }: Readonly<AuthenticationSectionProps>) {
   const { t } = useTranslation();
   const [pinSuccess, triggerPinSuccess] = useAutoHideSuccess();
   const hasPin = vault.status?.unlockMethods.includes('pin') || false;
@@ -166,7 +166,7 @@ function getBiometricDescription(
   return t("settings.security.biometricNotAvailable");
 }
 
-function BiometricSection({ vault }: AuthenticationSectionProps) {
+function BiometricSection({ vault }: Readonly<AuthenticationSectionProps>) {
   const { t } = useTranslation();
   const hasBiometric = vault.status?.unlockMethods.includes('biometric') || false;
   const statusClassName = hasBiometric ? 'bg-success/20 text-success' : 'bg-surface-0/50 text-text-muted';
@@ -210,13 +210,13 @@ function SecurityKeySetupContent({
   keys,
   onRefresh,
   t,
-}: {
+}: Readonly<{
   loading: boolean;
   available: boolean | null;
   keys: SecurityKeyInfo[];
   onRefresh: () => void;
   t: (key: string, opts?: Record<string, unknown>) => string;
-}) {
+}>) {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-6 gap-3">
@@ -305,7 +305,7 @@ function SecurityKeySetupContent({
   );
 }
 
-function SecurityKeySection({ vault }: AuthenticationSectionProps) {
+function SecurityKeySection({ vault }: Readonly<AuthenticationSectionProps>) {
   const { t } = useTranslation();
   const [securityKeySuccess, triggerSecurityKeySuccess] = useAutoHideSuccess();
   const hasSecurityKey = vault.status?.unlockMethods.includes('security_key') || false;

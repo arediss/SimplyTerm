@@ -372,9 +372,8 @@ function TunnelManager({ isOpen, onClose, sessionId, sessionName, embedded = fal
       {/* Overlay */}
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-        role="presentation"
+        aria-hidden="true"
         onClick={onClose}
-        onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
       />
 
       {/* Modal */}

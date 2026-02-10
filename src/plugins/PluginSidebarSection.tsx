@@ -60,22 +60,22 @@ function PluginSidebarSection({ pluginId, section }: Readonly<PluginSidebarSecti
   return (
     <div className="plugin-sidebar-section mt-3" data-plugin={pluginId} data-section={config.id}>
       {/* Section header */}
-      <div
-        className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-text-muted uppercase tracking-wider ${
-          isCollapsible ? 'cursor-pointer hover:text-text' : ''
-        }`}
-        role={isCollapsible ? "button" : undefined}
-        tabIndex={isCollapsible ? 0 : undefined}
-        onClick={() => isCollapsible && setIsCollapsed(!isCollapsed)}
-        onKeyDown={isCollapsible ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsCollapsed(!isCollapsed); } } : undefined}
-      >
-        {isCollapsible && (
+      {isCollapsible ? (
+        <button
+          type="button"
+          className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:text-text w-full bg-transparent border-none"
+          onClick={() => setIsCollapsed(!isCollapsed)}
+        >
           <span className="text-text-muted">
             {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
           </span>
-        )}
-        <span>{config.title}</span>
-      </div>
+          <span>{config.title}</span>
+        </button>
+      ) : (
+        <div className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-text-muted uppercase tracking-wider">
+          <span>{config.title}</span>
+        </div>
+      )}
 
       {/* Section content */}
       {!isCollapsed && (

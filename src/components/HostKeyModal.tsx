@@ -67,9 +67,8 @@ function HostKeyModal({
       {/* Overlay */}
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-        role="presentation"
+        aria-hidden="true"
         onClick={() => !isLoading && onReject()}
-        onKeyDown={(e) => { if (e.key === 'Escape' && !isLoading) onReject(); }}
       />
 
       {/* Modal */}

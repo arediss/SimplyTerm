@@ -534,6 +534,7 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: Readonly<SftpBrows
             top: Math.min(contextMenu.y, globalThis.innerHeight - 200),
           }}
           role="menu"
+          tabIndex={-1}
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => { if (e.key === 'Escape') setContextMenu(null); }}
         >

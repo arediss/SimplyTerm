@@ -83,9 +83,8 @@ export function PluginWidget({ pluginId, panel, position, visible }: Readonly<Pl
   const positionClass = position === 'floating-left' ? 'left-3' : 'right-3';
 
   return (
-    <div
+    <output
       className={`fixed bottom-3 ${positionClass} z-50`}
-      role="status"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -101,6 +100,6 @@ export function PluginWidget({ pluginId, panel, position, visible }: Readonly<Pl
           className="plugin-widget-content"
         />
       </div>
-    </div>
+    </output>
   );
 }

@@ -36,9 +36,8 @@ i18n.on('languageChanged', async (lng) => {
 
 // Eagerly load fallback locale in background if it's not the active one
 if (savedLanguage !== 'en' && !i18n.hasResourceBundle('en', 'translation')) {
-  loaders['en']().then((mod) => {
-    i18n.addResourceBundle('en', 'translation', mod.default);
-  });
+  const fallbackMod = await loaders['en']();
+  i18n.addResourceBundle('en', 'translation', fallbackMod.default);
 }
 
 export default i18n;
