@@ -80,7 +80,7 @@ export default function TunnelSidebar({
   }, [isOpen]);
 
   const isMountedRef = useRef(true);
-  useEffect(() => () => { isMountedRef.current = false; }, []);
+  useEffect(() => { isMountedRef.current = true; return () => { isMountedRef.current = false; }; }, []);
 
   const onTunnelCountChangeRef = useRef(onTunnelCountChange);
   onTunnelCountChangeRef.current = onTunnelCountChange;

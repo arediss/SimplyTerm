@@ -84,7 +84,7 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: Readonly<SftpBrows
   } | null>(null);
 
   const isMountedRef = useRef(true);
-  useEffect(() => { return () => { isMountedRef.current = false; }; }, []);
+  useEffect(() => { isMountedRef.current = true; return () => { isMountedRef.current = false; }; }, []);
 
   const loadDirectory = useCallback(async (path: string) => {
     setLoading(true);

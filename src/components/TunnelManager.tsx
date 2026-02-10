@@ -55,7 +55,7 @@ function TunnelManager({ isOpen, onClose, sessionId, sessionName, embedded = fal
   const [creating, setCreating] = useState(false);
 
   const isMountedRef = useRef(true);
-  useEffect(() => () => { isMountedRef.current = false; }, []);
+  useEffect(() => { isMountedRef.current = true; return () => { isMountedRef.current = false; }; }, []);
 
   const loadTunnels = useCallback(async () => {
     try {
