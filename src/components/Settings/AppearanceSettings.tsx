@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import i18n from "../../i18n";
 import { getThemes } from "../../themes";
 import { SettingGroup, ThemeCard } from "./SettingsUIComponents";
-import type { AppSettings } from "../../types/settings";
+import type { AppSettings } from "../../types";
 
 interface AppearanceSettingsProps {
   settings: AppSettings;

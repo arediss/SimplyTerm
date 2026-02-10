@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { useAutoHideSuccess } from "../../hooks/useAutoHideSuccess";
 import { SettingGroup, SettingRow } from "./SettingsUIComponents";
-import type { useVault } from "../../hooks/useVault";
+import type { useVault } from "../../hooks";
 
 interface AuthenticationSectionProps {
   vault: ReturnType<typeof useVault>;

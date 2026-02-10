@@ -20,8 +20,7 @@ import {
 } from "lucide-react";
 import { SavedSession } from "../types";
 import { pluginManager } from "../plugins";
-import type { SidebarViewRegistration, ContextMenuItemConfig } from "../plugins/types";
-import type { ContextMenuContext } from "../plugins/extensionTypes";
+import type { SidebarViewRegistration, ContextMenuItemConfig, ContextMenuContext } from "../plugins";
 
 interface SidebarProps {
   isOpen: boolean;

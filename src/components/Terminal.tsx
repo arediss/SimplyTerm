@@ -10,7 +10,7 @@ import { X, ChevronUp, ChevronDown, CaseSensitive, Regex } from "lucide-react";
 import "@xterm/xterm/css/xterm.css";
 import { getTerminalTheme } from "../themes";
 import { isModifierPressed } from "../utils";
-import type { AppSettings } from "../types/settings";
+import type { AppSettings } from "../types";
 
 type TerminalSettings = AppSettings["terminal"];
 

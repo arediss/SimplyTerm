@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { MousePointer2 } from "lucide-react";
 import { SettingGroup, SettingRow, Toggle } from "./SettingsUIComponents";
-import type { AppSettings } from "../../types/settings";
+import type { AppSettings } from "../../types";
 
 interface TerminalSettingsProps {
   settings: AppSettings["terminal"];

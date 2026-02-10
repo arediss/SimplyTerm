@@ -1,4 +1,4 @@
-import type { PaneGroupTab } from "../../types/workspace";
+import type { PaneGroupTab } from "../../types";
 
 interface PaneGroupContentProps {
   tab: PaneGroupTab | null;

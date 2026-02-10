@@ -2,9 +2,9 @@ import { useState, useRef, useEffect, useCallback, forwardRef, memo } from "reac
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Plus, X, ChevronDown, Terminal, ArrowLeftRight, Columns2, Rows2, XCircle } from "lucide-react";
-import type { PaneGroupTab } from "../../types/workspace";
+import type { PaneGroupTab } from "../../types";
 import { pluginManager } from "../../plugins";
-import type { QuickConnectSectionRegistration } from "../../plugins/types";
+import type { QuickConnectSectionRegistration } from "../../plugins";
 
 interface PaneGroupTabBarProps {
   tabs: PaneGroupTab[];

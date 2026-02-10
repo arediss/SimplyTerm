@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
-import type { ModalConfig } from "../plugins/types";
+import type { ModalConfig } from "../plugins";
 
 interface PluginModalProps {
   isOpen: boolean;

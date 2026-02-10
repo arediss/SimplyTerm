@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import type { PromptConfig } from "../plugins/types";
+import type { PromptConfig } from "../plugins";
 
 interface PromptModalProps {
   isOpen: boolean;

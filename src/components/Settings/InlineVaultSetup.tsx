@@ -4,7 +4,7 @@ import { Shield } from "lucide-react";
 import { PasswordInput } from "../UI/PasswordInput";
 import { validatePassword } from "../../utils/validatePassword";
 import { SettingGroup } from "./SettingsUIComponents";
-import type { useVault } from "../../hooks/useVault";
+import type { useVault } from "../../hooks";
 
 interface InlineVaultSetupProps {
   vault: ReturnType<typeof useVault>;

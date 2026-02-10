@@ -3,8 +3,8 @@ import { useTranslation } from "react-i18next";
 import { Menu, Minus, Square, Copy, X, Settings, KeyRound } from "lucide-react";
 import DynamicLucideIcon from "./DynamicLucideIcon";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import type { HeaderActionItem } from "../plugins/PluginManager";
-import { isMac } from "../utils/platform";
+import type { HeaderActionItem } from "../plugins";
+import { isMac } from "../utils";
 
 interface HeaderBarProps {
   onToggleSidebar: () => void;

@@ -1,4 +1,4 @@
-import type { WorkspaceNode, PaneGroup, PaneGroupTab } from "../types/workspace";
+import type { WorkspaceNode, PaneGroup, PaneGroupTab } from "../types";
 
 // ============================================================================
 // ID Generation

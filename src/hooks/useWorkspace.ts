@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
-import type { WorkspaceNode, PaneGroup, PaneGroupTab } from "../types/workspace";
+import type { WorkspaceNode, PaneGroup, PaneGroupTab } from "../types";
 import {
   createGroup,
   createGroupNode,
@@ -8,7 +8,7 @@ import {
   closeGroupNode,
   resizeSplit,
 } from "../utils/workspaceTree";
-import { generateTabId } from "../utils/idGenerator";
+import { generateTabId } from "../utils";
 
 interface WorkspaceState {
   tree: WorkspaceNode;

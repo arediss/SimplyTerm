@@ -2,9 +2,9 @@ import { useState, useEffect, useMemo, useCallback, memo, lazy, Suspense } from 
 import { useTranslation } from "react-i18next";
 import { Palette, Terminal, Link2, Info, Shield, Puzzle } from "lucide-react";
 import { pluginManager } from "../../plugins";
-import { PluginSettingsPanel } from "../../plugins/PluginSettingsPanel";
-import type { SettingsPanelRegistration } from "../../plugins/types";
-import type { AppSettings } from "../../types/settings";
+import { PluginSettingsPanel } from "../../plugins";
+import type { SettingsPanelRegistration } from "../../plugins";
+import type { AppSettings } from "../../types";
 import {
   AppearanceSettings,
   TerminalSettings,

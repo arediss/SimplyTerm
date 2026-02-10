@@ -11,12 +11,12 @@ import { StatusBar, type StatusBarItem } from "./components/StatusBar";
 import { pluginManager, type SessionInfo, type ModalConfig, type NotificationType, type PromptConfig } from "./plugins";
 const PluginHost = lazy(() => import("./plugins/PluginHost").then(m => ({ default: m.PluginHost })));
 // plugin-updater is lazy-imported in the auto-check useEffect below
-import type { HeaderActionItem } from "./plugins/PluginManager";
+import type { HeaderActionItem } from "./plugins";
 const SftpBrowser = lazy(() => import("./components/SftpBrowser").then(m => ({ default: m.SftpBrowser })));
 const TunnelManager = lazy(() => import("./components/TunnelManager"));
 const TunnelSidebar = lazy(() => import("./components/TunnelSidebar"));
 import { WorkspaceSplit } from "./components/WorkspaceSplit";
-import { WorkspaceActionsContext, type WorkspaceActions } from "./components/PaneGroup/WorkspaceActionsContext";
+import { WorkspaceActionsContext, type WorkspaceActions } from "./components/PaneGroup";
 import EmptyPaneSessions from "./components/EmptyPaneSessions";
 
 // Lazy-loaded modals and settings (only shown on user action)
@@ -31,7 +31,7 @@ const VaultUnlockModal = lazy(() => import("./components/Vault/VaultUnlockModal"
 import { useSessions, useAppSettings, useVaultFlow, useHostKeyVerification, useWorkspace } from "./hooks";
 import type { SshConnectionResult } from "./hooks";
 import { SavedSession, TelnetConnectionConfig, SerialConnectionConfig, SshKeyProfile, ConnectionType } from "./types";
-import type { PaneGroupTab } from "./types/workspace";
+import type { PaneGroupTab } from "./types";
 import { generateSessionId, expandHomeDir, isModifierPressed } from "./utils";
 import { applyTheme } from "./themes";
 
