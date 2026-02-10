@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Lock, ShieldCheck, AlertCircle, Trash2 } from "lucide-react";
 import { getAutoLockOptions } from "../../utils";
 import { SettingGroup, SettingRow, Toggle } from "./SettingsUIComponents";
-import type { useVault } from "../../hooks/useVault";
+import type { useVault } from "../../hooks";
 
 interface VaultStatusSectionProps {
   vault: ReturnType<typeof useVault>;

@@ -9,8 +9,9 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useAutoHideSuccess } from "../../hooks/useAutoHideSuccess";
+import { isWindows } from "../../utils";
 import { SettingGroup, SettingRow } from "./SettingsUIComponents";
-import type { useVault } from "../../hooks/useVault";
+import type { useVault } from "../../hooks";
 
 interface AuthenticationSectionProps {
   vault: ReturnType<typeof useVault>;
@@ -287,7 +288,7 @@ export default function AuthenticationSection({ vault }: AuthenticationSectionPr
               </div>
             ) : detectedSecurityKeys.length === 0 ? (
               <div className="p-4 bg-surface-0/30 rounded-lg">
-                {navigator.platform.includes('Win') ? (
+                {isWindows ? (
                   <>
                     <p className="text-sm text-text text-center">
                       {t("settings.security.windowsWebAuthnReady")}
@@ -364,7 +365,7 @@ export default function AuthenticationSection({ vault }: AuthenticationSectionPr
               </button>
               <button
                 onClick={handleSetupSecurityKey}
-                disabled={securityKeyLoading || (detectedSecurityKeys.length === 0 && !navigator.platform.includes('Win'))}
+                disabled={securityKeyLoading || (detectedSecurityKeys.length === 0 && !isWindows)}
                 className="flex-1 py-2 bg-accent text-crust text-sm font-medium rounded-lg hover:bg-accent-hover transition-colors disabled:opacity-50"
               >
                 {securityKeyLoading ? t("settings.security.touchKey") : t("common.configure")}

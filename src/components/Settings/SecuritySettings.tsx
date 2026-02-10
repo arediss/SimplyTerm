@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Shield, Key, KeyRound } from "lucide-react";
-import { useVault } from "../../hooks/useVault";
+import { useVault } from "../../hooks";
 import SshKeyManager from "../SshKeyManager";
 import { SubTabs } from "./SettingsUIComponents";
 import InlineVaultSetup from "./InlineVaultSetup";

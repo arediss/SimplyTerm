@@ -58,7 +58,7 @@ export function PluginHost({
 
   // Subscribe to plugin events
   useEffect(() => {
-    const unsubscribe = pluginManager.subscribe((event) => {
+    return pluginManager.subscribe((event) => {
       switch (event.type) {
         case 'panel:register':
           setPanels(new Map(pluginManager.registeredPanels));
@@ -92,8 +92,6 @@ export function PluginHost({
           break;
       }
     });
-
-    return unsubscribe;
   }, []);
 
   // Load enabled plugins on mount
@@ -182,7 +180,7 @@ export function usePlugins() {
   }, []);
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, [refresh]);
 
   const enablePlugin = useCallback(async (id: string) => {

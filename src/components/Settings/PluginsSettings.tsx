@@ -27,12 +27,12 @@ export default function PluginsSettings() {
   const installedIds = new Set(plugins.filter((p) => !p.isDev).map((p) => p.id));
 
   useEffect(() => {
-    registry.checkUpdates();
+    void registry.checkUpdates();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (tab === "browse" && registry.plugins.length === 0 && !registry.loading) {
-      registry.fetchPlugins();
+      void registry.fetchPlugins();
     }
   }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -118,9 +118,9 @@ export default function PluginsSettings() {
     (query: string) => {
       setSearchQuery(query);
       if (query.trim()) {
-        registry.searchPlugins(query);
+        void registry.searchPlugins(query);
       } else {
-        registry.fetchPlugins();
+        void registry.fetchPlugins();
       }
     },
     [registry] // eslint-disable-line react-hooks/exhaustive-deps

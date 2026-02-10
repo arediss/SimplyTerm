@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { AppSettings, defaultSettings } from "../types/settings";
+import { AppSettings, defaultSettings } from "../types";
 
 export function useAppSettings() {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
@@ -25,7 +25,7 @@ export function useAppSettings() {
         }
       }
     };
-    loadSettings();
+    void loadSettings();
     return () => {
       active = false;
     };

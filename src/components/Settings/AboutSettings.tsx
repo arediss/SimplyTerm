@@ -55,7 +55,7 @@ export default function AboutSettings() {
   }, []);
 
   const handleCopyVersion = () => {
-    navigator.clipboard.writeText(`SimplyTerm v${appVersion}`);
+    navigator.clipboard.writeText(`SimplyTerm v${appVersion}`).catch(() => {});
     setCopied(true);
     if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
     copyTimeoutRef.current = setTimeout(() => setCopied(false), 1500);

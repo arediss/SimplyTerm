@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { getErrorMessage } from "../utils";
 import { Key, Plus, Pencil, Trash2, Lock, X, Check, AlertTriangle } from "lucide-react";
-import { useSshKeys } from "../hooks/useSshKeys";
+import { useSshKeys } from "../hooks";
 import type { SshKeyProfileInfo } from "../types";
 
 interface SshKeyManagerProps {

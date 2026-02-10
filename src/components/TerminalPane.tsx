@@ -1,5 +1,5 @@
 import Terminal from "./Terminal";
-import type { AppSettings } from "../types/settings";
+import type { AppSettings } from "../types";
 
 interface TerminalPaneProps {
   sessionId: string;

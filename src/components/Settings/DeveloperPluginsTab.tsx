@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { RefreshCw, Code2, ScanSearch } from "lucide-react";
-import { useAppSettings } from "../../hooks/useAppSettings";
+import { useAppSettings } from "../../hooks";
 import type { PluginManifest } from "../../plugins";
 import { InstalledPluginCard, PluginListSkeleton } from "./PluginCards";
 
@@ -62,7 +62,7 @@ export default function DeveloperPluginsTab({
         ...settings,
         developer: { enabled: true, devPluginsPath: devPath },
       };
-      updateSettings(updated);
+      void updateSettings(updated);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

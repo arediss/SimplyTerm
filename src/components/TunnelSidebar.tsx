@@ -102,7 +102,7 @@ export default function TunnelSidebar({
 
   useEffect(() => {
     if (!isOpen) return;
-    loadTunnels();
+    void loadTunnels();
     const interval = setInterval(loadTunnels, 5000);
     return () => clearInterval(interval);
   }, [isOpen, loadTunnels]);
@@ -119,7 +119,11 @@ export default function TunnelSidebar({
 
     try {
       const session = savedSessions.find(s => s.id === selectedSessionId);
-      if (!session) throw new Error("Session not found");
+      if (!session) {
+        setError("Session not found");
+        setCreating(false);
+        return;
+      }
 
       // Get credentials from vault
       let credentials: { password: string | null; key_passphrase: string | null };
@@ -142,7 +146,7 @@ export default function TunnelSidebar({
       }
 
       // Generate unique session ID
-      const sshSessionId = `tunnel-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const sshSessionId = `tunnel-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 
       // Expand ~ in key path
       let keyPath = session.key_path;

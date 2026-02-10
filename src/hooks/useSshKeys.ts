@@ -27,7 +27,7 @@ export function useSshKeys() {
 
   useEffect(() => {
     isMountedRef.current = true;
-    refresh();
+    void refresh();
     return () => {
       isMountedRef.current = false;
     };

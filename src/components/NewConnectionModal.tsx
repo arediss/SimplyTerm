@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import Modal from "./Modal";
 import { SshConnectionConfig, ConnectionType, TelnetConnectionConfig, SerialConnectionConfig, SerialPortInfo } from "../types";
-import { useSshKeys } from "../hooks/useSshKeys";
+import { useSshKeys } from "../hooks";
 import { Terminal, Wifi, Cable } from "lucide-react";
 import { SshFormContent } from "./Connection/SshConnectionForm";
 import { TelnetFormContent } from "./Connection/TelnetConnectionForm";

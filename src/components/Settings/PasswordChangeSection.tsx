@@ -5,7 +5,7 @@ import { PasswordInput } from "../UI/PasswordInput";
 import { useAutoHideSuccess } from "../../hooks/useAutoHideSuccess";
 import { validatePassword } from "../../utils/validatePassword";
 import { SettingGroup } from "./SettingsUIComponents";
-import type { useVault } from "../../hooks/useVault";
+import type { useVault } from "../../hooks";
 
 interface PasswordChangeSectionProps {
   vault: ReturnType<typeof useVault>;

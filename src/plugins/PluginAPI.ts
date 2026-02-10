@@ -70,7 +70,7 @@ export function createPluginAPI(
   const pluginId = manifest.id;
   const permissions = manifest.permissions;
 
-  const api: SimplyTermPluginAPI = {
+  return {
     // Plugin ID
     pluginId,
 
@@ -494,7 +494,5 @@ export function createPluginAPI(
       }
       return callbacks.onShowPrompt(config);
     },
-  };
-
-  return api;
+  } satisfies SimplyTermPluginAPI;
 }
