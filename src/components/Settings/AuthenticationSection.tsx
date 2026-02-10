@@ -17,7 +17,7 @@ interface AuthenticationSectionProps {
   vault: ReturnType<typeof useVault>;
 }
 
-export default function AuthenticationSection({ vault }: AuthenticationSectionProps) {
+export default function AuthenticationSection({ vault }: Readonly<AuthenticationSectionProps>) {
   return (
     <>
       <PinSection vault={vault} />
@@ -79,7 +79,7 @@ function PinSection({ vault }: AuthenticationSectionProps) {
               maxLength={6}
               placeholder={t("settings.security.newPinPlaceholder")}
               value={newPin}
-              onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
+              onChange={(e) => setNewPin(e.target.value.replaceAll(/\D/g, ''))}
               className="w-full px-4 py-3 bg-surface-0/30 border border-surface-0/50 rounded-xl text-text placeholder-text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
             />
             <input
@@ -88,7 +88,7 @@ function PinSection({ vault }: AuthenticationSectionProps) {
               maxLength={6}
               placeholder={t("settings.security.confirmPinPlaceholder")}
               value={confirmPin}
-              onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
+              onChange={(e) => setConfirmPin(e.target.value.replaceAll(/\D/g, ''))}
               className="w-full px-4 py-3 bg-surface-0/30 border border-surface-0/50 rounded-xl text-text placeholder-text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
             />
           </div>
@@ -180,13 +180,13 @@ function BiometricSection({ vault }: AuthenticationSectionProps) {
         description={getBiometricDescription(hasBiometric, vault.status?.biometricAvailable, t)}
       >
         <div className="flex items-center gap-2">
-          {!vault.status?.biometricAvailable ? (
-            <span className="px-2 py-1 bg-surface-0/50 text-text-muted text-[10px] rounded-full">
-              {t("common.notSupported")}
-            </span>
-          ) : (
+          {vault.status?.biometricAvailable ? (
             <span className="px-2 py-1 bg-accent/20 text-accent text-[10px] rounded-full">
               {t("common.comingSoon")}
+            </span>
+          ) : (
+            <span className="px-2 py-1 bg-surface-0/50 text-text-muted text-[10px] rounded-full">
+              {t("common.notSupported")}
             </span>
           )}
         </div>
@@ -371,75 +371,75 @@ function SecurityKeySection({ vault }: AuthenticationSectionProps) {
   const statusClassName = hasSecurityKey ? 'bg-success/20 text-success' : 'bg-surface-0/50 text-text-muted';
   const canSetup = !securityKeyLoading && (detectedSecurityKeys.length > 0 || isWindows);
 
-  if (!showSecurityKeySetup) {
+  if (showSecurityKeySetup) {
     return (
       <SettingGroup title={t("settings.security.fido2Title")} description={t("settings.security.fido2Desc")}>
-        <SettingRow
-          icon={<Key size={20} />}
-          iconClassName={`w-10 h-10 rounded-lg flex items-center justify-center ${statusClassName}`}
-          title={t("settings.security.fido2Key")}
-          description={hasSecurityKey ? t("settings.security.fido2Configured") : t("settings.security.fido2NotConfigured")}
-        >
-          <div className="flex gap-2">
-            {hasSecurityKey && (
-              <button
-                onClick={handleRemoveSecurityKey}
-                disabled={!vault.status?.isUnlocked}
-                className="px-3 py-1.5 bg-error/10 text-error text-xs rounded-lg hover:bg-error/20 transition-colors disabled:opacity-50"
-              >
-                {t("common.remove")}
-              </button>
-            )}
+        <div className="p-4 bg-surface-0/20 rounded-lg space-y-4">
+          <SecurityKeySetupContent
+            loading={securityKeyLoading}
+            available={securityKeyAvailable}
+            keys={detectedSecurityKeys}
+            onRefresh={handleRefreshSecurityKeys}
+            t={t}
+          />
+
+          {securityKeyError && <p className="text-sm text-error">{securityKeyError}</p>}
+          {securityKeySuccess && (
+            <p className="text-sm text-success flex items-center gap-2">
+              <Check size={16} /> {t("settings.security.keySetupSuccess")}
+            </p>
+          )}
+
+          <div className="flex gap-2 pt-2">
             <button
-              onClick={handleOpenSecurityKeySetup}
-              disabled={!vault.status?.isUnlocked}
-              className="px-3 py-1.5 bg-accent/20 text-accent text-xs rounded-lg hover:bg-accent/30 transition-colors disabled:opacity-50"
+              onClick={() => {
+                setShowSecurityKeySetup(false);
+                setSecurityKeyError(null);
+              }}
+              className="flex-1 py-2 bg-surface-0/50 text-text-muted text-sm rounded-lg hover:bg-surface-0 transition-colors"
             >
-              {hasSecurityKey ? t("common.modify") : t("common.configure")}
+              {t("common.cancel")}
+            </button>
+            <button
+              onClick={handleSetupSecurityKey}
+              disabled={!canSetup}
+              className="flex-1 py-2 bg-accent text-crust text-sm font-medium rounded-lg hover:bg-accent-hover transition-colors disabled:opacity-50"
+            >
+              {securityKeyLoading ? t("settings.security.touchKey") : t("common.configure")}
             </button>
           </div>
-        </SettingRow>
+        </div>
       </SettingGroup>
     );
   }
 
   return (
     <SettingGroup title={t("settings.security.fido2Title")} description={t("settings.security.fido2Desc")}>
-      <div className="p-4 bg-surface-0/20 rounded-lg space-y-4">
-        <SecurityKeySetupContent
-          loading={securityKeyLoading}
-          available={securityKeyAvailable}
-          keys={detectedSecurityKeys}
-          onRefresh={handleRefreshSecurityKeys}
-          t={t}
-        />
-
-        {securityKeyError && <p className="text-sm text-error">{securityKeyError}</p>}
-        {securityKeySuccess && (
-          <p className="text-sm text-success flex items-center gap-2">
-            <Check size={16} /> {t("settings.security.keySetupSuccess")}
-          </p>
-        )}
-
-        <div className="flex gap-2 pt-2">
+      <SettingRow
+        icon={<Key size={20} />}
+        iconClassName={`w-10 h-10 rounded-lg flex items-center justify-center ${statusClassName}`}
+        title={t("settings.security.fido2Key")}
+        description={hasSecurityKey ? t("settings.security.fido2Configured") : t("settings.security.fido2NotConfigured")}
+      >
+        <div className="flex gap-2">
+          {hasSecurityKey && (
+            <button
+              onClick={handleRemoveSecurityKey}
+              disabled={!vault.status?.isUnlocked}
+              className="px-3 py-1.5 bg-error/10 text-error text-xs rounded-lg hover:bg-error/20 transition-colors disabled:opacity-50"
+            >
+              {t("common.remove")}
+            </button>
+          )}
           <button
-            onClick={() => {
-              setShowSecurityKeySetup(false);
-              setSecurityKeyError(null);
-            }}
-            className="flex-1 py-2 bg-surface-0/50 text-text-muted text-sm rounded-lg hover:bg-surface-0 transition-colors"
+            onClick={handleOpenSecurityKeySetup}
+            disabled={!vault.status?.isUnlocked}
+            className="px-3 py-1.5 bg-accent/20 text-accent text-xs rounded-lg hover:bg-accent/30 transition-colors disabled:opacity-50"
           >
-            {t("common.cancel")}
-          </button>
-          <button
-            onClick={handleSetupSecurityKey}
-            disabled={!canSetup}
-            className="flex-1 py-2 bg-accent text-crust text-sm font-medium rounded-lg hover:bg-accent-hover transition-colors disabled:opacity-50"
-          >
-            {securityKeyLoading ? t("settings.security.touchKey") : t("common.configure")}
+            {hasSecurityKey ? t("common.modify") : t("common.configure")}
           </button>
         </div>
-      </div>
+      </SettingRow>
     </SettingGroup>
   );
 }

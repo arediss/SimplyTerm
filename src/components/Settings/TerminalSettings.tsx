@@ -11,7 +11,7 @@ interface TerminalSettingsProps {
   ) => void;
 }
 
-export default function TerminalSettings({ settings, onChange }: TerminalSettingsProps) {
+export default function TerminalSettings({ settings, onChange }: Readonly<TerminalSettingsProps>) {
   const { t } = useTranslation();
 
   return (
@@ -44,7 +44,7 @@ export default function TerminalSettings({ settings, onChange }: TerminalSetting
             min={10}
             max={20}
             value={settings.fontSize}
-            onChange={(e) => onChange("fontSize", parseInt(e.target.value))}
+            onChange={(e) => onChange("fontSize", Number.parseInt(e.target.value))}
             className="flex-1 accent-accent"
           />
           <span className="w-12 text-center text-sm text-text font-mono">
@@ -97,7 +97,7 @@ export default function TerminalSettings({ settings, onChange }: TerminalSetting
             max={50000}
             step={1000}
             value={settings.scrollback}
-            onChange={(e) => onChange("scrollback", parseInt(e.target.value))}
+            onChange={(e) => onChange("scrollback", Number.parseInt(e.target.value))}
             className="flex-1 accent-accent"
           />
           <span className="w-20 text-center text-sm text-text font-mono">

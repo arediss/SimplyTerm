@@ -43,7 +43,7 @@ function getTunnelTypeLabel(type: TunnelType): string {
   return "Dynamic (-D)";
 }
 
-function TunnelManager({ isOpen, onClose, sessionId, sessionName, embedded = false }: TunnelManagerProps) {
+function TunnelManager({ isOpen, onClose, sessionId, sessionName, embedded = false }: Readonly<TunnelManagerProps>) {
   const [tunnels, setTunnels] = useState<Tunnel[]>([]);
   const [error, setError] = useState<string | null>(null);
   
@@ -84,9 +84,9 @@ function TunnelManager({ isOpen, onClose, sessionId, sessionName, embedded = fal
       await invoke("tunnel_create", {
         sessionId,
         tunnelType,
-        localPort: parseInt(localPort),
+        localPort: Number.parseInt(localPort),
         remoteHost: tunnelType === "dynamic" ? null : remoteHost || null,
-        remotePort: tunnelType === "dynamic" ? null : parseInt(remotePort) || null,
+        remotePort: tunnelType === "dynamic" ? null : Number.parseInt(remotePort) || null,
       });
       
       // Reset form
@@ -126,7 +126,7 @@ function TunnelManager({ isOpen, onClose, sessionId, sessionName, embedded = fal
     const k = 1024;
     const sizes = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
   };
 
   const getTunnelIcon = (type: TunnelType) => {
@@ -374,6 +374,7 @@ function TunnelManager({ isOpen, onClose, sessionId, sessionName, embedded = fal
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         role="presentation"
         onClick={onClose}
+        onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
       />
 
       {/* Modal */}

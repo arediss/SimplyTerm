@@ -52,7 +52,7 @@ export const TelnetFormContent = memo(function TelnetFormContent(props: TelnetFo
           <input
             type="number"
             value={props.port}
-            onChange={(e) => props.setPort(parseInt(e.target.value) || 23)}
+            onChange={(e) => props.setPort(Number.parseInt(e.target.value) || 23)}
             min={1}
             max={65535}
             className="input-field"

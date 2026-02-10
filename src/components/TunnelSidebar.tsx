@@ -42,7 +42,7 @@ export default function TunnelSidebar({
   onClose,
   savedSessions,
   onTunnelCountChange
-}: TunnelSidebarProps) {
+}: Readonly<TunnelSidebarProps>) {
   const { t } = useTranslation();
   const [isAnimating, setIsAnimating] = useState(false);
   const [shouldRender, setShouldRender] = useState(false);
@@ -172,9 +172,9 @@ export default function TunnelSidebar({
       await invoke("tunnel_create", {
         sessionId: sshSessionId,
         tunnelType,
-        localPort: parseInt(localPort),
+        localPort: Number.parseInt(localPort),
         remoteHost: tunnelType === "dynamic" ? undefined : remoteHost,
-        remotePort: tunnelType === "dynamic" ? undefined : parseInt(remotePort),
+        remotePort: tunnelType === "dynamic" ? undefined : Number.parseInt(remotePort),
       });
 
       // Reset form
@@ -240,6 +240,7 @@ export default function TunnelSidebar({
         }`}
         role="presentation"
         onClick={onClose}
+        onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
       />
 
       {/* Sidebar panel - flottant à gauche */}
@@ -284,15 +285,7 @@ export default function TunnelSidebar({
         <div className="flex-1 overflow-y-auto">
           {/* New Tunnel Button/Form */}
           <div className="p-3 border-b border-surface-0/30">
-            {!showNewForm ? (
-              <button
-                onClick={() => setShowNewForm(true)}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-accent hover:bg-accent-hover text-crust rounded-xl text-sm font-medium transition-colors"
-              >
-                <Plus size={14} />
-                {t('tunnelSidebar.newTunnel')}
-              </button>
-            ) : (
+            {showNewForm ? (
               <form onSubmit={createTunnel} className="space-y-3">
                 {/* Session selector */}
                 <div>
@@ -404,6 +397,14 @@ export default function TunnelSidebar({
                   </button>
                 </div>
               </form>
+            ) : (
+              <button
+                onClick={() => setShowNewForm(true)}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-accent hover:bg-accent-hover text-crust rounded-xl text-sm font-medium transition-colors"
+              >
+                <Plus size={14} />
+                {t('tunnelSidebar.newTunnel')}
+              </button>
             )}
           </div>
 
@@ -476,11 +477,11 @@ function TunnelStatusIcon({
   isActive,
   tunnel,
   getStatusColor,
-}: {
+}: Readonly<{
   isActive: boolean;
   tunnel: Tunnel;
   getStatusColor: (status: Tunnel["status"]) => string;
-}) {
+}>) {
   if (isActive) {
     return <CheckCircle size={10} className={getStatusColor(tunnel.status)} />;
   }
