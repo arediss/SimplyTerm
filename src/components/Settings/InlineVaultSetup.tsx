@@ -10,7 +10,7 @@ interface InlineVaultSetupProps {
   vault: ReturnType<typeof useVault>;
 }
 
-export default function InlineVaultSetup({ vault }: InlineVaultSetupProps) {
+export default function InlineVaultSetup({ vault }: Readonly<InlineVaultSetupProps>) {
   const { t } = useTranslation();
 
   const [showForm, setShowForm] = useState(false);
@@ -54,14 +54,7 @@ export default function InlineVaultSetup({ vault }: InlineVaultSetupProps) {
           </p>
         </div>
 
-        {!showForm ? (
-          <button
-            onClick={() => setShowForm(true)}
-            className="w-full py-3 bg-accent text-crust font-medium rounded-xl hover:bg-accent-hover transition-colors"
-          >
-            {t("settings.security.configureVault")}
-          </button>
-        ) : (
+        {showForm ? (
           <div className="p-4 bg-surface-0/20 rounded-lg space-y-4">
             <div className="space-y-3">
               <PasswordInput
@@ -94,6 +87,13 @@ export default function InlineVaultSetup({ vault }: InlineVaultSetupProps) {
               </button>
             </div>
           </div>
+        ) : (
+          <button
+            onClick={() => setShowForm(true)}
+            className="w-full py-3 bg-accent text-crust font-medium rounded-xl hover:bg-accent-hover transition-colors"
+          >
+            {t("settings.security.configureVault")}
+          </button>
         )}
       </SettingGroup>
     </div>

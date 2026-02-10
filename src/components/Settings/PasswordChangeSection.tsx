@@ -11,7 +11,7 @@ interface PasswordChangeSectionProps {
   vault: ReturnType<typeof useVault>;
 }
 
-export default function PasswordChangeSection({ vault }: PasswordChangeSectionProps) {
+export default function PasswordChangeSection({ vault }: Readonly<PasswordChangeSectionProps>) {
   const { t } = useTranslation();
 
   const [passwordSuccess, triggerPasswordSuccess] = useAutoHideSuccess();
@@ -47,15 +47,7 @@ export default function PasswordChangeSection({ vault }: PasswordChangeSectionPr
 
   return (
     <SettingGroup title={t("settings.security.masterPasswordTitle")} description={t("settings.security.masterPasswordDesc")}>
-      {!showForm ? (
-        <button
-          onClick={() => setShowForm(true)}
-          disabled={!vault.status?.isUnlocked}
-          className="px-4 py-2.5 bg-surface-0/30 text-text text-sm rounded-lg hover:bg-surface-0/50 transition-colors disabled:opacity-50"
-        >
-          {t("settings.security.changePassword")}
-        </button>
-      ) : (
+      {showForm ? (
         <div className="p-4 bg-surface-0/20 rounded-lg space-y-4">
           <div className="space-y-3">
             <PasswordInput
@@ -103,6 +95,14 @@ export default function PasswordChangeSection({ vault }: PasswordChangeSectionPr
             </button>
           </div>
         </div>
+      ) : (
+        <button
+          onClick={() => setShowForm(true)}
+          disabled={!vault.status?.isUnlocked}
+          className="px-4 py-2.5 bg-surface-0/30 text-text text-sm rounded-lg hover:bg-surface-0/50 transition-colors disabled:opacity-50"
+        >
+          {t("settings.security.changePassword")}
+        </button>
       )}
     </SettingGroup>
   );
