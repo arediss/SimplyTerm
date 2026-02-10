@@ -119,7 +119,11 @@ export default function TunnelSidebar({
 
     try {
       const session = savedSessions.find(s => s.id === selectedSessionId);
-      if (!session) throw new Error("Session not found");
+      if (!session) {
+        setError("Session not found");
+        setCreating(false);
+        return;
+      }
 
       // Get credentials from vault
       let credentials: { password: string | null; key_passphrase: string | null };

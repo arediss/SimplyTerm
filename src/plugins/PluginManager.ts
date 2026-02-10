@@ -140,7 +140,8 @@ export class PluginManager {
       const manifest = await this.getPluginManifest(id);
 
       if (manifest.status !== 'enabled') {
-        throw new Error(`Plugin ${id} is not enabled`);
+        console.warn(`Plugin ${id} is not enabled, skipping load`);
+        return;
       }
 
       // Get plugin main file
