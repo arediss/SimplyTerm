@@ -132,7 +132,7 @@ export default function TunnelSidebar({
           "get_session_credentials",
           { id: session.id }
         );
-      } catch (err) {
+      } catch {
         setError(t('tunnelSidebar.vaultLocked'));
         setCreating(false);
         return;
@@ -498,7 +498,7 @@ interface TunnelItemProps {
   getStatusColor: (status: Tunnel["status"]) => string;
 }
 
-function TunnelItem({ tunnel, onStop, onRemove, getTunnelIcon, getStatusColor }: TunnelItemProps) {
+function TunnelItem({ tunnel, onStop, onRemove, getTunnelIcon, getStatusColor }: Readonly<TunnelItemProps>) {
   const { t } = useTranslation();
   const isActive = tunnel.status.state === "Active" || tunnel.status.state === "Starting";
 

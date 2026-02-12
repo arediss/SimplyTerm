@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from "react";
+import { useRef, useEffect } from "react";
 
 interface SplitHandleProps {
   direction: "horizontal" | "vertical";
@@ -18,18 +18,18 @@ export function SplitHandle({ direction, onDrag, onDragStart }: Readonly<SplitHa
   onDragRef.current = onDrag;
   onDragStartRef.current = onDragStart;
 
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
+  useEffect(() => {
+    const el = handleRef.current;
+    if (!el) return;
+
+    const handleMouseDown = (e: MouseEvent) => {
       e.preventDefault();
       isDragging.current = true;
       startPos.current = direction === "horizontal" ? e.clientY : e.clientX;
       document.body.classList.add(direction === "horizontal" ? "split-dragging-h" : "split-dragging-v");
       onDragStartRef.current?.();
-    },
-    [direction]
-  );
+    };
 
-  useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging.current) return;
       e.preventDefault();
@@ -54,10 +54,12 @@ export function SplitHandle({ direction, onDrag, onDragStart }: Readonly<SplitHa
       document.body.classList.remove("split-dragging-h", "split-dragging-v");
     };
 
+    el.addEventListener("mousedown", handleMouseDown);
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
 
     return () => {
+      el.removeEventListener("mousedown", handleMouseDown);
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
     };
@@ -66,7 +68,6 @@ export function SplitHandle({ direction, onDrag, onDragStart }: Readonly<SplitHa
   return (
     <div
       ref={handleRef}
-      onMouseDown={handleMouseDown}
       className={`
         ${direction === "horizontal" ? "h-1 cursor-row-resize" : "w-1 cursor-col-resize"}
         hover:bg-accent/30 active:bg-accent/50 transition-colors

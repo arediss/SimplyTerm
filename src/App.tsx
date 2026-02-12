@@ -1067,7 +1067,7 @@ function App() {
   }, [allTabs]);
 
   const getActiveSessionInfo = useCallback((): SessionInfo | null => {
-    if (!activeTab || !activeTab.ptySessionId) return null;
+    if (!activeTab?.ptySessionId) return null;
     return {
       id: activeTab.ptySessionId,
       type: activeTab.type === "local" ? "local" : "ssh",
