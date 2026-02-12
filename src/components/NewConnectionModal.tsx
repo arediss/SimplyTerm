@@ -207,6 +207,11 @@ export function NewConnectionModal({
 
   const modalTitle = title || t("app.newConnection");
 
+  let submitLabel: string;
+  if (isConnecting) submitLabel = t("connection.connecting");
+  else if (isEditing) submitLabel = t("connection.saveAndConnect");
+  else submitLabel = t("connection.connect");
+
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title={modalTitle} width="2xl">
       <form onSubmit={handleSubmit} className="flex flex-col min-h-[380px]">
@@ -348,11 +353,7 @@ export function NewConnectionModal({
               disabled={isConnecting}
               className="flex-1 py-2.5 bg-accent text-base font-medium text-sm rounded-lg hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isConnecting
-                ? t("connection.connecting")
-                : isEditing
-                  ? t("connection.saveAndConnect")
-                  : t("connection.connect")}
+              {submitLabel}
             </button>
           </div>
         </div>

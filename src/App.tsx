@@ -450,8 +450,8 @@ function App() {
     if (!editingSessionId) return;
     try {
       // SSH config has host/username/authType, telnet has host, serial has port
-      const sshConfig = "username" in config ? config as SshConnectionConfig : null;
-      const telnetConfig = "host" in config && !("username" in config) ? config as TelnetConnectionConfig : null;
+      const sshConfig = "username" in config ? config : null;
+      const telnetConfig = "host" in config && !("username" in config) ? config : null;
 
       await invoke("save_session", {
         id: editingSessionId,
