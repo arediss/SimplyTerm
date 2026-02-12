@@ -292,6 +292,7 @@ export default function SshKeyManager({ isVaultUnlocked }: Readonly<SshKeyManage
               checked={formAlwaysAsk}
               onChange={(e) => setFormAlwaysAsk(e.target.checked)}
               className="mt-0.5 accent-accent"
+              aria-label={t("settings.security.sshKeysAlwaysAskPassphrase")}
             />
             <span>
               <span className="block text-xs text-text">{t("settings.security.sshKeysAlwaysAskPassphrase")}</span>

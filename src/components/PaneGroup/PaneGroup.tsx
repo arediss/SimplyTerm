@@ -38,7 +38,8 @@ export const PaneGroupComponent = memo(function PaneGroupComponent({
 
   return (
     <div
-      className="w-full h-full flex flex-col overflow-hidden rounded-xl"
+      tabIndex={-1}
+      className="w-full h-full flex flex-col overflow-hidden rounded-xl outline-none"
       style={{ backgroundColor: "var(--color-panel)" }}
       onClick={onFocus}
     >
