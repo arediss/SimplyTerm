@@ -22,6 +22,8 @@ export function PaneGroupContent({
   if (!tab) return <>{renderEmpty()}</>;
 
   switch (tab.type) {
+    case "home":
+      return <>{renderEmpty()}</>;
     case "settings":
       return <>{renderSettings()}</>;
     case "sftp":

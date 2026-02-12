@@ -445,6 +445,34 @@ function App() {
     }
   };
 
+  // Save session without connecting (edit mode only)
+  const handleSaveSessionOnly = async (_type: ConnectionType, config: SshConnectionConfig | TelnetConnectionConfig | SerialConnectionConfig) => {
+    if (!editingSessionId) return;
+    try {
+      // SSH config has host/username/authType, telnet has host, serial has port
+      const sshConfig = "username" in config ? config : null;
+      const telnetConfig = "host" in config && !("username" in config) ? config : null;
+
+      await invoke("save_session", {
+        id: editingSessionId,
+        name: config.name,
+        host: sshConfig?.host || telnetConfig?.host || "",
+        port: sshConfig?.port || telnetConfig?.port || 0,
+        username: sshConfig?.username || "",
+        authType: sshConfig?.authType || "password",
+        keyPath: sshConfig?.keyPath || null,
+        password: sshConfig?.password || null,
+        keyPassphrase: sshConfig?.keyPassphrase || null,
+        sshKeyId: sshConfig?.sshKeyId || null,
+      });
+      await loadSavedSessions();
+    } catch (err) {
+      console.error("[SavedSession] Failed to save session:", err);
+    }
+    setEditingSessionId(null);
+    setIsConnectionModalOpen(false);
+  };
+
   const handleSshConnect = async (config: SshConnectionConfig) => {
     setIsConnecting(true);
     setConnectionError(undefined);
@@ -1209,6 +1237,8 @@ function App() {
     [savedSessions, connectingSessionId, stableHandleConnectToSavedSession, handleOpenConnectionModal, handleNewLocalTab, stableHandleEditSavedSession, handleDeleteSavedSession, stableHandleOpenSftpTab, stableHandleOpenTunnelTab]
   );
 
+  const handleOpenHomeTab = useCallback(() => workspace.openHome(), [workspace]);
+
   // WorkspaceActionsContext value — global actions + render fns shared by all pane groups
   const workspaceActions: WorkspaceActions = useMemo(() => ({
     onNewConnection: handleOpenConnectionModal,
@@ -1218,6 +1248,7 @@ function App() {
     activeTunnelCount,
     onSplitVertical: handleSplitVertical,
     onSplitHorizontal: handleSplitHorizontal,
+    onHome: handleOpenHomeTab,
     renderTerminal,
     renderSftp,
     renderTunnel,
@@ -1226,7 +1257,7 @@ function App() {
   }), [
     handleOpenConnectionModal, handleNewLocalTab, handleToggleTunnelSidebar,
     isTunnelSidebarOpen, activeTunnelCount,
-    handleSplitVertical, handleSplitHorizontal,
+    handleSplitVertical, handleSplitHorizontal, handleOpenHomeTab,
     renderTerminal, renderSftp, renderTunnel, renderSettings, renderEmpty,
   ]);
 
@@ -1341,7 +1372,9 @@ function App() {
             onSshConnect={stableHandleSshConnect}
             onTelnetConnect={stableHandleTelnetConnect}
             onSerialConnect={stableHandleSerialConnect}
+            onSave={editingSessionId ? handleSaveSessionOnly : undefined}
             isConnecting={isConnecting}
+            isEditing={!!editingSessionId}
             error={connectionError}
             initialSshConfig={initialConnectionConfig}
             initialTelnetConfig={initialTelnetConfig}

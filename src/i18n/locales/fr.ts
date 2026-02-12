@@ -458,6 +458,7 @@ export default {
       uninstalling: "Désinstallation...",
       uninstallConfirm: "Êtes-vous sûr de vouloir désinstaller \"{{name}}\" ?",
       uninstallError: "Échec de la désinstallation du plugin",
+      openSettings: "Paramètres du plugin",
       // Mode Développeur
       devModeTitle: "Mode développeur",
       devModeDesc: "Charger les plugins directement depuis un dossier local pour le développement",
@@ -669,6 +670,8 @@ export default {
     passphraseOptional: "Passphrase (optionnel)",
     // Bouton connecter
     connect: "Se connecter",
+    // Bouton sauvegarder et connecter (mode édition)
+    saveAndConnect: "Sauvegarder & Connecter",
     // Statut connexion en cours
     connecting: "Connexion...",
     // Invitation à entrer le mot de passe pour session sauvegardée
@@ -967,6 +970,8 @@ export default {
     newSshConnection: "Nouvelle connexion SSH",
     // Tooltip dropdown connexions rapides
     quickConnections: "Connexions rapides",
+    // Tooltip bouton accueil
+    home: "Accueil",
     // Contrôles de fenêtre
     minimize: "Réduire",
     maximize: "Agrandir",

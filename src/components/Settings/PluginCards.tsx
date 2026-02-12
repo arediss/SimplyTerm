@@ -10,6 +10,7 @@ import {
   ArrowUpCircle,
   ExternalLink,
   Trash2,
+  Settings,
 } from "lucide-react";
 import type { PluginManifest } from "../../plugins";
 import type { RegistryPlugin, PluginUpdate } from "../../hooks/useRegistry";
@@ -27,6 +28,7 @@ export function InstalledPluginCard({
   onToggle,
   onUninstall,
   onUpdate,
+  onOpenSettings,
 }: Readonly<{
   plugin: PluginManifest;
   update?: PluginUpdate;
@@ -34,6 +36,7 @@ export function InstalledPluginCard({
   onToggle: () => void;
   onUninstall: () => void;
   onUpdate?: () => void;
+  onOpenSettings?: () => void;
 }>) {
   const { t } = useTranslation();
 
@@ -104,6 +107,15 @@ export function InstalledPluginCard({
             <><PowerOff size={11} />{t("common.inactive")}</>
           )}
         </button>
+        {onOpenSettings && (
+          <button
+            onClick={onOpenSettings}
+            className="p-1.5 rounded-lg text-text-muted/30 opacity-0 group-hover:opacity-100 hover:text-accent hover:bg-accent/10 transition-[colors,opacity]"
+            title={t("settings.plugins.openSettings")}
+          >
+            <Settings size={13} />
+          </button>
+        )}
         {!plugin.isDev && (
           <button
             onClick={onUninstall}

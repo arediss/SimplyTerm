@@ -29,7 +29,7 @@ export interface PaneGroup {
 /** A single tab inside a PaneGroup */
 export interface PaneGroupTab {
   id: string;
-  type: "local" | "ssh" | "sftp" | "tunnel" | "telnet" | "serial" | "settings";
+  type: "local" | "ssh" | "sftp" | "tunnel" | "telnet" | "serial" | "settings" | "home";
   title: string;
   sessionId: string;
   ptySessionId?: string;

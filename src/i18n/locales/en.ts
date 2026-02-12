@@ -464,6 +464,7 @@ export default {
       uninstalling: "Uninstalling...",
       uninstallConfirm: "Are you sure you want to uninstall \"{{name}}\"?",
       uninstallError: "Failed to uninstall plugin",
+      openSettings: "Plugin settings",
       // Developer Mode
       devModeTitle: "Developer Mode",
       devModeDesc: "Load plugins directly from a local folder for development",
@@ -675,6 +676,8 @@ export default {
     passphraseOptional: "Passphrase (optional)",
     // Connect button
     connect: "Connect",
+    // Save & Connect button (edit mode)
+    saveAndConnect: "Save & Connect",
     // Connecting status
     connecting: "Connecting...",
     // Enter password prompt for saved session
@@ -973,6 +976,8 @@ export default {
     newSshConnection: "New SSH connection",
     // Quick connections dropdown tooltip
     quickConnections: "Quick connections",
+    // Home button tooltip
+    home: "Home",
     // Window controls
     minimize: "Minimize",
     maximize: "Maximize",
