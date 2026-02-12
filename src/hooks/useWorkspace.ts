@@ -84,6 +84,73 @@ export function useWorkspace(): UseWorkspaceReturn {
     []
   );
 
+  /** Remove a group from the tree, or empty it if it's the last one. */
+  const removeGroup = (prev: WorkspaceState, groupId: string): WorkspaceState => {
+    const group = prev.groups.get(groupId);
+    if (!group) return prev;
+
+    const allIds = getAllGroupIds(prev.tree);
+    if (allIds.length <= 1) {
+      const newGroups = new Map(prev.groups);
+      newGroups.set(groupId, { ...group, tabs: [], activeTabId: null });
+      return { ...prev, groups: newGroups };
+    }
+
+    const newTree = closeGroupNode(prev.tree, groupId);
+    const newGroups = new Map(prev.groups);
+    newGroups.delete(groupId);
+
+    const newFocusedGroupId =
+      prev.focusedGroupId === groupId
+        ? getAllGroupIds(newTree!)[0]
+        : prev.focusedGroupId;
+
+    return { tree: newTree!, groups: newGroups, focusedGroupId: newFocusedGroupId };
+  };
+
+  /** Open (or focus) a singleton tab by type. */
+  const openSingletonTab = useCallback(
+    (type: PaneGroupTab["type"], title: string) => {
+      setState((prev) => {
+        // Search for existing tab of this type in all groups
+        for (const [gid, group] of prev.groups) {
+          const existing = group.tabs.find((t) => t.type === type);
+          if (existing) {
+            const newGroups = new Map(prev.groups);
+            newGroups.set(gid, { ...group, activeTabId: existing.id });
+            return { ...prev, groups: newGroups, focusedGroupId: gid };
+          }
+        }
+
+        // Not found — create in focused group
+        const group = prev.groups.get(prev.focusedGroupId);
+        if (!group) return prev;
+
+        const tab: PaneGroupTab = {
+          id: generateTabId(),
+          type,
+          title,
+          sessionId: type,
+        };
+
+        const newGroups = new Map(prev.groups);
+        newGroups.set(prev.focusedGroupId, {
+          ...group,
+          tabs: [...group.tabs, tab],
+          activeTabId: tab.id,
+        });
+        return { ...prev, groups: newGroups };
+      });
+    },
+    []
+  );
+
+  /** Cycle through an array with wrap-around. */
+  const cycleIndex = (current: number, length: number, direction: "next" | "prev"): number => {
+    if (direction === "next") return (current + 1) % length;
+    return current <= 0 ? length - 1 : current - 1;
+  };
+
   // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
@@ -153,29 +220,7 @@ export function useWorkspace(): UseWorkspaceReturn {
 
       // If the group is now empty, remove it from the tree
       if (newTabs.length === 0) {
-        const allIds = getAllGroupIds(prev.tree);
-        // Don't remove the last group
-        if (allIds.length <= 1) {
-          const newGroups = new Map(prev.groups);
-          newGroups.set(targetGroupId, { ...group, tabs: [], activeTabId: null });
-          return { ...prev, groups: newGroups };
-        }
-
-        const newTree = closeGroupNode(prev.tree, targetGroupId);
-        const newGroups = new Map(prev.groups);
-        newGroups.delete(targetGroupId);
-
-        // Update focus if we removed the focused group
-        const newFocusedGroupId =
-          prev.focusedGroupId === targetGroupId
-            ? getAllGroupIds(newTree!)[0]
-            : prev.focusedGroupId;
-
-        return {
-          tree: newTree!,
-          groups: newGroups,
-          focusedGroupId: newFocusedGroupId,
-        };
+        return removeGroup(prev, targetGroupId);
       }
 
       // Update active tab if needed
@@ -227,29 +272,7 @@ export function useWorkspace(): UseWorkspaceReturn {
       const group = prev.groups.get(groupId);
       if (!group) return prev;
       closedTabs = [...group.tabs];
-
-      const allIds = getAllGroupIds(prev.tree);
-      // Don't remove the last group
-      if (allIds.length <= 1) {
-        const newGroups = new Map(prev.groups);
-        newGroups.set(groupId, { ...group, tabs: [], activeTabId: null });
-        return { ...prev, groups: newGroups };
-      }
-
-      const newTree = closeGroupNode(prev.tree, groupId);
-      const newGroups = new Map(prev.groups);
-      newGroups.delete(groupId);
-
-      const newFocusedGroupId =
-        prev.focusedGroupId === groupId
-          ? getAllGroupIds(newTree!)[0]
-          : prev.focusedGroupId;
-
-      return {
-        tree: newTree!,
-        groups: newGroups,
-        focusedGroupId: newFocusedGroupId,
-      };
+      return removeGroup(prev, groupId);
     });
 
     return closedTabs;
@@ -259,72 +282,9 @@ export function useWorkspace(): UseWorkspaceReturn {
     setState((prev) => ({ ...prev, focusedGroupId: groupId }));
   }, []);
 
-  const openSettings = useCallback(() => {
-    setState((prev) => {
-      // Search for existing settings tab in all groups
-      for (const [gid, group] of prev.groups) {
-        const settingsTab = group.tabs.find((t) => t.type === "settings");
-        if (settingsTab) {
-          // Focus the existing settings tab
-          const newGroups = new Map(prev.groups);
-          newGroups.set(gid, { ...group, activeTabId: settingsTab.id });
-          return { ...prev, groups: newGroups, focusedGroupId: gid };
-        }
-      }
+  const openSettings = useCallback(() => openSingletonTab("settings", "Settings"), [openSingletonTab]);
 
-      // No existing settings tab — create one in focused group
-      const group = prev.groups.get(prev.focusedGroupId);
-      if (!group) return prev;
-
-      const tab: PaneGroupTab = {
-        id: generateTabId(),
-        type: "settings",
-        title: "Settings",
-        sessionId: "settings",
-      };
-
-      const newGroups = new Map(prev.groups);
-      newGroups.set(prev.focusedGroupId, {
-        ...group,
-        tabs: [...group.tabs, tab],
-        activeTabId: tab.id,
-      });
-      return { ...prev, groups: newGroups };
-    });
-  }, []);
-
-  const openHome = useCallback(() => {
-    setState((prev) => {
-      // Search for existing home tab in all groups
-      for (const [gid, group] of prev.groups) {
-        const homeTab = group.tabs.find((t) => t.type === "home");
-        if (homeTab) {
-          const newGroups = new Map(prev.groups);
-          newGroups.set(gid, { ...group, activeTabId: homeTab.id });
-          return { ...prev, groups: newGroups, focusedGroupId: gid };
-        }
-      }
-
-      // No existing home tab — create one in focused group
-      const group = prev.groups.get(prev.focusedGroupId);
-      if (!group) return prev;
-
-      const tab: PaneGroupTab = {
-        id: generateTabId(),
-        type: "home",
-        title: "Home",
-        sessionId: "home",
-      };
-
-      const newGroups = new Map(prev.groups);
-      newGroups.set(prev.focusedGroupId, {
-        ...group,
-        tabs: [...group.tabs, tab],
-        activeTabId: tab.id,
-      });
-      return { ...prev, groups: newGroups };
-    });
-  }, []);
+  const openHome = useCallback(() => openSingletonTab("home", "Home"), [openSingletonTab]);
 
   const resizeSplitNode = useCallback((splitId: string, newSizes: number[]) => {
     setState((prev) => ({
@@ -374,12 +334,7 @@ export function useWorkspace(): UseWorkspaceReturn {
         if (!group || group.tabs.length <= 1) return prev;
 
         const currentIndex = group.tabs.findIndex((t) => t.id === group.activeTabId);
-        let nextIndex: number;
-        if (direction === "next") {
-          nextIndex = (currentIndex + 1) % group.tabs.length;
-        } else {
-          nextIndex = currentIndex <= 0 ? group.tabs.length - 1 : currentIndex - 1;
-        }
+        const nextIndex = cycleIndex(currentIndex, group.tabs.length, direction);
 
         const newGroups = new Map(prev.groups);
         newGroups.set(prev.focusedGroupId, {
@@ -399,14 +354,7 @@ export function useWorkspace(): UseWorkspaceReturn {
         if (allIds.length <= 1) return prev;
 
         const currentIndex = allIds.indexOf(prev.focusedGroupId);
-        let nextIndex: number;
-        if (direction === "next") {
-          nextIndex = (currentIndex + 1) % allIds.length;
-        } else {
-          nextIndex = currentIndex <= 0 ? allIds.length - 1 : currentIndex - 1;
-        }
-
-        return { ...prev, focusedGroupId: allIds[nextIndex] };
+        return { ...prev, focusedGroupId: allIds[cycleIndex(currentIndex, allIds.length, direction)] };
       });
     },
     []
