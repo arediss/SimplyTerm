@@ -3,6 +3,7 @@ import i18n from "../../i18n";
 import { getThemes } from "../../themes";
 import { SettingGroup, ThemeCard } from "./SettingsUIComponents";
 import type { AppSettings } from "../../types";
+import { isWindows } from "../../utils/platform";
 
 interface AppearanceSettingsProps {
   settings: AppSettings;
@@ -54,32 +55,34 @@ export default function AppearanceSettings({ settings, onChange }: Readonly<Appe
         </div>
       </SettingGroup>
 
-      <SettingGroup title={t("settings.appearance.windowEffectTitle")} description={t("settings.appearance.windowEffectDesc")}>
-        <div className="flex gap-3">
-          {[
-            { value: "none", label: t("settings.appearance.effectNone") },
-            { value: "acrylic", label: t("settings.appearance.effectAcrylic") },
-            { value: "mica", label: t("settings.appearance.effectMica") },
-          ].map((effect) => (
-            <button
-              key={effect.value}
-              onClick={() => onChange("windowEffect", effect.value)}
-              className={`
-                px-4 py-2 rounded-lg text-sm transition-colors
-                ${(settings.appearance.windowEffect ?? "none") === effect.value
-                  ? "bg-accent/20 text-accent border border-accent/30"
-                  : "bg-surface-0/30 text-text-muted hover:text-text border border-transparent"
-                }
-              `}
-            >
-              {effect.label}
-            </button>
-          ))}
-        </div>
-        <p className="text-xs text-text-muted/70 mt-2">
-          {t("settings.appearance.windowEffectNote")}
-        </p>
-      </SettingGroup>
+      {isWindows && (
+        <SettingGroup title={t("settings.appearance.windowEffectTitle")} description={t("settings.appearance.windowEffectDesc")}>
+          <div className="flex gap-3">
+            {[
+              { value: "none", label: t("settings.appearance.effectNone") },
+              { value: "acrylic", label: t("settings.appearance.effectAcrylic") },
+              { value: "mica", label: t("settings.appearance.effectMica") },
+            ].map((effect) => (
+              <button
+                key={effect.value}
+                onClick={() => onChange("windowEffect", effect.value)}
+                className={`
+                  px-4 py-2 rounded-lg text-sm transition-colors
+                  ${(settings.appearance.windowEffect ?? "none") === effect.value
+                    ? "bg-accent/20 text-accent border border-accent/30"
+                    : "bg-surface-0/30 text-text-muted hover:text-text border border-transparent"
+                  }
+                `}
+              >
+                {effect.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-text-muted/70 mt-2">
+            {t("settings.appearance.windowEffectNote")}
+          </p>
+        </SettingGroup>
+      )}
 
       <SettingGroup title={t("settings.appearance.languageTitle")} description={t("settings.appearance.languageDesc")}>
         <div className="flex gap-3">
