@@ -53,7 +53,13 @@ export type UseWorkspaceReturn = WorkspaceState & WorkspaceActions;
 
 export function useWorkspace(): UseWorkspaceReturn {
   const [state, setState] = useState<WorkspaceState>(() => {
-    const initialGroup = createGroup();
+    const homeTab: PaneGroupTab = {
+      id: generateTabId(),
+      type: "home",
+      title: "Home",
+      sessionId: "home",
+    };
+    const initialGroup = createGroup(homeTab);
     return {
       tree: createGroupNode(initialGroup.id),
       groups: new Map([[initialGroup.id, initialGroup]]),
