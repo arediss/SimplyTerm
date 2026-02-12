@@ -1237,6 +1237,8 @@ function App() {
     [savedSessions, connectingSessionId, stableHandleConnectToSavedSession, handleOpenConnectionModal, handleNewLocalTab, stableHandleEditSavedSession, handleDeleteSavedSession, stableHandleOpenSftpTab, stableHandleOpenTunnelTab]
   );
 
+  const handleOpenHomeTab = useCallback(() => workspace.openHome(), [workspace]);
+
   // WorkspaceActionsContext value — global actions + render fns shared by all pane groups
   const workspaceActions: WorkspaceActions = useMemo(() => ({
     onNewConnection: handleOpenConnectionModal,
@@ -1272,7 +1274,6 @@ function App() {
   }, [sidebarPinned, handleToggleSidebarPin]);
 
   const handleOpenSettingsTab = useCallback(() => workspace.openSettings(), [workspace]);
-  const handleOpenHomeTab = useCallback(() => workspace.openHome(), [workspace]);
 
   const handleVaultToggle = useCallback(
     () => vault.status?.isUnlocked ? lockVault() : openVaultUnlock(),
