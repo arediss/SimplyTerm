@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import type { PromptConfig } from "../plugins";
 
 interface PromptModalProps {
@@ -41,7 +42,7 @@ function PromptModal({ isOpen, config, onConfirm, onCancel }: Readonly<PromptMod
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
@@ -54,7 +55,7 @@ function PromptModal({ isOpen, config, onConfirm, onCancel }: Readonly<PromptMod
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <dialog
           open
-          className="bg-mantle border border-surface-0/50 rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto animate-scale-in p-0"
+          className="relative bg-mantle border border-surface-0/50 rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto animate-scale-in p-0"
         >
           <form onSubmit={handleSubmit}>
             {/* Header */}
@@ -97,7 +98,8 @@ function PromptModal({ isOpen, config, onConfirm, onCancel }: Readonly<PromptMod
           </form>
         </dialog>
       </div>
-    </>
+    </>,
+    document.body
   );
 }
 

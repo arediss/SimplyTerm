@@ -34,6 +34,7 @@ import type {
   HeaderActionHandle,
   QuickConnectSectionRegistration,
   SessionDecoratorRegistration,
+  HomePanelColumnRegistration,
 } from './types';
 import type { StatusBarItem } from '../components/StatusBar';
 
@@ -76,6 +77,7 @@ export class PluginManager {
   public registeredContextMenuItems: Map<string, { pluginId: string; item: ContextMenuItemConfig }> = new Map();
   public registeredQuickConnectSections: Map<string, { pluginId: string; section: QuickConnectSectionRegistration }> = new Map();
   public registeredSessionDecorators: Map<string, { pluginId: string; decorator: SessionDecoratorRegistration }> = new Map();
+  public registeredHomePanelColumns: Map<string, { pluginId: string; column: HomePanelColumnRegistration }> = new Map();
 
   // Status bar items
   public registeredStatusBarItems: Map<string, { pluginId: string; config: StatusBarItemConfig; visible: boolean }> = new Map();
@@ -167,6 +169,7 @@ export class PluginManager {
         contextMenuItems: new Map(),
         quickConnectSections: new Map(),
         sessionDecorators: new Map(),
+        homePanelColumns: new Map(),
         subscriptions: [],
       };
 
@@ -193,6 +196,8 @@ export class PluginManager {
         onQuickConnectSectionUnregister: this.handleQuickConnectSectionUnregister.bind(this),
         onSessionDecoratorRegister: this.handleSessionDecoratorRegister.bind(this),
         onSessionDecoratorUnregister: this.handleSessionDecoratorUnregister.bind(this),
+        onHomePanelColumnRegister: this.handleHomePanelColumnRegister.bind(this),
+        onHomePanelColumnUnregister: this.handleHomePanelColumnUnregister.bind(this),
         onAddStatusBarItem: this.handleAddStatusBarItem.bind(this),
         onAddHeaderAction: this.handleAddHeaderAction.bind(this),
         // Arrow functions for property-based callbacks
@@ -381,6 +386,12 @@ export class PluginManager {
       this.emit({ type: 'session-decorator:unregister', pluginId: id, decoratorId });
     });
 
+    // Remove registered home panel columns
+    plugin.homePanelColumns.forEach((_, columnId) => {
+      this.registeredHomePanelColumns.delete(columnId);
+      this.emit({ type: 'home-panel:unregister', pluginId: id, columnId });
+    });
+
     // Remove registered status bar items for this plugin
     if (this.removeEntriesByPlugin(this.registeredStatusBarItems, id)) {
       this.notifyStatusBarChanged();
@@ -466,118 +477,106 @@ export class PluginManager {
     this.emit({ type: 'command:register', pluginId, commandId: command.id });
   }
 
-  // Sidebar view (tab) registration handlers
-  private handleSidebarViewRegister(pluginId: string, view: SidebarViewRegistration): void {
+  /**
+   * Generic extension register: stores item in plugin-local + global maps, emits event.
+   */
+  private registerExtension(
+    pluginId: string, itemId: string, item: unknown,
+    pluginMapKey: keyof LoadedPlugin, registeredMap: Map<string, unknown>,
+    wrapKey: string, event: PluginEvent,
+  ): void {
     const plugin = this.plugins.get(pluginId);
-    if (plugin) {
-      plugin.sidebarViews.set(view.config.id, view);
-      this.registeredSidebarViews.set(view.config.id, { pluginId, view });
-      this.emit({ type: 'sidebar-view:register', pluginId, viewId: view.config.id });
-    }
+    if (!plugin) return;
+    (plugin[pluginMapKey] as Map<string, unknown>).set(itemId, item);
+    registeredMap.set(itemId, { pluginId, [wrapKey]: item });
+    this.emit(event);
   }
 
-  private handleSidebarViewUnregister(pluginId: string, viewId: string): void {
+  /**
+   * Generic extension unregister: removes from plugin-local + global maps, emits event.
+   */
+  private unregisterExtension(
+    pluginId: string, itemId: string,
+    pluginMapKey: keyof LoadedPlugin, registeredMap: Map<string, unknown>,
+    event: PluginEvent,
+  ): void {
     const plugin = this.plugins.get(pluginId);
-    if (plugin) {
-      plugin.sidebarViews.delete(viewId);
-      this.registeredSidebarViews.delete(viewId);
-      this.emit({ type: 'sidebar-view:unregister', pluginId, viewId });
-    }
+    if (!plugin) return;
+    (plugin[pluginMapKey] as Map<string, unknown>).delete(itemId);
+    registeredMap.delete(itemId);
+    this.emit(event);
+  }
+
+  // Sidebar view (tab) registration handlers
+  private handleSidebarViewRegister(pluginId: string, view: SidebarViewRegistration): void {
+    this.registerExtension(pluginId, view.config.id, view, 'sidebarViews',
+      this.registeredSidebarViews as Map<string, unknown>, 'view',
+      { type: 'sidebar-view:register', pluginId, viewId: view.config.id });
+  }
+  private handleSidebarViewUnregister(pluginId: string, viewId: string): void {
+    this.unregisterExtension(pluginId, viewId, 'sidebarViews',
+      this.registeredSidebarViews as Map<string, unknown>,
+      { type: 'sidebar-view:unregister', pluginId, viewId });
   }
 
   // Sidebar section registration handlers (deprecated)
   private handleSidebarSectionRegister(pluginId: string, section: SidebarSectionRegistration): void {
-    const plugin = this.plugins.get(pluginId);
-    if (plugin) {
-      plugin.sidebarSections.set(section.config.id, section);
-      this.registeredSidebarSections.set(section.config.id, { pluginId, section });
-      this.emit({ type: 'sidebar:register', pluginId, sectionId: section.config.id });
-    }
+    this.registerExtension(pluginId, section.config.id, section, 'sidebarSections',
+      this.registeredSidebarSections as Map<string, unknown>, 'section',
+      { type: 'sidebar:register', pluginId, sectionId: section.config.id });
   }
-
   private handleSidebarSectionUnregister(pluginId: string, sectionId: string): void {
-    const plugin = this.plugins.get(pluginId);
-    if (plugin) {
-      plugin.sidebarSections.delete(sectionId);
-      this.registeredSidebarSections.delete(sectionId);
-      this.emit({ type: 'sidebar:unregister', pluginId, sectionId });
-    }
+    this.unregisterExtension(pluginId, sectionId, 'sidebarSections',
+      this.registeredSidebarSections as Map<string, unknown>,
+      { type: 'sidebar:unregister', pluginId, sectionId });
   }
 
   // Settings panel registration handlers
   private handleSettingsPanelRegister(pluginId: string, panel: SettingsPanelRegistration): void {
-    const plugin = this.plugins.get(pluginId);
-    if (plugin) {
-      plugin.settingsPanels.set(panel.config.id, panel);
-      this.registeredSettingsPanels.set(panel.config.id, { pluginId, panel });
-      this.emit({ type: 'settings:register', pluginId, panelId: panel.config.id });
-    }
+    this.registerExtension(pluginId, panel.config.id, panel, 'settingsPanels',
+      this.registeredSettingsPanels as Map<string, unknown>, 'panel',
+      { type: 'settings:register', pluginId, panelId: panel.config.id });
   }
-
   private handleSettingsPanelUnregister(pluginId: string, panelId: string): void {
-    const plugin = this.plugins.get(pluginId);
-    if (plugin) {
-      plugin.settingsPanels.delete(panelId);
-      this.registeredSettingsPanels.delete(panelId);
-      this.emit({ type: 'settings:unregister', pluginId, panelId });
-    }
+    this.unregisterExtension(pluginId, panelId, 'settingsPanels',
+      this.registeredSettingsPanels as Map<string, unknown>,
+      { type: 'settings:unregister', pluginId, panelId });
   }
 
   // Context menu item registration handlers
   private handleContextMenuItemRegister(pluginId: string, item: ContextMenuItemConfig): void {
-    const plugin = this.plugins.get(pluginId);
-    if (plugin) {
-      plugin.contextMenuItems.set(item.id, item);
-      this.registeredContextMenuItems.set(item.id, { pluginId, item });
-      this.emit({ type: 'context-menu:register', pluginId, itemId: item.id });
-    }
+    this.registerExtension(pluginId, item.id, item, 'contextMenuItems',
+      this.registeredContextMenuItems as Map<string, unknown>, 'item',
+      { type: 'context-menu:register', pluginId, itemId: item.id });
   }
-
   private handleContextMenuItemUnregister(pluginId: string, itemId: string): void {
-    const plugin = this.plugins.get(pluginId);
-    if (plugin) {
-      plugin.contextMenuItems.delete(itemId);
-      this.registeredContextMenuItems.delete(itemId);
-      this.emit({ type: 'context-menu:unregister', pluginId, itemId });
-    }
+    this.unregisterExtension(pluginId, itemId, 'contextMenuItems',
+      this.registeredContextMenuItems as Map<string, unknown>,
+      { type: 'context-menu:unregister', pluginId, itemId });
   }
 
   // QuickConnect section registration handlers
   private handleQuickConnectSectionRegister(pluginId: string, section: QuickConnectSectionRegistration): void {
-    const plugin = this.plugins.get(pluginId);
-    if (plugin) {
-      plugin.quickConnectSections.set(section.config.id, section);
-      this.registeredQuickConnectSections.set(section.config.id, { pluginId, section });
-      this.emit({ type: 'quick-connect:register', pluginId, sectionId: section.config.id });
-    }
+    this.registerExtension(pluginId, section.config.id, section, 'quickConnectSections',
+      this.registeredQuickConnectSections as Map<string, unknown>, 'section',
+      { type: 'quick-connect:register', pluginId, sectionId: section.config.id });
   }
-
   private handleQuickConnectSectionUnregister(pluginId: string, sectionId: string): void {
-    const plugin = this.plugins.get(pluginId);
-    if (plugin) {
-      plugin.quickConnectSections.delete(sectionId);
-      this.registeredQuickConnectSections.delete(sectionId);
-      this.emit({ type: 'quick-connect:unregister', pluginId, sectionId });
-    }
+    this.unregisterExtension(pluginId, sectionId, 'quickConnectSections',
+      this.registeredQuickConnectSections as Map<string, unknown>,
+      { type: 'quick-connect:unregister', pluginId, sectionId });
   }
 
   // Session decorator registration handlers
   private handleSessionDecoratorRegister(pluginId: string, decorator: SessionDecoratorRegistration): void {
-    const plugin = this.plugins.get(pluginId);
-    if (plugin) {
-      plugin.sessionDecorators.set(decorator.config.id, decorator);
-      this.registeredSessionDecorators.set(decorator.config.id, { pluginId, decorator });
-      this.emit({ type: 'session-decorator:register', pluginId, decoratorId: decorator.config.id });
-    }
+    this.registerExtension(pluginId, decorator.config.id, decorator, 'sessionDecorators',
+      this.registeredSessionDecorators as Map<string, unknown>, 'decorator',
+      { type: 'session-decorator:register', pluginId, decoratorId: decorator.config.id });
   }
-
   private handleSessionDecoratorUnregister(pluginId: string, decoratorId: string): void {
-    const plugin = this.plugins.get(pluginId);
-    if (plugin) {
-      plugin.sessionDecorators.delete(decoratorId);
-      this.registeredSessionDecorators.delete(decoratorId);
-      this.emit({ type: 'session-decorator:unregister', pluginId, decoratorId });
-    }
+    this.unregisterExtension(pluginId, decoratorId, 'sessionDecorators',
+      this.registeredSessionDecorators as Map<string, unknown>,
+      { type: 'session-decorator:unregister', pluginId, decoratorId });
   }
 
   /**
@@ -586,6 +585,26 @@ export class PluginManager {
   getSessionDecorators(): { pluginId: string; decorator: SessionDecoratorRegistration }[] {
     return Array.from(this.registeredSessionDecorators.values())
       .sort((a, b) => (a.decorator.config.order ?? 50) - (b.decorator.config.order ?? 50));
+  }
+
+  // Home panel column registration handlers
+  private handleHomePanelColumnRegister(pluginId: string, column: HomePanelColumnRegistration): void {
+    this.registerExtension(pluginId, column.config.id, column, 'homePanelColumns',
+      this.registeredHomePanelColumns as Map<string, unknown>, 'column',
+      { type: 'home-panel:register', pluginId, columnId: column.config.id });
+  }
+  private handleHomePanelColumnUnregister(pluginId: string, columnId: string): void {
+    this.unregisterExtension(pluginId, columnId, 'homePanelColumns',
+      this.registeredHomePanelColumns as Map<string, unknown>,
+      { type: 'home-panel:unregister', pluginId, columnId });
+  }
+
+  /**
+   * Get all registered home panel columns, sorted by order
+   */
+  getHomePanelColumns(): { pluginId: string; column: HomePanelColumnRegistration }[] {
+    return Array.from(this.registeredHomePanelColumns.values())
+      .sort((a, b) => (a.column.config.order ?? 50) - (b.column.config.order ?? 50));
   }
 
   // Status bar item handler

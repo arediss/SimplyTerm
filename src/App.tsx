@@ -1200,9 +1200,13 @@ function App() {
         onConnect={stableHandleConnectToSavedSession}
         onNewConnection={handleOpenConnectionModal}
         onLocalTerminal={handleNewLocalTab}
+        onEdit={stableHandleEditSavedSession}
+        onDelete={handleDeleteSavedSession}
+        onSftp={stableHandleOpenSftpTab}
+        onTunnel={stableHandleOpenTunnelTab}
       />
     ),
-    [savedSessions, connectingSessionId, stableHandleConnectToSavedSession, handleOpenConnectionModal, handleNewLocalTab]
+    [savedSessions, connectingSessionId, stableHandleConnectToSavedSession, handleOpenConnectionModal, handleNewLocalTab, stableHandleEditSavedSession, handleDeleteSavedSession, stableHandleOpenSftpTab, stableHandleOpenTunnelTab]
   );
 
   // WorkspaceActionsContext value — global actions + render fns shared by all pane groups
