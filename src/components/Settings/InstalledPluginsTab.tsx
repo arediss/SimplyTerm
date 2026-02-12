@@ -13,6 +13,8 @@ interface InstalledPluginsTabProps {
   onUninstall: (plugin: PluginManifest) => void;
   onUpdate: (update: PluginUpdate) => void;
   onRefresh: () => void;
+  pluginsWithSettings?: Set<string>;
+  onOpenPluginSettings?: (pluginId: string) => void;
 }
 
 export default function InstalledPluginsTab({
@@ -24,6 +26,8 @@ export default function InstalledPluginsTab({
   onUninstall,
   onUpdate,
   onRefresh,
+  pluginsWithSettings,
+  onOpenPluginSettings,
 }: Readonly<InstalledPluginsTabProps>) {
   const { t } = useTranslation();
   const updatableCount = updates.length;
@@ -71,6 +75,8 @@ export default function InstalledPluginsTab({
         onToggle={onToggle}
         onUninstall={onUninstall}
         onUpdate={onUpdate}
+        pluginsWithSettings={pluginsWithSettings}
+        onOpenPluginSettings={onOpenPluginSettings}
         t={t}
       />
     </div>
@@ -85,6 +91,8 @@ function InstalledPluginsList({
   onToggle,
   onUninstall,
   onUpdate,
+  pluginsWithSettings,
+  onOpenPluginSettings,
   t,
 }: Readonly<{
   loading: boolean;
@@ -94,6 +102,8 @@ function InstalledPluginsList({
   onToggle: (plugin: PluginManifest) => void;
   onUninstall: (plugin: PluginManifest) => void;
   onUpdate: (update: PluginUpdate) => void;
+  pluginsWithSettings?: Set<string>;
+  onOpenPluginSettings?: (pluginId: string) => void;
   t: (key: string, opts?: Record<string, unknown>) => string;
 }>) {
   if (loading) {
@@ -127,6 +137,9 @@ function InstalledPluginsList({
             onToggle={() => onToggle(plugin)}
             onUninstall={() => onUninstall(plugin)}
             onUpdate={update ? () => onUpdate(update) : undefined}
+            onOpenSettings={pluginsWithSettings?.has(plugin.id) && onOpenPluginSettings
+              ? () => onOpenPluginSettings(plugin.id)
+              : undefined}
           />
         );
       })}

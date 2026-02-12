@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Trash2 } from "lucide-react";
-import { usePlugins, type PluginManifest } from "../../plugins";
+import { pluginManager, usePlugins, type PluginManifest } from "../../plugins";
 import { useRegistry, type RegistryPlugin, type PluginUpdate } from "../../hooks/useRegistry";
 import PermissionApprovalModal from "../PermissionApprovalModal";
 import Modal from "../Modal";
@@ -12,7 +12,11 @@ import DeveloperPluginsTab from "./DeveloperPluginsTab";
 
 type Tab = "installed" | "browse" | "dev";
 
-export default function PluginsSettings() {
+interface PluginsSettingsProps {
+  onNavigateToSection?: (section: string) => void;
+}
+
+export default function PluginsSettings({ onNavigateToSection }: Readonly<PluginsSettingsProps> = {}) {
   const { t } = useTranslation();
   const { plugins, loading, refresh, enablePlugin, disablePlugin, uninstallPlugin } = usePlugins();
   const registry = useRegistry();
@@ -136,6 +140,21 @@ export default function PluginsSettings() {
   const installedPlugins = plugins.filter((p) => !p.isDev);
   const devPlugins = plugins.filter((p) => p.isDev);
 
+  // Build set of plugin IDs that have registered settings panels
+  const pluginsWithSettings = new Set(
+    Array.from(pluginManager.registeredSettingsPanels.values()).map((entry) => entry.pluginId)
+  );
+
+  const handleOpenPluginSettings = useCallback((pluginId: string) => {
+    // Find the panel ID for this plugin
+    for (const [panelId, entry] of pluginManager.registeredSettingsPanels) {
+      if (entry.pluginId === pluginId) {
+        onNavigateToSection?.(`plugin:${panelId}`);
+        return;
+      }
+    }
+  }, [onNavigateToSection]);
+
   return (
     <div className="space-y-4">
       <SubTabs
@@ -158,6 +177,8 @@ export default function PluginsSettings() {
           onUninstall={setUninstallTarget}
           onUpdate={handleUpdate}
           onRefresh={handleRefresh}
+          pluginsWithSettings={pluginsWithSettings}
+          onOpenPluginSettings={handleOpenPluginSettings}
         />
       )}
 

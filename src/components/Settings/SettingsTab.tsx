@@ -130,7 +130,7 @@ export default function SettingsTab({
       {/* Nav sidebar */}
       <div className="w-52 flex flex-col border-r border-surface-0/30">
         <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-          {sections.map((section) => (
+          {coreSections.map((section) => (
             <SettingsSectionButton
               key={section.id}
               section={section}
@@ -138,6 +138,19 @@ export default function SettingsTab({
               onSelect={setActiveSection}
             />
           ))}
+          {pluginSections.length > 0 && (
+            <>
+              <div className="my-2 mx-3 border-t border-surface-0/30" />
+              {pluginSections.map((section) => (
+                <SettingsSectionButton
+                  key={section.id}
+                  section={section}
+                  isActive={activeSection === section.id}
+                  onSelect={setActiveSection}
+                />
+              ))}
+            </>
+          )}
         </nav>
       </div>
 
@@ -158,7 +171,7 @@ export default function SettingsTab({
           )}
           <Suspense fallback={<div className="animate-pulse space-y-3">{[0, 1, 2].map(n => <div key={n} className="h-12 bg-surface-0/30 rounded-lg" />)}</div>}>
             {activeSection === "security" && <SecuritySettings />}
-            {activeSection === "plugins" && <PluginsSettings />}
+            {activeSection === "plugins" && <PluginsSettings onNavigateToSection={setActiveSection as (section: string) => void} />}
             {activeSection === "about" && <AboutSettings />}
           </Suspense>
           {activePluginPanel && (

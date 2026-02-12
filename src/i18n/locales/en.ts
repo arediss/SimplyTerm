@@ -464,6 +464,7 @@ export default {
       uninstalling: "Uninstalling...",
       uninstallConfirm: "Are you sure you want to uninstall \"{{name}}\"?",
       uninstallError: "Failed to uninstall plugin",
+      openSettings: "Plugin settings",
       // Developer Mode
       devModeTitle: "Developer Mode",
       devModeDesc: "Load plugins directly from a local folder for development",

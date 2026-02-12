@@ -458,6 +458,7 @@ export default {
       uninstalling: "Désinstallation...",
       uninstallConfirm: "Êtes-vous sûr de vouloir désinstaller \"{{name}}\" ?",
       uninstallError: "Échec de la désinstallation du plugin",
+      openSettings: "Paramètres du plugin",
       // Mode Développeur
       devModeTitle: "Mode développeur",
       devModeDesc: "Charger les plugins directement depuis un dossier local pour le développement",
