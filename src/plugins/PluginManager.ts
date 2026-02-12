@@ -34,6 +34,7 @@ import type {
   HeaderActionHandle,
   QuickConnectSectionRegistration,
   SessionDecoratorRegistration,
+  HomePanelColumnRegistration,
 } from './types';
 import type { StatusBarItem } from '../components/StatusBar';
 
@@ -76,6 +77,7 @@ export class PluginManager {
   public registeredContextMenuItems: Map<string, { pluginId: string; item: ContextMenuItemConfig }> = new Map();
   public registeredQuickConnectSections: Map<string, { pluginId: string; section: QuickConnectSectionRegistration }> = new Map();
   public registeredSessionDecorators: Map<string, { pluginId: string; decorator: SessionDecoratorRegistration }> = new Map();
+  public registeredHomePanelColumns: Map<string, { pluginId: string; column: HomePanelColumnRegistration }> = new Map();
 
   // Status bar items
   public registeredStatusBarItems: Map<string, { pluginId: string; config: StatusBarItemConfig; visible: boolean }> = new Map();
@@ -167,6 +169,7 @@ export class PluginManager {
         contextMenuItems: new Map(),
         quickConnectSections: new Map(),
         sessionDecorators: new Map(),
+        homePanelColumns: new Map(),
         subscriptions: [],
       };
 
@@ -193,6 +196,8 @@ export class PluginManager {
         onQuickConnectSectionUnregister: this.handleQuickConnectSectionUnregister.bind(this),
         onSessionDecoratorRegister: this.handleSessionDecoratorRegister.bind(this),
         onSessionDecoratorUnregister: this.handleSessionDecoratorUnregister.bind(this),
+        onHomePanelColumnRegister: this.handleHomePanelColumnRegister.bind(this),
+        onHomePanelColumnUnregister: this.handleHomePanelColumnUnregister.bind(this),
         onAddStatusBarItem: this.handleAddStatusBarItem.bind(this),
         onAddHeaderAction: this.handleAddHeaderAction.bind(this),
         // Arrow functions for property-based callbacks
@@ -379,6 +384,12 @@ export class PluginManager {
     plugin.sessionDecorators.forEach((_, decoratorId) => {
       this.registeredSessionDecorators.delete(decoratorId);
       this.emit({ type: 'session-decorator:unregister', pluginId: id, decoratorId });
+    });
+
+    // Remove registered home panel columns
+    plugin.homePanelColumns.forEach((_, columnId) => {
+      this.registeredHomePanelColumns.delete(columnId);
+      this.emit({ type: 'home-panel:unregister', pluginId: id, columnId });
     });
 
     // Remove registered status bar items for this plugin
@@ -586,6 +597,33 @@ export class PluginManager {
   getSessionDecorators(): { pluginId: string; decorator: SessionDecoratorRegistration }[] {
     return Array.from(this.registeredSessionDecorators.values())
       .sort((a, b) => (a.decorator.config.order ?? 50) - (b.decorator.config.order ?? 50));
+  }
+
+  // Home panel column registration handlers
+  private handleHomePanelColumnRegister(pluginId: string, column: HomePanelColumnRegistration): void {
+    const plugin = this.plugins.get(pluginId);
+    if (plugin) {
+      plugin.homePanelColumns.set(column.config.id, column);
+      this.registeredHomePanelColumns.set(column.config.id, { pluginId, column });
+      this.emit({ type: 'home-panel:register', pluginId, columnId: column.config.id });
+    }
+  }
+
+  private handleHomePanelColumnUnregister(pluginId: string, columnId: string): void {
+    const plugin = this.plugins.get(pluginId);
+    if (plugin) {
+      plugin.homePanelColumns.delete(columnId);
+      this.registeredHomePanelColumns.delete(columnId);
+      this.emit({ type: 'home-panel:unregister', pluginId, columnId });
+    }
+  }
+
+  /**
+   * Get all registered home panel columns, sorted by order
+   */
+  getHomePanelColumns(): { pluginId: string; column: HomePanelColumnRegistration }[] {
+    return Array.from(this.registeredHomePanelColumns.values())
+      .sort((a, b) => (a.column.config.order ?? 50) - (b.column.config.order ?? 50));
   }
 
   // Status bar item handler

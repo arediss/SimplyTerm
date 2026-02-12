@@ -25,7 +25,7 @@ import type {
   HeaderActionConfig,
   HeaderActionHandle,
 } from './types';
-import type { SidebarViewRegistration, SidebarSectionRegistration, SettingsPanelRegistration, ContextMenuItemConfig, QuickConnectSectionRegistration, SessionDecoratorRegistration } from './extensionTypes';
+import type { SidebarViewRegistration, SidebarSectionRegistration, SettingsPanelRegistration, ContextMenuItemConfig, QuickConnectSectionRegistration, SessionDecoratorRegistration, HomePanelColumnRegistration } from './extensionTypes';
 
 /**
  * Check if a plugin has a specific permission
@@ -60,6 +60,8 @@ export function createPluginAPI(
     onQuickConnectSectionUnregister: (pluginId: string, sectionId: string) => void;
     onSessionDecoratorRegister: (pluginId: string, decorator: SessionDecoratorRegistration) => void;
     onSessionDecoratorUnregister: (pluginId: string, decoratorId: string) => void;
+    onHomePanelColumnRegister: (pluginId: string, column: HomePanelColumnRegistration) => void;
+    onHomePanelColumnUnregister: (pluginId: string, columnId: string) => void;
     onAddStatusBarItem: (pluginId: string, config: StatusBarItemConfig) => StatusBarItemHandle;
     onAddHeaderAction: (pluginId: string, config: HeaderActionConfig) => HeaderActionHandle;
     getSessions: () => SessionInfo[];
@@ -189,6 +191,21 @@ export function createPluginAPI(
     unregisterSessionDecorator(decoratorId: string) {
       pluginState.sessionDecorators.delete(decoratorId);
       callbacks.onSessionDecoratorUnregister(pluginId, decoratorId);
+    },
+
+    // Home panel columns
+    registerHomePanelColumn(config: HomePanelColumnRegistration) {
+      if (!hasPermission(permissions, 'ui_home_panel')) {
+        console.warn(`[Plugin ${pluginId}] Missing permission: ui_home_panel`);
+        return;
+      }
+      pluginState.homePanelColumns.set(config.config.id, config);
+      callbacks.onHomePanelColumnRegister(pluginId, config);
+    },
+
+    unregisterHomePanelColumn(columnId: string) {
+      pluginState.homePanelColumns.delete(columnId);
+      callbacks.onHomePanelColumnUnregister(pluginId, columnId);
     },
 
     // Commands

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import type { ModalConfig } from "../plugins";
 
 interface PluginModalProps {
@@ -37,7 +38,7 @@ function PluginModal({ isOpen, config, onButtonClick, onClose }: Readonly<Plugin
     ? config.buttons
     : [{ label: "Close", variant: "secondary" as const }];
 
-  return (
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
@@ -50,7 +51,7 @@ function PluginModal({ isOpen, config, onButtonClick, onClose }: Readonly<Plugin
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <dialog
           open
-          className="bg-mantle border border-surface-0/50 rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto animate-scale-in p-0"
+          className="relative bg-mantle border border-surface-0/50 rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto animate-scale-in p-0"
         >
           {/* Header */}
           <div className="px-6 pt-5 pb-4">
@@ -83,7 +84,8 @@ function PluginModal({ isOpen, config, onButtonClick, onClose }: Readonly<Plugin
           </div>
         </dialog>
       </div>
-    </>
+    </>,
+    document.body
   );
 }
 

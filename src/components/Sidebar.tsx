@@ -1,26 +1,21 @@
 import { useEffect, useState, useMemo, useRef, useCallback, memo } from "react";
-import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
   Monitor,
-  Terminal,
   Search,
   XCircle,
-  Pencil,
   FolderOpen,
-  ArrowLeftRight,
-  Trash2,
   List,
   Clock,
   Folder,
-  Tag,
   Loader2,
   Pin,
   PinOff,
 } from "lucide-react";
 import { SavedSession } from "../types";
 import { pluginManager } from "../plugins";
-import type { SidebarViewRegistration, ContextMenuItemConfig, ContextMenuContext } from "../plugins";
+import type { SidebarViewRegistration } from "../plugins";
+import SessionContextMenu from "./SessionContextMenu";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -289,24 +284,6 @@ function getIconForView(iconName?: string): React.ReactNode {
   }
 }
 
-// Helper to get icon for context menu items (12px size)
-function getContextMenuIcon(iconName?: string): React.ReactNode {
-  switch (iconName) {
-    case 'folder':
-      return <Folder size={12} />;
-    case 'folder-open':
-      return <FolderOpen size={12} />;
-    case 'tag':
-      return <Tag size={12} />;
-    case 'pencil':
-      return <Pencil size={12} />;
-    case 'trash':
-      return <Trash2 size={12} />;
-    default:
-      return null;
-  }
-}
-
 // Memoized sidebar tab button to avoid inline onClick closures
 const SidebarTabButton = memo(function SidebarTabButton({
   tab,
@@ -458,23 +435,7 @@ const SavedSessionItem = memo(function SavedSessionItem({
 }: SavedSessionItemProps) {
   const { t } = useTranslation();
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
-  const [pluginMenuItems, setPluginMenuItems] = useState<{ pluginId: string; item: ContextMenuItemConfig }[]>([]);
   const decoratorRef = useRef<HTMLDivElement>(null);
-
-  // Subscribe to plugin context menu items
-  useEffect(() => {
-    const updateItems = () => {
-      setPluginMenuItems(pluginManager.getContextMenuItems('session'));
-    };
-
-    updateItems();
-
-    return pluginManager.subscribe((event) => {
-      if (event.type === 'context-menu:register' || event.type === 'context-menu:unregister') {
-        updateItems();
-      }
-    });
-  }, []);
 
   // Session decorators (e.g., tag pills from plugins)
   useEffect(() => {
@@ -484,7 +445,6 @@ const SavedSessionItem = memo(function SavedSessionItem({
     const cleanups: (() => void)[] = [];
 
     const renderDecorators = () => {
-      // Run previous cleanups
       cleanups.forEach(fn => fn());
       cleanups.length = 0;
       container.replaceChildren();
@@ -498,14 +458,12 @@ const SavedSessionItem = memo(function SavedSessionItem({
 
     renderDecorators();
 
-    // Re-render when decorators change
     const unsubscribe = pluginManager.subscribe((event) => {
       if (event.type === 'session-decorator:register' || event.type === 'session-decorator:unregister') {
         renderDecorators();
       }
     });
 
-    // Listen for plugin-triggered re-renders (e.g., after tag assignment changes)
     const handleDecoratorChanged = () => renderDecorators();
     globalThis.addEventListener('plugin-decorators-changed', handleDecoratorChanged);
 
@@ -519,49 +477,12 @@ const SavedSessionItem = memo(function SavedSessionItem({
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    // Fermer tous les autres context menus
     globalThis.dispatchEvent(new CustomEvent("closeContextMenus"));
     setContextMenu({ x: e.clientX, y: e.clientY });
   };
 
-  const closeContextMenu = () => {
-    setContextMenu(null);
-  };
-
   const handleConnect = useCallback(() => { onConnect(session); }, [session, onConnect]);
-  const handleEdit = useCallback(() => { onEdit(session); }, [session, onEdit]);
-  const handleDelete = useCallback(() => { onDelete(session.id); }, [session.id, onDelete]);
   const handleSftp = useCallback(() => { onSftp(session); }, [session, onSftp]);
-  const handleTunnel = useCallback(() => { onTunnel(session); }, [session, onTunnel]);
-
-  const handlePluginAction = (item: ContextMenuItemConfig) => {
-    const context: ContextMenuContext = {
-      type: 'session',
-      targetId: session.id,
-      data: {
-        name: session.name,
-        host: session.host,
-        port: session.port,
-        username: session.username,
-      },
-    };
-    item.onClick(context);
-    closeContextMenu();
-  };
-
-  // Close context menu on outside click or when another menu opens
-  useEffect(() => {
-    const handleClick = () => closeContextMenu();
-    const handleCloseAll = () => closeContextMenu();
-
-    document.addEventListener("click", handleClick);
-    globalThis.addEventListener("closeContextMenus", handleCloseAll);
-
-    return () => {
-      document.removeEventListener("click", handleClick);
-      globalThis.removeEventListener("closeContextMenus", handleCloseAll);
-    };
-  }, []);
 
   return (
     <>
@@ -608,74 +529,17 @@ const SavedSessionItem = memo(function SavedSessionItem({
         )}
       </div>
 
-      {/* Context Menu - rendered via Portal to escape transform context */}
-      {contextMenu && createPortal(
-        <div
-          className="fixed z-[100] min-w-[160px] bg-crust border border-surface-0/50 rounded-lg shadow-xl py-1"
-          style={{ transform: `translate3d(${contextMenu.x}px, ${contextMenu.y}px, 0)`, left: 0, top: 0 }}
-          role="menu"
-          tabIndex={-1}
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => { if (e.key === 'Escape') closeContextMenu(); }}
-        >
-          <button
-            onClick={() => { handleConnect(); closeContextMenu(); }}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-text hover:bg-surface-0/50 transition-colors"
-          >
-            <Terminal size={12} />
-            <span>{t('sidebar.connect')}</span>
-          </button>
-          <button
-            onClick={() => { handleSftp(); closeContextMenu(); }}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-text hover:bg-surface-0/50 transition-colors"
-          >
-            <FolderOpen size={12} />
-            <span>{t('sidebar.openSftp')}</span>
-          </button>
-          <button
-            onClick={() => { handleTunnel(); closeContextMenu(); }}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-blue hover:bg-blue/10 transition-colors"
-          >
-            <ArrowLeftRight size={12} />
-            <span>{t('sidebar.tunnelOnly')}</span>
-          </button>
-          <div className="h-px bg-surface-0/30 my-1" />
-          <button
-            onClick={() => { handleEdit(); closeContextMenu(); }}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-text hover:bg-surface-0/50 transition-colors"
-          >
-            <Pencil size={12} />
-            <span>{t('sidebar.edit')}</span>
-          </button>
-
-          {/* Plugin context menu items */}
-          {pluginMenuItems.length > 0 && (
-            <>
-              <div className="h-px bg-surface-0/30 my-1" />
-              {pluginMenuItems.map(({ item }) => (
-                <button
-                  key={item.id}
-                  onClick={() => handlePluginAction(item)}
-                  disabled={item.disabled}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-text hover:bg-surface-0/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {getContextMenuIcon(item.icon)}
-                  <span>{item.label}</span>
-                </button>
-              ))}
-            </>
-          )}
-
-          <div className="h-px bg-surface-0/30 my-1" />
-          <button
-            onClick={() => { handleDelete(); closeContextMenu(); }}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-error hover:bg-error/10 transition-colors"
-          >
-            <Trash2 size={12} />
-            <span>{t('common.delete')}</span>
-          </button>
-        </div>,
-        document.body
+      {contextMenu && (
+        <SessionContextMenu
+          session={session}
+          position={contextMenu}
+          onClose={() => setContextMenu(null)}
+          onConnect={onConnect}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onSftp={onSftp}
+          onTunnel={onTunnel}
+        />
       )}
     </>
   );

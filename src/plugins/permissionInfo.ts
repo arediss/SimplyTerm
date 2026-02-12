@@ -175,6 +175,21 @@ export const permissionInfoMap: Record<string, PermissionInfo> = {
     description: 'Add items to context menus',
     risk: 'medium',
   },
+  ui_quick_connect: {
+    label: 'UI Quick Connect',
+    description: 'Add items to the quick-connect dropdown',
+    risk: 'medium',
+  },
+  ui_session_decorator: {
+    label: 'UI Session Decorator',
+    description: 'Add visual decorators (tags, badges) to session cards',
+    risk: 'medium',
+  },
+  ui_home_panel: {
+    label: 'UI Home Panel',
+    description: 'Register columns in the home panel',
+    risk: 'medium',
+  },
 
   // Terminal
   terminal_read: {

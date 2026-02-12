@@ -240,6 +240,40 @@ export interface SessionDecoratorRegistration {
 }
 
 // ============================================================================
+// Home Panel Column Extension Types
+// ============================================================================
+
+/**
+ * Configuration for a home panel column registered by a plugin
+ */
+export interface HomePanelColumnConfig {
+  /** Unique column identifier */
+  id: string;
+  /** Display title for the column header */
+  title: string;
+  /** Icon name (from lucide-react) */
+  icon?: string;
+  /** Sort order (lower = more to the left) */
+  order?: number;
+  /** Optional callback for a "+" button shown in the header on hover */
+  onAdd?: () => void;
+}
+
+/**
+ * Registration object for a home panel column
+ */
+export interface HomePanelColumnRegistration {
+  /** Column configuration */
+  config: HomePanelColumnConfig;
+  /**
+   * Render function called when the column is mounted
+   * @param container - DOM element to render into
+   * @returns Optional cleanup function called on unmount
+   */
+  render: (container: HTMLElement) => void | (() => void);
+}
+
+// ============================================================================
 // Status Bar Extension Types
 // ============================================================================
 

@@ -4,10 +4,10 @@
  * API v1 - Unified types for backend and frontend plugin system
  */
 
-import type { SidebarSectionRegistration, SidebarViewRegistration, SettingsPanelRegistration, ContextMenuItemConfig, StatusBarItemConfig, StatusBarItemHandle, HeaderActionConfig, HeaderActionHandle, QuickConnectSectionRegistration, SessionDecoratorRegistration } from './extensionTypes';
+import type { SidebarSectionRegistration, SidebarViewRegistration, SettingsPanelRegistration, ContextMenuItemConfig, StatusBarItemConfig, StatusBarItemHandle, HeaderActionConfig, HeaderActionHandle, QuickConnectSectionRegistration, SessionDecoratorRegistration, HomePanelColumnRegistration } from './extensionTypes';
 
 // Re-export extension types
-export type { SidebarSectionRegistration, SidebarViewRegistration, SettingsPanelRegistration, ContextMenuItemConfig, StatusBarItemConfig, StatusBarItemHandle, HeaderActionConfig, HeaderActionHandle, QuickConnectSectionRegistration, SessionDecoratorRegistration } from './extensionTypes';
+export type { SidebarSectionRegistration, SidebarViewRegistration, SettingsPanelRegistration, ContextMenuItemConfig, StatusBarItemConfig, StatusBarItemHandle, HeaderActionConfig, HeaderActionHandle, QuickConnectSectionRegistration, SessionDecoratorRegistration, HomePanelColumnRegistration } from './extensionTypes';
 export type { ContextMenuContext } from './extensionTypes';
 
 // ============================================================================
@@ -133,6 +133,10 @@ export interface SimplyTermPluginAPI {
   registerSessionDecorator(config: SessionDecoratorRegistration): void;
   unregisterSessionDecorator(decoratorId: string): void;
 
+  // Home panel columns (requires ui_home_panel)
+  registerHomePanelColumn(config: HomePanelColumnRegistration): void;
+  unregisterHomePanelColumn(columnId: string): void;
+
   // Commands (requires ui_commands)
   registerCommand(config: CommandRegistration): void;
   executeCommand(commandId: string): void;
@@ -226,6 +230,7 @@ export interface LoadedPlugin {
   contextMenuItems: Map<string, ContextMenuItemConfig>;
   quickConnectSections: Map<string, QuickConnectSectionRegistration>;
   sessionDecorators: Map<string, SessionDecoratorRegistration>;
+  homePanelColumns: Map<string, HomePanelColumnRegistration>;
   subscriptions: Unsubscribe[];
   onLoadCallback?: () => void;
   onUnloadCallback?: () => void;
@@ -260,6 +265,8 @@ export type PluginEvent =
   | { type: 'quick-connect:unregister'; pluginId: string; sectionId: string }
   | { type: 'session-decorator:register'; pluginId: string; decoratorId: string }
   | { type: 'session-decorator:unregister'; pluginId: string; decoratorId: string }
+  | { type: 'home-panel:register'; pluginId: string; columnId: string }
+  | { type: 'home-panel:unregister'; pluginId: string; columnId: string }
   | { type: 'statusbar:changed' }
   | { type: 'headeractions:changed' };
 
