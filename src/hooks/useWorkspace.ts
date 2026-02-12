@@ -143,7 +143,12 @@ export function useWorkspace(): UseWorkspaceReturn {
       if (!targetGroupId) return prev;
 
       const group = prev.groups.get(targetGroupId)!;
-      closedTab = group.tabs.find((t) => t.id === tabId) || null;
+      const tab = group.tabs.find((t) => t.id === tabId);
+
+      // Prevent closing the Home tab
+      if (tab?.type === "home") return prev;
+
+      closedTab = tab || null;
       const newTabs = group.tabs.filter((t) => t.id !== tabId);
 
       // If the group is now empty, remove it from the tree

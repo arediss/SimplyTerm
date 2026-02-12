@@ -126,18 +126,28 @@ export function PaneGroupTabBar({
         </button>
       </div>
 
-      {/* Home button */}
-      <button
-        onClick={onHome}
-        className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-text-muted hover:text-text hover:bg-surface-0/40 transition-colors ml-0.5"
-        title={t("header.home")}
-      >
-        <Home size={14} />
-      </button>
+      {/* Home button — acts as the Home tab itself */}
+      {(() => {
+        const homeTab = tabs.find((t) => t.type === "home");
+        const isHomeActive = homeTab ? homeTab.id === activeTabId : false;
+        return (
+          <button
+            onClick={onHome}
+            className={`shrink-0 w-7 h-7 flex items-center justify-center rounded-lg transition-colors ml-0.5 ${
+              isHomeActive
+                ? "bg-surface-0/50 text-accent"
+                : "text-text-muted hover:text-text hover:bg-surface-0/40"
+            }`}
+            title={t("header.home")}
+          >
+            <Home size={14} />
+          </button>
+        );
+      })()}
 
-      {/* Tabs scrollable */}
+      {/* Tabs scrollable (home tab excluded — represented by the Home button above) */}
       <div className="flex-1 flex items-center gap-0.5 px-1.5 overflow-x-auto hide-scrollbar">
-        {tabs.map((tab) => (
+        {tabs.filter((tab) => tab.type !== "home").map((tab) => (
           <TabPillWrapper
             key={tab.id}
             tab={tab}
