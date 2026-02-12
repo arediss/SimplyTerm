@@ -97,12 +97,12 @@ export default function HeaderBar({
     >
       <div className="relative h-full flex items-center justify-between px-2">
         {/* Left side */}
-        <div className={`flex items-center no-drag ${isMac && !isFullscreen ? "ml-[70px]" : ""}`}>
+        <div className={`flex items-center gap-0.5 no-drag ${isMac && !isFullscreen ? "ml-[70px]" : ""}`}>
           {/* Menu button */}
           <button
             onClick={onToggleSidebar}
             className={`
-              shrink-0 w-8 h-7 flex items-center justify-center rounded-lg
+              shrink-0 w-10 h-8 flex items-center justify-center rounded-lg
               transition-colors hover:bg-surface-0/50
               ${isSidebarOpen ? "text-accent" : "text-text-muted hover:text-text"}
             `}
@@ -114,7 +114,7 @@ export default function HeaderBar({
           {/* Settings cog */}
           <button
             onClick={onOpenSettings}
-            className="shrink-0 w-8 h-7 flex items-center justify-center rounded-lg text-text-muted hover:text-text hover:bg-surface-0/50 transition-colors"
+            className="shrink-0 w-10 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-text hover:bg-surface-0/50 transition-colors"
             title={t("sidebar.settings")}
           >
             <Settings size={15} />
@@ -124,11 +124,11 @@ export default function HeaderBar({
           {vaultExists && (
             <button
               onClick={onVaultToggle}
-              className="relative shrink-0 w-8 h-7 flex items-center justify-center rounded-lg text-text-muted hover:text-text hover:bg-surface-0/50 transition-colors"
+              className="relative shrink-0 w-10 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-text hover:bg-surface-0/50 transition-colors"
               title={vaultUnlocked ? t("sidebar.vaultUnlocked") : t("sidebar.vaultLocked")}
             >
               <KeyRound size={15} />
-              <span className={`absolute top-1.5 right-1 w-1.5 h-1.5 rounded-full ${
+              <span className={`absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full ${
                 vaultUnlocked ? "bg-success" : "bg-warning"
               }`} />
             </button>
