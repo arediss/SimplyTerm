@@ -9,10 +9,11 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.7.0-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-0.7.1-blue" alt="Version" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey" alt="Platform" />
-  <a href="https://sonarcloud.io/dashboard?id=arediss_SimplyTerm"><img src="https://sonarcloud.io/api/project_badges/measure?project=arediss_SimplyTerm&metric=alert_status" alt="Quality Gate" /></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=arediss_SimplyTerm"><img src="https://sonarcloud.io/api/project_badges/measure?project=arediss_SimplyTerm&metric=alert_status" alt="Quality Gate Status" /></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=arediss_SimplyTerm"><img src="https://sonarcloud.io/api/project_badges/ai_code_assurance?project=arediss_SimplyTerm" alt="AI Code Assurance" /></a>
 </p>
 
 ---
