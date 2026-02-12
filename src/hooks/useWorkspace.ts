@@ -33,6 +33,8 @@ export interface WorkspaceActions {
   focusGroup: (groupId: string) => void;
   /** Open settings as a tab (reuse existing if found) */
   openSettings: () => void;
+  /** Open home as a tab (reuse existing if found) */
+  openHome: () => void;
   /** Resize a split node */
   resizeSplitNode: (splitId: string, newSizes: number[]) => void;
   /** Rename a tab */
@@ -280,6 +282,39 @@ export function useWorkspace(): UseWorkspaceReturn {
     });
   }, []);
 
+  const openHome = useCallback(() => {
+    setState((prev) => {
+      // Search for existing home tab in all groups
+      for (const [gid, group] of prev.groups) {
+        const homeTab = group.tabs.find((t) => t.type === "home");
+        if (homeTab) {
+          const newGroups = new Map(prev.groups);
+          newGroups.set(gid, { ...group, activeTabId: homeTab.id });
+          return { ...prev, groups: newGroups, focusedGroupId: gid };
+        }
+      }
+
+      // No existing home tab — create one in focused group
+      const group = prev.groups.get(prev.focusedGroupId);
+      if (!group) return prev;
+
+      const tab: PaneGroupTab = {
+        id: generateTabId(),
+        type: "home",
+        title: "Home",
+        sessionId: "home",
+      };
+
+      const newGroups = new Map(prev.groups);
+      newGroups.set(prev.focusedGroupId, {
+        ...group,
+        tabs: [...group.tabs, tab],
+        activeTabId: tab.id,
+      });
+      return { ...prev, groups: newGroups };
+    });
+  }, []);
+
   const resizeSplitNode = useCallback((splitId: string, newSizes: number[]) => {
     setState((prev) => ({
       ...prev,
@@ -383,6 +418,7 @@ export function useWorkspace(): UseWorkspaceReturn {
       closeGroup,
       focusGroup,
       openSettings,
+      openHome,
       resizeSplitNode,
       renameTab,
       getAllTabs,
@@ -402,6 +438,7 @@ export function useWorkspace(): UseWorkspaceReturn {
       closeGroup,
       focusGroup,
       openSettings,
+      openHome,
       resizeSplitNode,
       renameTab,
       getAllTabs,

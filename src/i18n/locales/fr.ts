@@ -970,6 +970,8 @@ export default {
     newSshConnection: "Nouvelle connexion SSH",
     // Tooltip dropdown connexions rapides
     quickConnections: "Connexions rapides",
+    // Tooltip bouton accueil
+    home: "Accueil",
     // Contrôles de fenêtre
     minimize: "Réduire",
     maximize: "Agrandir",

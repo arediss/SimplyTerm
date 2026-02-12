@@ -9,6 +9,7 @@ export interface WorkspaceActions {
   activeTunnelCount: number;
   onSplitVertical: () => void;
   onSplitHorizontal: () => void;
+  onHome: () => void;
   // Render functions
   renderTerminal: (ptySessionId: string, isActive: boolean, type: string) => React.ReactNode;
   renderSftp: (sessionId: string) => React.ReactNode;

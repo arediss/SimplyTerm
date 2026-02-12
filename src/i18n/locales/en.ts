@@ -976,6 +976,8 @@ export default {
     newSshConnection: "New SSH connection",
     // Quick connections dropdown tooltip
     quickConnections: "Quick connections",
+    // Home button tooltip
+    home: "Home",
     // Window controls
     minimize: "Minimize",
     maximize: "Maximize",

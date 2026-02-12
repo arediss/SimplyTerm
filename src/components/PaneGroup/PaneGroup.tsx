@@ -29,6 +29,7 @@ export const PaneGroupComponent = memo(function PaneGroupComponent({
     activeTunnelCount,
     onSplitVertical,
     onSplitHorizontal,
+    onHome,
     renderTerminal,
     renderSftp,
     renderTunnel,
@@ -57,6 +58,7 @@ export const PaneGroupComponent = memo(function PaneGroupComponent({
         onSplitVertical={onSplitVertical}
         onSplitHorizontal={onSplitHorizontal}
         onClosePane={onClosePane}
+        onHome={onHome}
       />
 
       {/* Content area — render ALL tabs, hide inactive (preserve terminal state) */}

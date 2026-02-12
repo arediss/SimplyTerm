@@ -1246,6 +1246,7 @@ function App() {
     activeTunnelCount,
     onSplitVertical: handleSplitVertical,
     onSplitHorizontal: handleSplitHorizontal,
+    onHome: handleOpenHomeTab,
     renderTerminal,
     renderSftp,
     renderTunnel,
@@ -1254,7 +1255,7 @@ function App() {
   }), [
     handleOpenConnectionModal, handleNewLocalTab, handleToggleTunnelSidebar,
     isTunnelSidebarOpen, activeTunnelCount,
-    handleSplitVertical, handleSplitHorizontal,
+    handleSplitVertical, handleSplitHorizontal, handleOpenHomeTab,
     renderTerminal, renderSftp, renderTunnel, renderSettings, renderEmpty,
   ]);
 
@@ -1271,6 +1272,7 @@ function App() {
   }, [sidebarPinned, handleToggleSidebarPin]);
 
   const handleOpenSettingsTab = useCallback(() => workspace.openSettings(), [workspace]);
+  const handleOpenHomeTab = useCallback(() => workspace.openHome(), [workspace]);
 
   const handleVaultToggle = useCallback(
     () => vault.status?.isUnlocked ? lockVault() : openVaultUnlock(),

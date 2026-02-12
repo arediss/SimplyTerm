@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, memo } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { Plus, X, ChevronDown, Terminal, ArrowLeftRight, Columns2, Rows2, XCircle } from "lucide-react";
+import { Plus, X, ChevronDown, Terminal, ArrowLeftRight, Columns2, Rows2, XCircle, Home } from "lucide-react";
 import type { PaneGroupTab } from "../../types";
 import { pluginManager } from "../../plugins";
 import type { QuickConnectSectionRegistration } from "../../plugins";
@@ -19,6 +19,7 @@ interface PaneGroupTabBarProps {
   onSplitVertical: () => void;
   onSplitHorizontal: () => void;
   onClosePane: () => void;
+  onHome: () => void;
 }
 
 export function PaneGroupTabBar({
@@ -34,6 +35,7 @@ export function PaneGroupTabBar({
   onSplitVertical,
   onSplitHorizontal,
   onClosePane,
+  onHome,
 }: Readonly<PaneGroupTabBarProps>) {
   const { t } = useTranslation();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -93,6 +95,7 @@ export function PaneGroupTabBar({
       case "telnet": return "bg-warning";
       case "serial": return "bg-warning";
       case "settings": return "bg-text-muted";
+      case "home": return "bg-accent";
       default: return "bg-success";
     }
   };
@@ -122,6 +125,15 @@ export function PaneGroupTabBar({
           <ChevronDown size={12} className={`transition-transform ${isDropdownOpen ? "rotate-180" : ""}`} />
         </button>
       </div>
+
+      {/* Home button */}
+      <button
+        onClick={onHome}
+        className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-text-muted hover:text-text hover:bg-surface-0/40 transition-colors ml-0.5"
+        title={t("header.home")}
+      >
+        <Home size={14} />
+      </button>
 
       {/* Tabs scrollable */}
       <div className="flex-1 flex items-center gap-0.5 px-1.5 overflow-x-auto hide-scrollbar">
