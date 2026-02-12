@@ -676,6 +676,8 @@ export default {
     passphraseOptional: "Passphrase (optional)",
     // Connect button
     connect: "Connect",
+    // Save & Connect button (edit mode)
+    saveAndConnect: "Save & Connect",
     // Connecting status
     connecting: "Connecting...",
     // Enter password prompt for saved session

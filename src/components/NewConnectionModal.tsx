@@ -15,7 +15,9 @@ interface NewConnectionModalProps {
   onSshConnect: (config: SshConnectionConfig) => void;
   onTelnetConnect: (config: TelnetConnectionConfig) => void;
   onSerialConnect: (config: SerialConnectionConfig) => void;
+  onSave?: (type: ConnectionType, config: SshConnectionConfig | TelnetConnectionConfig | SerialConnectionConfig) => void;
   isConnecting?: boolean;
+  isEditing?: boolean;
   error?: string;
   initialSshConfig?: Partial<SshConnectionConfig> | null;
   initialTelnetConfig?: Partial<TelnetConnectionConfig> | null;
@@ -30,7 +32,9 @@ export function NewConnectionModal({
   onSshConnect,
   onTelnetConnect,
   onSerialConnect,
+  onSave,
   isConnecting,
+  isEditing,
   error,
   initialSshConfig,
   initialTelnetConfig,
@@ -146,41 +150,50 @@ export function NewConnectionModal({
     onClose();
   };
 
+  const buildSshConfig = (): SshConnectionConfig => ({
+    name: sshName || `${sshUsername}@${sshHost}`,
+    host: sshHost,
+    port: sshPort,
+    username: sshUsername,
+    authType: sshAuthType,
+    password: sshAuthType === "password" ? sshPassword : undefined,
+    keyPath: sshAuthType === "key" && !sshKeyId ? sshKeyPath : undefined,
+    keyPassphrase: sshAuthType === "key" && !sshKeyId ? sshKeyPassphrase : undefined,
+    sshKeyId: sshAuthType === "key" && sshKeyId ? sshKeyId : undefined,
+  });
+
+  const buildTelnetConfig = (): TelnetConnectionConfig => ({
+    name: telnetName || telnetHost,
+    host: telnetHost,
+    port: telnetPort,
+  });
+
+  const buildSerialConfig = (): SerialConnectionConfig => ({
+    name: serialName || serialPort,
+    port: serialPort,
+    baudRate,
+    dataBits,
+    stopBits,
+    parity,
+    flowControl,
+  });
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     switch (connectionType) {
-      case "ssh":
-        onSshConnect({
-          name: sshName || `${sshUsername}@${sshHost}`,
-          host: sshHost,
-          port: sshPort,
-          username: sshUsername,
-          authType: sshAuthType,
-          password: sshAuthType === "password" ? sshPassword : undefined,
-          keyPath: sshAuthType === "key" && !sshKeyId ? sshKeyPath : undefined,
-          keyPassphrase: sshAuthType === "key" && !sshKeyId ? sshKeyPassphrase : undefined,
-          sshKeyId: sshAuthType === "key" && sshKeyId ? sshKeyId : undefined,
-        });
-        break;
-      case "telnet":
-        onTelnetConnect({
-          name: telnetName || telnetHost,
-          host: telnetHost,
-          port: telnetPort,
-        });
-        break;
-      case "serial":
-        onSerialConnect({
-          name: serialName || serialPort,
-          port: serialPort,
-          baudRate,
-          dataBits,
-          stopBits,
-          parity,
-          flowControl,
-        });
-        break;
+      case "ssh": onSshConnect(buildSshConfig()); break;
+      case "telnet": onTelnetConnect(buildTelnetConfig()); break;
+      case "serial": onSerialConnect(buildSerialConfig()); break;
+    }
+  };
+
+  const handleSave = () => {
+    if (!onSave) return;
+    switch (connectionType) {
+      case "ssh": onSave("ssh", buildSshConfig()); break;
+      case "telnet": onSave("telnet", buildTelnetConfig()); break;
+      case "serial": onSave("serial", buildSerialConfig()); break;
     }
   };
 
@@ -321,12 +334,25 @@ export function NewConnectionModal({
             >
               {t("common.cancel")}
             </button>
+            {isEditing && onSave && (
+              <button
+                type="button"
+                onClick={handleSave}
+                className="flex-1 py-2.5 bg-surface-0/80 text-text font-medium text-sm rounded-lg hover:bg-surface-0 transition-colors"
+              >
+                {t("common.save")}
+              </button>
+            )}
             <button
               type="submit"
               disabled={isConnecting}
               className="flex-1 py-2.5 bg-accent text-base font-medium text-sm rounded-lg hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isConnecting ? t("connection.connecting") : t("connection.connect")}
+              {isConnecting
+                ? t("connection.connecting")
+                : isEditing
+                  ? t("connection.saveAndConnect")
+                  : t("connection.connect")}
             </button>
           </div>
         </div>

@@ -670,6 +670,8 @@ export default {
     passphraseOptional: "Passphrase (optionnel)",
     // Bouton connecter
     connect: "Se connecter",
+    // Bouton sauvegarder et connecter (mode édition)
+    saveAndConnect: "Sauvegarder & Connecter",
     // Statut connexion en cours
     connecting: "Connexion...",
     // Invitation à entrer le mot de passe pour session sauvegardée
