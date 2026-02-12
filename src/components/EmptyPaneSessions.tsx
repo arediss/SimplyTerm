@@ -4,6 +4,7 @@ import { Monitor, Plus, Terminal, Loader2 } from "lucide-react";
 import type { SavedSession } from "../types";
 import { pluginManager } from "../plugins/PluginManager";
 import type { HomePanelColumnRegistration } from "../plugins/types";
+import { useSessionDecorators } from "../hooks/useSessionDecorators";
 import DynamicLucideIcon from "./DynamicLucideIcon";
 import SessionContextMenu from "./SessionContextMenu";
 
@@ -261,7 +262,7 @@ const EmptyPaneSessionItem = memo(function EmptyPaneSessionItem({
   onTunnel: (session: SavedSession) => void;
 }) {
   const { t } = useTranslation();
-  const decoratorRef = useRef<HTMLDivElement>(null);
+  const decoratorRef = useSessionDecorators(session.id);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   const handleClick = useCallback(() => {
@@ -275,43 +276,6 @@ const EmptyPaneSessionItem = memo(function EmptyPaneSessionItem({
     globalThis.dispatchEvent(new CustomEvent("closeContextMenus"));
     setContextMenu({ x: e.clientX, y: e.clientY });
   }, [isDisabled]);
-
-  // Session decorators (same pattern as Sidebar.tsx)
-  useEffect(() => {
-    const container = decoratorRef.current;
-    if (!container) return;
-
-    const cleanups: (() => void)[] = [];
-
-    const renderDecorators = () => {
-      cleanups.forEach(fn => fn());
-      cleanups.length = 0;
-      container.replaceChildren();
-
-      const decorators = pluginManager.getSessionDecorators();
-      for (const { decorator } of decorators) {
-        const cleanup = decorator.render(session.id, container);
-        if (cleanup) cleanups.push(cleanup);
-      }
-    };
-
-    renderDecorators();
-
-    const unsubscribe = pluginManager.subscribe((event) => {
-      if (event.type === 'session-decorator:register' || event.type === 'session-decorator:unregister') {
-        renderDecorators();
-      }
-    });
-
-    const handleDecoratorChanged = () => renderDecorators();
-    globalThis.addEventListener('plugin-decorators-changed', handleDecoratorChanged);
-
-    return () => {
-      unsubscribe();
-      globalThis.removeEventListener('plugin-decorators-changed', handleDecoratorChanged);
-      cleanups.forEach(fn => fn());
-    };
-  }, [session.id]);
 
   return (
     <>

@@ -15,6 +15,7 @@ import {
 import { SavedSession } from "../types";
 import { pluginManager } from "../plugins";
 import type { SidebarViewRegistration } from "../plugins";
+import { useSessionDecorators } from "../hooks/useSessionDecorators";
 import SessionContextMenu from "./SessionContextMenu";
 
 interface SidebarProps {
@@ -435,44 +436,7 @@ const SavedSessionItem = memo(function SavedSessionItem({
 }: SavedSessionItemProps) {
   const { t } = useTranslation();
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
-  const decoratorRef = useRef<HTMLDivElement>(null);
-
-  // Session decorators (e.g., tag pills from plugins)
-  useEffect(() => {
-    const container = decoratorRef.current;
-    if (!container) return;
-
-    const cleanups: (() => void)[] = [];
-
-    const renderDecorators = () => {
-      cleanups.forEach(fn => fn());
-      cleanups.length = 0;
-      container.replaceChildren();
-
-      const decorators = pluginManager.getSessionDecorators();
-      for (const { decorator } of decorators) {
-        const cleanup = decorator.render(session.id, container);
-        if (cleanup) cleanups.push(cleanup);
-      }
-    };
-
-    renderDecorators();
-
-    const unsubscribe = pluginManager.subscribe((event) => {
-      if (event.type === 'session-decorator:register' || event.type === 'session-decorator:unregister') {
-        renderDecorators();
-      }
-    });
-
-    const handleDecoratorChanged = () => renderDecorators();
-    globalThis.addEventListener('plugin-decorators-changed', handleDecoratorChanged);
-
-    return () => {
-      unsubscribe();
-      globalThis.removeEventListener('plugin-decorators-changed', handleDecoratorChanged);
-      cleanups.forEach(fn => fn());
-    };
-  }, [session.id]);
+  const decoratorRef = useSessionDecorators(session.id);
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
