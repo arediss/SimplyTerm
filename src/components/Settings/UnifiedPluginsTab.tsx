@@ -326,6 +326,44 @@ function PluginList({
   );
 }
 
+interface PluginCardHandlers {
+  onToggle?: () => void;
+  onUninstall?: () => void;
+  onUpdate?: () => void;
+  onInstall?: () => void;
+  onOpenSettings?: () => void;
+}
+
+function resolvePluginHandlers(
+  plugin: UnifiedPlugin,
+  update: PluginUpdate | undefined,
+  callbacks: {
+    onToggle: (p: PluginManifest) => void;
+    onUninstall: (p: PluginManifest) => void;
+    onUpdate: (u: PluginUpdate) => void;
+    onInstall: (p: UnifiedPlugin) => void;
+    pluginsWithSettings: Set<string>;
+    onOpenPluginSettings: (id: string) => void;
+  },
+): PluginCardHandlers {
+  if (!plugin.installed) {
+    return {
+      onInstall: () => callbacks.onInstall(plugin),
+      onUpdate: update ? () => callbacks.onUpdate(update) : undefined,
+    };
+  }
+
+  const manifest = plugin.manifest;
+  return {
+    onToggle: manifest ? () => callbacks.onToggle(manifest) : undefined,
+    onUninstall: manifest ? () => callbacks.onUninstall(manifest) : undefined,
+    onUpdate: update ? () => callbacks.onUpdate(update) : undefined,
+    onOpenSettings: callbacks.pluginsWithSettings.has(plugin.id)
+      ? () => callbacks.onOpenPluginSettings(plugin.id)
+      : undefined,
+  };
+}
+
 function PluginListItem({
   plugin,
   updates,
@@ -348,25 +386,15 @@ function PluginListItem({
   onOpenPluginSettings: (pluginId: string) => void;
 }>) {
   const update = updates.find((u) => u.id === plugin.id);
-  const manifest = plugin.installed ? plugin.manifest : undefined;
-
-  const handleToggle = manifest ? () => onToggle(manifest) : undefined;
-  const handleUninstall = manifest ? () => onUninstall(manifest) : undefined;
-  const handleUpdate = update ? () => onUpdate(update) : undefined;
-  const handleInstall = plugin.installed ? undefined : () => onInstall(plugin);
-  const handleOpenSettings = plugin.installed && pluginsWithSettings.has(plugin.id)
-    ? () => onOpenPluginSettings(plugin.id)
-    : undefined;
+  const handlers = resolvePluginHandlers(plugin, update, {
+    onToggle, onUninstall, onUpdate, onInstall, pluginsWithSettings, onOpenPluginSettings,
+  });
 
   return (
     <UnifiedPluginCard
       plugin={{ ...plugin, update }}
       loading={actionLoading === plugin.id}
-      onToggle={handleToggle}
-      onUninstall={handleUninstall}
-      onUpdate={handleUpdate}
-      onInstall={handleInstall}
-      onOpenSettings={handleOpenSettings}
+      {...handlers}
     />
   );
 }
