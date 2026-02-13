@@ -6,174 +6,83 @@ import {
   PowerOff,
   AlertCircle,
   Download,
-  Check,
   ArrowUpCircle,
   ExternalLink,
   Trash2,
   Settings,
 } from "lucide-react";
-import type { PluginManifest } from "../../plugins";
-import type { RegistryPlugin, PluginUpdate } from "../../hooks/useRegistry";
+import type { UnifiedPlugin } from "./PluginsSettings";
 
-function getPluginStatusClassName(status: string | undefined): string {
-  if (status === "error") return "bg-error/15 text-error";
-  if (status === "enabled") return "bg-accent/15 text-accent";
+function getIconClassName(plugin: UnifiedPlugin): string {
+  if (!plugin.installed) return "bg-accent/15 text-accent";
+  if (plugin.status === "error") return "bg-error/15 text-error";
+  if (plugin.status === "enabled") return "bg-accent/15 text-accent";
   return "bg-surface-0/40 text-text-muted";
 }
 
-export function InstalledPluginCard({
+export function UnifiedPluginCard({
   plugin,
-  update,
   loading,
   onToggle,
   onUninstall,
   onUpdate,
+  onInstall,
   onOpenSettings,
 }: Readonly<{
-  plugin: PluginManifest;
-  update?: PluginUpdate;
+  plugin: UnifiedPlugin;
   loading: boolean;
-  onToggle: () => void;
-  onUninstall: () => void;
+  onToggle?: () => void;
+  onUninstall?: () => void;
   onUpdate?: () => void;
+  onInstall?: () => void;
   onOpenSettings?: () => void;
 }>) {
   const { t } = useTranslation();
 
   return (
     <div className="group flex gap-3 p-3 bg-surface-0/15 hover:bg-surface-0/25 rounded-xl transition-colors">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${getPluginStatusClassName(plugin.status)}`}>
+      {/* Icon */}
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${getIconClassName(plugin)}`}>
         <Puzzle size={18} />
       </div>
 
+      {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-text truncate">{plugin.name}</span>
           <span className="text-[10px] text-text-muted/60 bg-surface-0/40 px-1.5 py-0.5 rounded shrink-0">
             v{plugin.version}
           </span>
-          {plugin.isDev && (
-            <span className="text-[10px] font-semibold text-orange-400 bg-orange-400/15 px-1.5 py-0.5 rounded shrink-0">
-              {t("settings.plugins.devBadge")}
+          {/* Status badge */}
+          {plugin.installed ? (
+            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0 ${
+              plugin.status === "enabled"
+                ? "text-success bg-success/15"
+                : "text-text-muted/70 bg-surface-0/40"
+            }`}>
+              {plugin.status === "enabled" ? t("common.active") : t("settings.plugins.installed")}
             </span>
+          ) : (
+            plugin.category && (
+              <span className="text-[10px] text-accent/70 bg-accent/10 px-1.5 py-0.5 rounded shrink-0">
+                {plugin.category}
+              </span>
+            )
           )}
           {plugin.status === "error" && <AlertCircle size={12} className="text-error shrink-0" />}
         </div>
         {plugin.description && (
           <p className="text-[11px] text-text-muted/70 truncate mt-0.5">{plugin.description}</p>
         )}
-        {plugin.author && (
-          <p className="text-[10px] text-text-muted/50 mt-0.5">
-            {t("settings.plugins.byAuthor", { author: plugin.author })}
-          </p>
-        )}
 
-        {update && onUpdate && (
-          <button
-            onClick={onUpdate}
-            disabled={loading}
-            className="flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-lg bg-warning/10 hover:bg-warning/20 transition-colors disabled:opacity-50"
-          >
-            {loading ? (
-              <RefreshCw size={11} className="text-warning animate-spin" />
-            ) : (
-              <ArrowUpCircle size={11} className="text-warning" />
-            )}
-            <span className="text-[11px] text-warning font-medium">
-              {loading
-                ? t("settings.plugins.updating")
-                : t("settings.plugins.updateTo", { version: update.latestVersion })}
-            </span>
-          </button>
-        )}
-      </div>
-
-      <div className="flex items-start gap-1 shrink-0">
-        <button
-          onClick={onToggle}
-          disabled={loading}
-          className={`
-            flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors
-            ${plugin.status === "enabled"
-              ? "bg-success/15 text-success hover:bg-success/25"
-              : "bg-surface-0/40 text-text-muted hover:bg-surface-0/60"
-            }
-            disabled:opacity-50
-          `}
-        >
-          {plugin.status === "enabled" ? (
-            <><Power size={11} />{t("common.active")}</>
-          ) : (
-            <><PowerOff size={11} />{t("common.inactive")}</>
-          )}
-        </button>
-        {onOpenSettings && (
-          <button
-            onClick={onOpenSettings}
-            className="p-1.5 rounded-lg text-text-muted/30 opacity-0 group-hover:opacity-100 hover:text-accent hover:bg-accent/10 transition-[colors,opacity]"
-            title={t("settings.plugins.openSettings")}
-          >
-            <Settings size={13} />
-          </button>
-        )}
-        {!plugin.isDev && (
-          <button
-            onClick={onUninstall}
-            disabled={loading}
-            className="p-1.5 rounded-lg text-text-muted/30 opacity-0 group-hover:opacity-100 hover:text-error hover:bg-error/10 transition-[colors,opacity] disabled:opacity-50"
-            title={t("settings.plugins.uninstall")}
-          >
-            <Trash2 size={13} />
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export function BrowsePluginCard({
-  plugin,
-  isInstalled,
-  loading,
-  onInstall,
-}: Readonly<{
-  plugin: RegistryPlugin;
-  isInstalled: boolean;
-  loading: boolean;
-  onInstall: () => void;
-}>) {
-  const { t } = useTranslation();
-
-  return (
-    <div className="flex gap-3 p-3 bg-surface-0/15 hover:bg-surface-0/25 rounded-xl transition-colors">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-        isInstalled ? "bg-success/15 text-success" : "bg-accent/15 text-accent"
-      }`}>
-        {isInstalled ? <Check size={18} /> : <Puzzle size={18} />}
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-text truncate">{plugin.name}</span>
-          <span className="text-[10px] text-text-muted/60 bg-surface-0/40 px-1.5 py-0.5 rounded shrink-0">
-            v{plugin.version}
-          </span>
-          {plugin.category && (
-            <span className="text-[10px] text-accent/70 bg-accent/10 px-1.5 py-0.5 rounded shrink-0">
-              {plugin.category}
-            </span>
-          )}
-        </div>
-        {plugin.description && (
-          <p className="text-[11px] text-text-muted/70 truncate mt-0.5">{plugin.description}</p>
-        )}
+        {/* Meta row: author, downloads, source */}
         <div className="flex items-center gap-2.5 mt-1">
           {plugin.author && (
             <span className="text-[10px] text-text-muted/50">
               {t("settings.plugins.byAuthor", { author: plugin.author })}
             </span>
           )}
-          {plugin.downloads > 0 && (
+          {plugin.downloads != null && plugin.downloads > 0 && (
             <span className="text-[10px] text-text-muted/40 flex items-center gap-0.5">
               <Download size={9} />
               {plugin.downloads.toLocaleString()}
@@ -191,26 +100,90 @@ export function BrowsePluginCard({
             </a>
           )}
         </div>
-      </div>
 
-      <div className="shrink-0 self-start">
-        {isInstalled ? (
-          <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-success/15 text-success">
-            <Check size={11} />
-            {t("settings.plugins.installed")}
-          </span>
-        ) : (
+        {/* Update banner */}
+        {plugin.update && onUpdate && (
           <button
-            onClick={onInstall}
+            onClick={onUpdate}
             disabled={loading}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-accent/15 text-accent hover:bg-accent/25 transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-lg bg-warning/10 hover:bg-warning/20 transition-colors disabled:opacity-50"
           >
             {loading ? (
-              <><RefreshCw size={11} className="animate-spin" />{t("settings.plugins.installing")}</>
+              <RefreshCw size={11} className="text-warning animate-spin" />
             ) : (
-              <><Download size={11} />{t("settings.plugins.install")}</>
+              <ArrowUpCircle size={11} className="text-warning" />
             )}
+            <span className="text-[11px] text-warning font-medium">
+              {loading
+                ? t("settings.plugins.updating")
+                : t("settings.plugins.updateTo", { version: plugin.update.latestVersion })}
+            </span>
           </button>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-start gap-1 shrink-0">
+        {plugin.installed ? (
+          <>
+            {/* Toggle enabled/disabled */}
+            {onToggle && (
+              <button
+                onClick={onToggle}
+                disabled={loading}
+                className={`
+                  flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors
+                  ${plugin.status === "enabled"
+                    ? "bg-success/15 text-success hover:bg-success/25"
+                    : "bg-surface-0/40 text-text-muted hover:bg-surface-0/60"
+                  }
+                  disabled:opacity-50
+                `}
+              >
+                {plugin.status === "enabled" ? (
+                  <><Power size={11} />{t("common.active")}</>
+                ) : (
+                  <><PowerOff size={11} />{t("common.inactive")}</>
+                )}
+              </button>
+            )}
+            {/* Settings */}
+            {onOpenSettings && (
+              <button
+                onClick={onOpenSettings}
+                className="p-1.5 rounded-lg text-text-muted/30 opacity-0 group-hover:opacity-100 hover:text-accent hover:bg-accent/10 transition-[colors,opacity]"
+                title={t("settings.plugins.openSettings")}
+              >
+                <Settings size={13} />
+              </button>
+            )}
+            {/* Uninstall */}
+            {onUninstall && (
+              <button
+                onClick={onUninstall}
+                disabled={loading}
+                className="p-1.5 rounded-lg text-text-muted/30 opacity-0 group-hover:opacity-100 hover:text-error hover:bg-error/10 transition-[colors,opacity] disabled:opacity-50"
+                title={t("settings.plugins.uninstall")}
+              >
+                <Trash2 size={13} />
+              </button>
+            )}
+          </>
+        ) : (
+          /* Install button for available plugins */
+          onInstall && (
+            <button
+              onClick={onInstall}
+              disabled={loading}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-accent/15 text-accent hover:bg-accent/25 transition-colors disabled:opacity-50"
+            >
+              {loading ? (
+                <><RefreshCw size={11} className="animate-spin" />{t("settings.plugins.installing")}</>
+              ) : (
+                <><Download size={11} />{t("settings.plugins.install")}</>
+              )}
+            </button>
+          )
         )}
       </div>
     </div>

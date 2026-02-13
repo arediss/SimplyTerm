@@ -1,16 +1,39 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Trash2 } from "lucide-react";
 import { pluginManager, usePlugins, type PluginManifest } from "../../plugins";
 import { useRegistry, type RegistryPlugin, type PluginUpdate } from "../../hooks/useRegistry";
+import { useAppSettings } from "../../hooks";
 import PermissionApprovalModal from "../PermissionApprovalModal";
 import Modal from "../Modal";
-import { SubTabs } from "./SettingsUIComponents";
-import InstalledPluginsTab from "./InstalledPluginsTab";
-import BrowsePluginsTab from "./BrowsePluginsTab";
-import DeveloperPluginsTab from "./DeveloperPluginsTab";
+import InstallConfirmationModal from "../InstallConfirmationModal";
+import UnifiedPluginsTab from "./UnifiedPluginsTab";
 
-type Tab = "installed" | "browse" | "dev";
+// ============================================================================
+// Unified Plugin Type
+// ============================================================================
+
+export type UnifiedPlugin = {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  author: string;
+  category?: string;
+  downloads?: number;
+  repository?: string;
+  homepage?: string;
+  permissions: string[];
+  installed: boolean;
+  status?: "enabled" | "disabled" | "error";
+  update?: PluginUpdate;
+  manifest?: PluginManifest;
+  registryEntry?: RegistryPlugin;
+};
+
+// ============================================================================
+// Component
+// ============================================================================
 
 interface PluginsSettingsProps {
   onNavigateToSection?: (section: string) => void;
@@ -20,25 +43,79 @@ export default function PluginsSettings({ onNavigateToSection }: Readonly<Plugin
   const { t } = useTranslation();
   const { plugins, loading, refresh, enablePlugin, disablePlugin, uninstallPlugin } = usePlugins();
   const registry = useRegistry();
+  const { settings } = useAppSettings();
 
-  const [tab, setTab] = useState<Tab>("installed");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [pendingPlugin, setPendingPlugin] = useState<PluginManifest | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [uninstallTarget, setUninstallTarget] = useState<PluginManifest | null>(null);
+  const [installTarget, setInstallTarget] = useState<RegistryPlugin | null>(null);
 
-  const installedIds = new Set(plugins.filter((p) => !p.isDev).map((p) => p.id));
+  const devModeEnabled = settings.developer?.enabled ?? false;
 
+  // Fetch registry on mount
   useEffect(() => {
+    registry.fetchPlugins();
     registry.checkUpdates();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (tab === "browse" && registry.plugins.length === 0 && !registry.loading) {
-      registry.fetchPlugins();
+  // ---- Build unified plugin list ----
+  const unifiedPlugins = useMemo(() => {
+    const result: UnifiedPlugin[] = [];
+    const installedById = new Map<string, PluginManifest>();
+
+    for (const p of plugins) {
+      if (!p.isDev) {
+        installedById.set(p.id, p);
+      }
     }
-  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const seen = new Set<string>();
+    for (const rp of registry.plugins) {
+      seen.add(rp.id);
+      const installed = installedById.get(rp.id);
+      result.push({
+        id: rp.id,
+        name: rp.name,
+        version: installed?.version ?? rp.version,
+        description: rp.description,
+        author: rp.author,
+        category: rp.category,
+        downloads: rp.downloads,
+        repository: rp.repository,
+        homepage: rp.homepage,
+        permissions: installed?.permissions ?? rp.permissions,
+        installed: !!installed,
+        status: installed?.status,
+        manifest: installed,
+        registryEntry: rp,
+      });
+    }
+
+    for (const [id, mp] of installedById) {
+      if (!seen.has(id)) {
+        result.push({
+          id: mp.id,
+          name: mp.name,
+          version: mp.version,
+          description: mp.description,
+          author: mp.author,
+          category: mp.category,
+          repository: mp.repository,
+          homepage: mp.homepage,
+          permissions: mp.permissions,
+          installed: true,
+          status: mp.status,
+          manifest: mp,
+        });
+      }
+    }
+
+    return result;
+  }, [plugins, registry.plugins]);
+
+  // ---- Handlers ----
 
   const handleTogglePlugin = async (plugin: PluginManifest) => {
     if (plugin.status === "enabled") {
@@ -72,19 +149,47 @@ export default function PluginsSettings({ onNavigateToSection }: Readonly<Plugin
   const handleRefresh = async () => {
     setActionLoading("refresh");
     try {
-      await refresh();
-      await registry.checkUpdates();
+      await Promise.all([refresh(), registry.fetchPlugins(), registry.checkUpdates()]);
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleInstall = async (plugin: RegistryPlugin) => {
+  const performInstall = async (plugin: RegistryPlugin) => {
     setActionLoading(plugin.id);
     try {
       const success = await registry.installPlugin(plugin);
       if (success) {
         await refresh();
+      }
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleInstall = (plugin: UnifiedPlugin) => {
+    if (plugin.registryEntry) {
+      setInstallTarget(plugin.registryEntry);
+    }
+  };
+
+  const handleConfirmInstallOnly = async () => {
+    if (!installTarget) return;
+    const plugin = installTarget;
+    setInstallTarget(null);
+    await performInstall(plugin);
+  };
+
+  const handleConfirmInstallAndActivate = async () => {
+    if (!installTarget) return;
+    const plugin = installTarget;
+    setInstallTarget(null);
+    setActionLoading(plugin.id);
+    try {
+      const success = await registry.installPlugin(plugin);
+      if (success) {
+        await refresh();
+        await enablePlugin(plugin.id);
       }
     } finally {
       setActionLoading(null);
@@ -130,23 +235,16 @@ export default function PluginsSettings({ onNavigateToSection }: Readonly<Plugin
     [registry] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
-  const filteredBrowse =
-    selectedCategory === "all"
-      ? registry.plugins
-      : registry.plugins.filter(
-          (p) => p.category?.toLowerCase() === selectedCategory
-        );
-
-  const installedPlugins = plugins.filter((p) => !p.isDev);
   const devPlugins = plugins.filter((p) => p.isDev);
 
-  // Build set of plugin IDs that have registered settings panels
-  const pluginsWithSettings = new Set(
-    Array.from(pluginManager.registeredSettingsPanels.values()).map((entry) => entry.pluginId)
+  const pluginsWithSettings = useMemo(
+    () => new Set(
+      Array.from(pluginManager.registeredSettingsPanels.values()).map((entry) => entry.pluginId)
+    ),
+    [plugins] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const handleOpenPluginSettings = useCallback((pluginId: string) => {
-    // Find the panel ID for this plugin
     for (const [panelId, entry] of pluginManager.registeredSettingsPanels) {
       if (entry.pluginId === pluginId) {
         onNavigateToSection?.(`plugin:${panelId}`);
@@ -157,56 +255,27 @@ export default function PluginsSettings({ onNavigateToSection }: Readonly<Plugin
 
   return (
     <div className="space-y-4">
-      <SubTabs
-        tabs={[
-          { id: "installed" as const, label: t("settings.plugins.tabInstalled") },
-          { id: "browse" as const, label: t("settings.plugins.tabBrowse") },
-          { id: "dev" as const, label: t("settings.plugins.tabDev"), variant: "warning" },
-        ]}
-        activeTab={tab}
-        onChange={setTab}
+      <UnifiedPluginsTab
+        plugins={unifiedPlugins}
+        updates={registry.updates}
+        loading={loading}
+        registryLoading={registry.loading}
+        registryError={registry.error}
+        actionLoading={actionLoading}
+        searchQuery={searchQuery}
+        selectedCategory={selectedCategory}
+        onSearch={handleSearch}
+        onCategoryChange={setSelectedCategory}
+        onToggle={handleTogglePlugin}
+        onUninstall={setUninstallTarget}
+        onUpdate={handleUpdate}
+        onInstall={handleInstall}
+        onRefresh={handleRefresh}
+        pluginsWithSettings={pluginsWithSettings}
+        onOpenPluginSettings={handleOpenPluginSettings}
+        devModeEnabled={devModeEnabled}
+        devPlugins={devPlugins}
       />
-
-      {tab === "installed" && (
-        <InstalledPluginsTab
-          plugins={installedPlugins}
-          updates={registry.updates}
-          loading={loading}
-          actionLoading={actionLoading}
-          onToggle={handleTogglePlugin}
-          onUninstall={setUninstallTarget}
-          onUpdate={handleUpdate}
-          onRefresh={handleRefresh}
-          pluginsWithSettings={pluginsWithSettings}
-          onOpenPluginSettings={handleOpenPluginSettings}
-        />
-      )}
-
-      {tab === "browse" && (
-        <BrowsePluginsTab
-          plugins={filteredBrowse}
-          loading={registry.loading}
-          error={registry.error}
-          installedIds={installedIds}
-          actionLoading={actionLoading}
-          searchQuery={searchQuery}
-          selectedCategory={selectedCategory}
-          onSearch={handleSearch}
-          onCategoryChange={setSelectedCategory}
-          onInstall={handleInstall}
-          onRefresh={() => registry.fetchPlugins()}
-        />
-      )}
-
-      {tab === "dev" && (
-        <DeveloperPluginsTab
-          plugins={devPlugins}
-          loading={loading}
-          actionLoading={actionLoading}
-          onToggle={handleTogglePlugin}
-          onRefresh={handleRefresh}
-        />
-      )}
 
       {/* Permission approval modal */}
       <PermissionApprovalModal
@@ -249,6 +318,15 @@ export default function PluginsSettings({ onNavigateToSection }: Readonly<Plugin
           </div>
         </div>
       </Modal>
+
+      {/* Install confirmation modal */}
+      <InstallConfirmationModal
+        isOpen={installTarget !== null}
+        onClose={() => setInstallTarget(null)}
+        onInstallOnly={handleConfirmInstallOnly}
+        onInstallAndActivate={handleConfirmInstallAndActivate}
+        plugin={installTarget}
+      />
     </div>
   );
 }

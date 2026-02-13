@@ -17,8 +17,10 @@ import {
   AlertCircle,
   Download,
   Loader2,
+  Code2,
 } from "lucide-react";
-import { SettingGroup, LinkButton } from "./SettingsUIComponents";
+import { SettingGroup, SettingRow, Toggle, LinkButton } from "./SettingsUIComponents";
+import { useAppSettings } from "../../hooks";
 
 type UpdateStatus =
   | "idle"
@@ -32,9 +34,12 @@ type UpdateStatus =
 
 export default function AboutSettings() {
   const { t } = useTranslation();
+  const { settings, updateSettings } = useAppSettings();
   const [appVersion, setAppVersion] = useState<string>("...");
   const [copied, setCopied] = useState(false);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
+
+  const devModeEnabled = settings.developer?.enabled ?? false;
 
   // Update state
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
@@ -385,6 +390,26 @@ export default function AboutSettings() {
             href="https://github.com/arediss/SimplyTerm/wiki"
           />
         </div>
+      </SettingGroup>
+
+      {/* Developer Mode */}
+      <SettingGroup title={t("settings.about.devModeTitle")} description={t("settings.about.devModeDesc")}>
+        <SettingRow
+          icon={<Code2 size={18} />}
+          iconClassName="bg-orange-400/15 text-orange-400"
+          title={t("settings.about.devModeToggle")}
+          description={t("settings.about.devModeToggleDesc")}
+        >
+          <Toggle
+            checked={devModeEnabled}
+            onChange={(checked) =>
+              updateSettings({
+                ...settings,
+                developer: { ...settings.developer, enabled: checked },
+              })
+            }
+          />
+        </SettingRow>
       </SettingGroup>
 
       {/* Footer */}
