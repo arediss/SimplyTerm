@@ -326,41 +326,29 @@ function PluginList({
   );
 }
 
-interface PluginCardHandlers {
-  onToggle?: () => void;
-  onUninstall?: () => void;
-  onUpdate?: () => void;
-  onInstall?: () => void;
-  onOpenSettings?: () => void;
+interface PluginCallbacks {
+  onToggle: (p: PluginManifest) => void;
+  onUninstall: (p: PluginManifest) => void;
+  onUpdate: (u: PluginUpdate) => void;
+  onInstall: (p: UnifiedPlugin) => void;
+  pluginsWithSettings: Set<string>;
+  onOpenPluginSettings: (id: string) => void;
 }
 
-function resolvePluginHandlers(
-  plugin: UnifiedPlugin,
-  update: PluginUpdate | undefined,
-  callbacks: {
-    onToggle: (p: PluginManifest) => void;
-    onUninstall: (p: PluginManifest) => void;
-    onUpdate: (u: PluginUpdate) => void;
-    onInstall: (p: UnifiedPlugin) => void;
-    pluginsWithSettings: Set<string>;
-    onOpenPluginSettings: (id: string) => void;
-  },
-): PluginCardHandlers {
-  if (!plugin.installed) {
-    return {
-      onInstall: () => callbacks.onInstall(plugin),
-      onUpdate: update ? () => callbacks.onUpdate(update) : undefined,
-    };
-  }
-
+function handlersForInstalled(plugin: UnifiedPlugin, update: PluginUpdate | undefined, cb: PluginCallbacks) {
   const manifest = plugin.manifest;
   return {
-    onToggle: manifest ? () => callbacks.onToggle(manifest) : undefined,
-    onUninstall: manifest ? () => callbacks.onUninstall(manifest) : undefined,
-    onUpdate: update ? () => callbacks.onUpdate(update) : undefined,
-    onOpenSettings: callbacks.pluginsWithSettings.has(plugin.id)
-      ? () => callbacks.onOpenPluginSettings(plugin.id)
-      : undefined,
+    onToggle: manifest ? () => cb.onToggle(manifest) : undefined,
+    onUninstall: manifest ? () => cb.onUninstall(manifest) : undefined,
+    onUpdate: update ? () => cb.onUpdate(update) : undefined,
+    onOpenSettings: cb.pluginsWithSettings.has(plugin.id) ? () => cb.onOpenPluginSettings(plugin.id) : undefined,
+  };
+}
+
+function handlersForAvailable(plugin: UnifiedPlugin, update: PluginUpdate | undefined, cb: PluginCallbacks) {
+  return {
+    onInstall: () => cb.onInstall(plugin),
+    onUpdate: update ? () => cb.onUpdate(update) : undefined,
   };
 }
 
@@ -368,27 +356,16 @@ function PluginListItem({
   plugin,
   updates,
   actionLoading,
-  onToggle,
-  onUninstall,
-  onUpdate,
-  onInstall,
-  pluginsWithSettings,
-  onOpenPluginSettings,
+  ...callbacks
 }: Readonly<{
   plugin: UnifiedPlugin;
   updates: PluginUpdate[];
   actionLoading: string | null;
-  onToggle: (plugin: PluginManifest) => void;
-  onUninstall: (plugin: PluginManifest) => void;
-  onUpdate: (update: PluginUpdate) => void;
-  onInstall: (plugin: UnifiedPlugin) => void;
-  pluginsWithSettings: Set<string>;
-  onOpenPluginSettings: (pluginId: string) => void;
-}>) {
+} & PluginCallbacks>) {
   const update = updates.find((u) => u.id === plugin.id);
-  const handlers = resolvePluginHandlers(plugin, update, {
-    onToggle, onUninstall, onUpdate, onInstall, pluginsWithSettings, onOpenPluginSettings,
-  });
+  const handlers = plugin.installed
+    ? handlersForInstalled(plugin, update, callbacks)
+    : handlersForAvailable(plugin, update, callbacks);
 
   return (
     <UnifiedPluginCard
