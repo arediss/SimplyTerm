@@ -55,7 +55,7 @@ function ShortcutKey({ keys }: Readonly<{ keys: string }>) {
   return (
     <span className="flex items-center gap-0.5">
       {parts.map((part, i) => (
-        <span key={i}>
+        <span key={part}>
           {i > 0 && <span className="text-text-muted/30 mx-0.5">+</span>}
           <kbd className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 text-[10px] font-medium text-text-muted bg-crust/80 border border-surface-0/30 rounded-md shadow-sm">
             {part}
