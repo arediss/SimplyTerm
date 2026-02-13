@@ -74,13 +74,17 @@ fn detect_default_shell() -> String {
     }
 }
 
-/// Check if a command exists in PATH
+/// Check if a command exists in PATH (hidden — no console window flash)
 #[cfg(windows)]
 fn which_exists(cmd: &str) -> bool {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+
     std::process::Command::new("where")
         .arg(cmd)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
+        .creation_flags(CREATE_NO_WINDOW)
         .status()
         .map(|s| s.success())
         .unwrap_or(false)
