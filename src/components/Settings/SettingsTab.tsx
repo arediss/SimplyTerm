@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, memo, lazy, Suspense } from "react";
 import { useTranslation } from "react-i18next";
-import { Palette, Terminal, Link2, Info, Shield, Puzzle } from "lucide-react";
+import { Palette, Terminal, Link2, Info, Shield, Puzzle, HelpCircle } from "lucide-react";
 import { pluginManager, PluginSettingsPanel, type SettingsPanelRegistration } from "../../plugins";
 import type { AppSettings } from "../../types";
 import {
@@ -12,6 +12,7 @@ import {
 // Lazy-load heavy settings sections (only loaded when navigated to)
 const SecuritySettings = lazy(() => import("./SecuritySettings"));
 const PluginsSettings = lazy(() => import("./PluginsSettings"));
+const HelpSettings = lazy(() => import("./HelpSettings"));
 const AboutSettings = lazy(() => import("./AboutSettings"));
 
 interface SettingsTabProps {
@@ -21,7 +22,7 @@ interface SettingsTabProps {
   onClearAllSessions: () => void;
 }
 
-type SettingsSection = "appearance" | "terminal" | "connections" | "security" | "plugins" | "about" | `plugin:${string}`;
+type SettingsSection = "appearance" | "terminal" | "connections" | "security" | "plugins" | "help" | "about" | `plugin:${string}`;
 
 /** Memoized nav button to avoid inline onClick closures */
 const SettingsSectionButton = memo(function SettingsSectionButton({
@@ -120,6 +121,7 @@ export default function SettingsTab({
     { id: "connections", label: t("settings.sections.connections"), icon: <Link2 size={18} /> },
     { id: "security", label: t("settings.sections.security"), icon: <Shield size={18} /> },
     { id: "plugins", label: t("settings.sections.plugins"), icon: <Puzzle size={18} /> },
+    { id: "help", label: t("settings.sections.help"), icon: <HelpCircle size={18} /> },
     { id: "about", label: t("settings.sections.about"), icon: <Info size={18} /> },
   ], [t]);
 
@@ -172,6 +174,7 @@ export default function SettingsTab({
           <Suspense fallback={<div className="animate-pulse space-y-3">{[0, 1, 2].map(n => <div key={n} className="h-12 bg-surface-0/30 rounded-lg" />)}</div>}>
             {activeSection === "security" && <SecuritySettings />}
             {activeSection === "plugins" && <PluginsSettings onNavigateToSection={setActiveSection as (section: string) => void} />}
+            {activeSection === "help" && <HelpSettings />}
             {activeSection === "about" && <AboutSettings />}
           </Suspense>
           {activePluginPanel && (

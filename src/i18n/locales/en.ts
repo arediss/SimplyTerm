@@ -88,6 +88,8 @@ export default {
       security: "Security",
       // Plugins management tab
       plugins: "Plugins",
+      // Help section tab
+      help: "Help",
       // About the app tab
       about: "About",
     },
@@ -488,6 +490,29 @@ export default {
       devNoPath: "Set a dev plugins path to get started",
       devNoPlugins: "No dev plugins found. Click Scan after setting the path.",
       tabDev: "Dev",
+    },
+
+    // --- Help section ---
+    help: {
+      shortcutsTitle: "Keyboard Shortcuts",
+      shortcutsDesc: "All available keyboard shortcuts",
+      groupGeneral: "General",
+      groupTabs: "Tabs",
+      groupPanes: "Panes",
+      groupTerminal: "Terminal",
+      commandPalette: "Command Palette",
+      openSettings: "Open Settings",
+      newSshConnection: "New SSH Connection",
+      newLocalTerminal: "New Local Terminal",
+      closeTab: "Close Tab",
+      nextTab: "Next Tab",
+      prevTab: "Previous Tab",
+      splitVertical: "Split Vertical",
+      splitHorizontal: "Split Horizontal",
+      focusNextPane: "Focus Next Pane",
+      focusPrevPane: "Focus Previous Pane",
+      searchInTerminal: "Search in Terminal",
+      tip: "Press Ctrl+Shift+P to open the Command Palette for quick access to all actions.",
     },
 
     // --- About section ---
