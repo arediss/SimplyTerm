@@ -23,6 +23,15 @@ const BASE_STATUS_FILTERS: { key: StatusFilter; i18n: string }[] = [
   { key: "available", i18n: "filterAvailable" },
 ];
 
+function getFilterButtonClass(key: StatusFilter, active: StatusFilter): string {
+  const isDev = key === "dev";
+  const isActive = key === active;
+  if (isActive && isDev) return "bg-orange-400/20 text-orange-400 shadow-sm";
+  if (isActive) return "bg-surface-0 text-text shadow-sm";
+  if (isDev) return "text-orange-400/60 hover:text-orange-400 hover:bg-orange-400/10";
+  return "text-text-muted hover:text-text hover:bg-surface-0/50";
+}
+
 interface UnifiedPluginsTabProps {
   plugins: UnifiedPlugin[];
   updates: PluginUpdate[];
@@ -148,29 +157,18 @@ export default function UnifiedPluginsTab({
         <div className="flex items-center gap-3 flex-wrap">
           {/* Status segmented control */}
           <div className="flex gap-1 p-1 bg-crust rounded-xl">
-            {statusFilters.map((sf) => {
-              const isDev = sf.key === "dev";
-              const isActive = statusFilter === sf.key;
-              return (
-                <button
-                  key={sf.key}
-                  onClick={() => setStatusFilter(sf.key)}
-                  className={`
-                    px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors duration-200
-                    ${isActive && isDev
-                      ? "bg-orange-400/20 text-orange-400 shadow-sm"
-                      : isActive
-                        ? "bg-surface-0 text-text shadow-sm"
-                        : isDev
-                          ? "text-orange-400/60 hover:text-orange-400 hover:bg-orange-400/10"
-                          : "text-text-muted hover:text-text hover:bg-surface-0/50"
-                    }
-                  `}
-                >
-                  {t(`settings.plugins.${sf.i18n}`)}
-                </button>
-              );
-            })}
+            {statusFilters.map((sf) => (
+              <button
+                key={sf.key}
+                onClick={() => setStatusFilter(sf.key)}
+                className={`
+                  px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors duration-200
+                  ${getFilterButtonClass(sf.key, statusFilter)}
+                `}
+              >
+                {t(`settings.plugins.${sf.i18n}`)}
+              </button>
+            ))}
           </div>
           {/* Category chips (hide in dev view) */}
           {!isDevView && (
@@ -310,25 +308,58 @@ function PluginList({
 
   return (
     <div className="space-y-2">
-      {plugins.map((plugin) => {
-        const update = updates.find((u) => u.id === plugin.id);
-        return (
-          <UnifiedPluginCard
-            key={plugin.id}
-            plugin={{ ...plugin, update }}
-            loading={actionLoading === plugin.id}
-            onToggle={plugin.installed && plugin.manifest ? () => onToggle(plugin.manifest!) : undefined}
-            onUninstall={plugin.installed && plugin.manifest ? () => onUninstall(plugin.manifest!) : undefined}
-            onUpdate={update ? () => onUpdate(update) : undefined}
-            onInstall={!plugin.installed ? () => onInstall(plugin) : undefined}
-            onOpenSettings={
-              plugin.installed && pluginsWithSettings.has(plugin.id)
-                ? () => onOpenPluginSettings(plugin.id)
-                : undefined
-            }
-          />
-        );
-      })}
+      {plugins.map((plugin) => (
+        <PluginListItem
+          key={plugin.id}
+          plugin={plugin}
+          updates={updates}
+          actionLoading={actionLoading}
+          onToggle={onToggle}
+          onUninstall={onUninstall}
+          onUpdate={onUpdate}
+          onInstall={onInstall}
+          pluginsWithSettings={pluginsWithSettings}
+          onOpenPluginSettings={onOpenPluginSettings}
+        />
+      ))}
     </div>
+  );
+}
+
+function PluginListItem({
+  plugin,
+  updates,
+  actionLoading,
+  onToggle,
+  onUninstall,
+  onUpdate,
+  onInstall,
+  pluginsWithSettings,
+  onOpenPluginSettings,
+}: Readonly<{
+  plugin: UnifiedPlugin;
+  updates: PluginUpdate[];
+  actionLoading: string | null;
+  onToggle: (plugin: PluginManifest) => void;
+  onUninstall: (plugin: PluginManifest) => void;
+  onUpdate: (update: PluginUpdate) => void;
+  onInstall: (plugin: UnifiedPlugin) => void;
+  pluginsWithSettings: Set<string>;
+  onOpenPluginSettings: (pluginId: string) => void;
+}>) {
+  const update = updates.find((u) => u.id === plugin.id);
+  const hasManifest = plugin.installed && plugin.manifest;
+  const hasSettings = plugin.installed && pluginsWithSettings.has(plugin.id);
+
+  return (
+    <UnifiedPluginCard
+      plugin={{ ...plugin, update }}
+      loading={actionLoading === plugin.id}
+      onToggle={hasManifest ? () => onToggle(plugin.manifest!) : undefined}
+      onUninstall={hasManifest ? () => onUninstall(plugin.manifest!) : undefined}
+      onUpdate={update ? () => onUpdate(update) : undefined}
+      onInstall={plugin.installed ? undefined : () => onInstall(plugin)}
+      onOpenSettings={hasSettings ? () => onOpenPluginSettings(plugin.id) : undefined}
+    />
   );
 }
