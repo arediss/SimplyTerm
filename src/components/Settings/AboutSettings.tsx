@@ -396,7 +396,7 @@ export default function AboutSettings() {
       <SettingGroup title={t("settings.about.devModeTitle")} description={t("settings.about.devModeDesc")}>
         <SettingRow
           icon={<Code2 size={18} />}
-          iconClassName="bg-orange-400/15 text-orange-400"
+          iconClassName="text-orange-400"
           title={t("settings.about.devModeToggle")}
           description={t("settings.about.devModeToggleDesc")}
         >
