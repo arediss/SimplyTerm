@@ -131,11 +131,18 @@ pub fn execute_command(
         ));
     }
 
-    // Build command
+    // Build command (CREATE_NO_WINDOW on Windows to prevent console flash)
     let mut cmd = Command::new(command);
     cmd.args(args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
 
     if let Some(dir) = working_dir {
         cmd.current_dir(dir);
