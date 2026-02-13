@@ -425,9 +425,15 @@ export default {
       // Installation step 3
       installStep3: "Refresh the list and enable the plugin",
       // Tabs
+      tabPlugins: "Plugins",
       tabInstalled: "Installed",
       tabBrowse: "Browse",
       tabUpdates: "Updates",
+      // Status filters
+      filterAll: "All",
+      filterInstalled: "Installed",
+      filterAvailable: "Available",
+      filterDev: "Development",
       // Browse tab
       searchPlaceholder: "Search plugins...",
       browseDesc: "Discover and install plugins from the registry",
@@ -437,6 +443,13 @@ export default {
       install: "Install",
       installing: "Installing...",
       installed: "Installed",
+      installConfirmTitle: "Install Plugin",
+      installOnly: "Install",
+      installAndActivate: "Install & Activate",
+      noPermissions: "No special permissions required",
+      permissionsRequired: "Permissions requested",
+      highRiskWarning: "This plugin requests sensitive permissions. Only install if you trust the source.",
+      viewSource: "View source",
       // Updates tab
       updatesDesc: "Keep your plugins up to date",
       updatesAvailable_one: "{{count}} update available",
@@ -517,6 +530,11 @@ export default {
       updateError: "Update check failed",
       retry: "Retry",
       releaseNotes: "Release notes",
+      // Developer Mode
+      devModeTitle: "Developer Mode",
+      devModeDesc: "For plugin developers",
+      devModeToggle: "Enable developer mode",
+      devModeToggleDesc: "Show the Development tab in Plugins to load local plugins",
     },
   },
 

@@ -4,7 +4,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { RefreshCw, Code2, ScanSearch } from "lucide-react";
 import { useAppSettings } from "../../hooks";
 import type { PluginManifest } from "../../plugins";
-import { InstalledPluginCard, PluginListSkeleton } from "./PluginCards";
+import { UnifiedPluginCard, PluginListSkeleton } from "./PluginCards";
+import type { UnifiedPlugin } from "./PluginsSettings";
 
 interface DeveloperPluginsTabProps {
   plugins: PluginManifest[];
@@ -159,15 +160,30 @@ function DevPluginsList({
       <span className="text-[11px] text-text-muted/60">
         {t("settings.plugins.pluginCount", { count: plugins.length })}
       </span>
-      {plugins.map((plugin) => (
-        <InstalledPluginCard
-          key={plugin.id}
-          plugin={plugin}
-          loading={actionLoading === plugin.id}
-          onToggle={() => onToggle(plugin)}
-          onUninstall={() => {}}
-        />
-      ))}
+      {plugins.map((plugin) => {
+        const unified: UnifiedPlugin = {
+          id: plugin.id,
+          name: plugin.name,
+          version: plugin.version,
+          description: plugin.description,
+          author: plugin.author,
+          category: plugin.category,
+          repository: plugin.repository,
+          homepage: plugin.homepage,
+          permissions: plugin.permissions,
+          installed: true,
+          status: plugin.status,
+          manifest: plugin,
+        };
+        return (
+          <UnifiedPluginCard
+            key={plugin.id}
+            plugin={unified}
+            loading={actionLoading === plugin.id}
+            onToggle={() => onToggle(plugin)}
+          />
+        );
+      })}
     </div>
   );
 }
