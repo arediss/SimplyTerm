@@ -88,6 +88,8 @@ export default {
       security: "Sécurité",
       // Onglet gestion des plugins
       plugins: "Plugins",
+      // Onglet aide
+      help: "Aide",
       // Onglet à propos de l'app
       about: "À propos",
     },
@@ -482,6 +484,29 @@ export default {
       devNoPath: "Définissez un chemin de plugins dev pour commencer",
       devNoPlugins: "Aucun plugin dev trouvé. Cliquez Scanner après avoir défini le chemin.",
       tabDev: "Dev",
+    },
+
+    // --- Section Aide ---
+    help: {
+      shortcutsTitle: "Raccourcis clavier",
+      shortcutsDesc: "Tous les raccourcis clavier disponibles",
+      groupGeneral: "Général",
+      groupTabs: "Onglets",
+      groupPanes: "Panneaux",
+      groupTerminal: "Terminal",
+      commandPalette: "Palette de commandes",
+      openSettings: "Ouvrir les paramètres",
+      newSshConnection: "Nouvelle connexion SSH",
+      newLocalTerminal: "Nouveau terminal local",
+      closeTab: "Fermer l'onglet",
+      nextTab: "Onglet suivant",
+      prevTab: "Onglet précédent",
+      splitVertical: "Scinder verticalement",
+      splitHorizontal: "Scinder horizontalement",
+      focusNextPane: "Panneau suivant",
+      focusPrevPane: "Panneau précédent",
+      searchInTerminal: "Rechercher dans le terminal",
+      tip: "Appuyez sur Ctrl+Shift+P pour ouvrir la Palette de commandes et accéder rapidement à toutes les actions.",
     },
 
     // --- Section À propos ---
