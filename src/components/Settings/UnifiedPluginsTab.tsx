@@ -348,18 +348,25 @@ function PluginListItem({
   onOpenPluginSettings: (pluginId: string) => void;
 }>) {
   const update = updates.find((u) => u.id === plugin.id);
-  const hasManifest = plugin.installed && plugin.manifest;
-  const hasSettings = plugin.installed && pluginsWithSettings.has(plugin.id);
+  const manifest = plugin.installed ? plugin.manifest : undefined;
+
+  const handleToggle = manifest ? () => onToggle(manifest) : undefined;
+  const handleUninstall = manifest ? () => onUninstall(manifest) : undefined;
+  const handleUpdate = update ? () => onUpdate(update) : undefined;
+  const handleInstall = plugin.installed ? undefined : () => onInstall(plugin);
+  const handleOpenSettings = plugin.installed && pluginsWithSettings.has(plugin.id)
+    ? () => onOpenPluginSettings(plugin.id)
+    : undefined;
 
   return (
     <UnifiedPluginCard
       plugin={{ ...plugin, update }}
       loading={actionLoading === plugin.id}
-      onToggle={hasManifest ? () => onToggle(plugin.manifest!) : undefined}
-      onUninstall={hasManifest ? () => onUninstall(plugin.manifest!) : undefined}
-      onUpdate={update ? () => onUpdate(update) : undefined}
-      onInstall={plugin.installed ? undefined : () => onInstall(plugin)}
-      onOpenSettings={hasSettings ? () => onOpenPluginSettings(plugin.id) : undefined}
+      onToggle={handleToggle}
+      onUninstall={handleUninstall}
+      onUpdate={handleUpdate}
+      onInstall={handleInstall}
+      onOpenSettings={handleOpenSettings}
     />
   );
 }
