@@ -32,7 +32,7 @@ function getFilterButtonClass(key: StatusFilter, active: StatusFilter): string {
   return "text-text-muted hover:text-text hover:bg-surface-0/50";
 }
 
-interface UnifiedPluginsTabProps {
+interface PluginsTabProps {
   plugins: UnifiedPlugin[];
   updates: PluginUpdate[];
   loading: boolean;
@@ -54,7 +54,7 @@ interface UnifiedPluginsTabProps {
   devPlugins: PluginManifest[];
 }
 
-export default function UnifiedPluginsTab({
+export default function PluginsTab({
   plugins,
   updates,
   loading,
@@ -74,7 +74,7 @@ export default function UnifiedPluginsTab({
   onOpenPluginSettings,
   devModeEnabled,
   devPlugins,
-}: Readonly<UnifiedPluginsTabProps>) {
+}: Readonly<PluginsTabProps>) {
   const { t } = useTranslation();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const updatableCount = updates.length;

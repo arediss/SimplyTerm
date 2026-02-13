@@ -7,7 +7,7 @@ import { useAppSettings } from "../../hooks";
 import PermissionApprovalModal from "../PermissionApprovalModal";
 import Modal from "../Modal";
 import InstallConfirmationModal from "../InstallConfirmationModal";
-import UnifiedPluginsTab from "./UnifiedPluginsTab";
+import PluginsTab from "./PluginsTab";
 
 // ============================================================================
 // Unified Plugin Type
@@ -255,7 +255,7 @@ export default function PluginsSettings({ onNavigateToSection }: Readonly<Plugin
 
   return (
     <div className="space-y-4">
-      <UnifiedPluginsTab
+      <PluginsTab
         plugins={unifiedPlugins}
         updates={registry.updates}
         loading={loading}
