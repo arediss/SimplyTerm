@@ -149,7 +149,7 @@ export default function PluginsSettings({ onNavigateToSection }: Readonly<Plugin
   const handleRefresh = async () => {
     setActionLoading("refresh");
     try {
-      await Promise.all([refresh(), registry.fetchPlugins(), registry.checkUpdates()]);
+      await Promise.all([refresh(), registry.forceRefresh()]);
     } finally {
       setActionLoading(null);
     }
@@ -223,17 +223,9 @@ export default function PluginsSettings({ onNavigateToSection }: Readonly<Plugin
     }
   };
 
-  const handleSearch = useCallback(
-    (query: string) => {
-      setSearchQuery(query);
-      if (query.trim()) {
-        registry.searchPlugins(query);
-      } else {
-        registry.fetchPlugins();
-      }
-    },
-    [registry] // eslint-disable-line react-hooks/exhaustive-deps
-  );
+  const handleSearch = useCallback((query: string) => {
+    setSearchQuery(query);
+  }, []);
 
   const devPlugins = plugins.filter((p) => p.isDev);
 
