@@ -23,10 +23,11 @@ export function PinInput({
   const [digits, setDigits] = useState<string[]>(new Array(length).fill(''));
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Focus first input on mount
+  // Focus first input on mount (delayed to override modal container focus)
   useEffect(() => {
-    if (autoFocus && inputRefs.current[0]) {
-      inputRefs.current[0].focus();
+    if (autoFocus) {
+      const id = setTimeout(() => inputRefs.current[0]?.focus(), 50);
+      return () => clearTimeout(id);
     }
   }, [autoFocus]);
 

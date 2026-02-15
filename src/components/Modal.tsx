@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 const widthClasses: Record<string, string> = {
   sm: "max-w-sm",
@@ -19,6 +20,7 @@ interface ModalProps {
 
 function Modal({ isOpen, onClose, title, children, width = "md" }: Readonly<ModalProps>) {
   const modalRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -30,6 +32,20 @@ function Modal({ isOpen, onClose, title, children, width = "md" }: Readonly<Moda
       return () => document.removeEventListener("keydown", handleEscape);
     }
   }, [isOpen, onClose]);
+
+  // Attach drag handler via ref to avoid a11y lint on non-interactive div
+  useEffect(() => {
+    const el = dragRef.current;
+    if (!isOpen || !el) return;
+    const handleMouseDown = (e: MouseEvent) => {
+      if (e.buttons === 1) {
+        e.preventDefault();
+        getCurrentWindow().startDragging();
+      }
+    };
+    el.addEventListener("mousedown", handleMouseDown);
+    return () => el.removeEventListener("mousedown", handleMouseDown);
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen && modalRef.current) {
@@ -46,6 +62,13 @@ function Modal({ isOpen, onClose, title, children, width = "md" }: Readonly<Moda
         className="absolute inset-0 bg-black/70"
         aria-hidden="true"
         onClick={onClose}
+      />
+
+      {/* Drag zone — allows moving the window even with modal open */}
+      <div
+        ref={dragRef}
+        aria-hidden="true"
+        className="absolute top-0 left-0 right-0 h-10 z-[51] cursor-default"
       />
 
       {/* Modal with floating title */}
