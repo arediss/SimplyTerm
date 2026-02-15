@@ -8,10 +8,10 @@ use tauri::State;
 use super::fido2::{self, SecurityKeyInfo};
 use super::state::VaultState;
 use super::types::{
-    BastionAuthType, BastionProfile, BastionProfileInfo,
     SshKeyProfile, SshKeyProfileInfo,
-    VaultBundle, VaultCredentialType,
+    VaultBundle, VaultCredentialType, VaultFolder,
     VaultExportResult, VaultStatus, SyncMeta,
+    ImportPreview, ImportResult,
 };
 
 /// Store the vault state in Tauri's managed state
@@ -213,6 +213,34 @@ pub fn vault_import_encrypted(
     vault.import_encrypted(bundle)
 }
 
+/// Export the vault to a .stvault JSON file.
+/// Does NOT require the vault to be unlocked.
+#[tauri::command]
+pub fn vault_export_to_file(
+    vault: State<VaultStateHandle>,
+    file_path: String,
+) -> Result<(), String> {
+    let export = vault.export_encrypted()?;
+    let content = serde_json::to_string_pretty(&export.bundle)
+        .map_err(|e| format!("Failed to serialize vault: {}", e))?;
+    std::fs::write(&file_path, content)
+        .map_err(|e| format!("Failed to write file: {}", e))
+}
+
+/// Import a vault from a .stvault JSON file, replacing the current vault.
+/// After import, the vault is locked and the user must re-unlock.
+#[tauri::command]
+pub fn vault_import_from_file(
+    vault: State<VaultStateHandle>,
+    file_path: String,
+) -> Result<SyncMeta, String> {
+    let content = std::fs::read_to_string(&file_path)
+        .map_err(|e| format!("Failed to read file: {}", e))?;
+    let bundle: VaultBundle = serde_json::from_str(&content)
+        .map_err(|e| format!("Invalid vault file: {}", e))?;
+    vault.import_encrypted(bundle)
+}
+
 // ============================================================================
 // FIDO2 Security Key Commands
 // ============================================================================
@@ -256,75 +284,91 @@ pub fn remove_vault_security_key(vault: State<VaultStateHandle>) -> Result<(), S
 }
 
 // ============================================================================
-// Bastion Profile Commands
+// Selective Export / Import Commands
 // ============================================================================
 
-/// List all bastion profiles (without sensitive data)
+/// Export selected items to an encrypted .stvault file
 #[tauri::command]
-pub fn list_bastions(vault: State<VaultStateHandle>) -> Result<Vec<BastionProfileInfo>, String> {
-    vault.list_bastions()
+pub fn vault_selective_export(
+    vault: State<VaultStateHandle>,
+    file_path: String,
+    folder_ids: Vec<String>,
+    session_ids: Vec<String>,
+    ssh_key_ids: Vec<String>,
+    export_password: String,
+) -> Result<(), String> {
+    let data = vault.selective_export(&folder_ids, &session_ids, &ssh_key_ids, &export_password)?;
+    std::fs::write(&file_path, data)
+        .map_err(|e| format!("Failed to write export file: {}", e))
 }
 
-/// Get a bastion profile by ID (without sensitive data)
+/// Preview the contents of a selective export file
 #[tauri::command]
-pub fn get_bastion(vault: State<VaultStateHandle>, id: String) -> Result<Option<BastionProfileInfo>, String> {
-    vault.get_bastion_info(&id)
+pub fn vault_selective_import_preview(
+    file_path: String,
+    import_password: String,
+) -> Result<ImportPreview, String> {
+    VaultState::selective_import_preview(&file_path, &import_password)
 }
 
-/// Get full bastion profile including credentials (for connection use)
+/// Import items from a selective export file into the current vault
 #[tauri::command]
-pub fn get_bastion_credentials(vault: State<VaultStateHandle>, id: String) -> Result<Option<BastionProfile>, String> {
-    vault.get_bastion_with_credentials(&id)
+pub fn vault_selective_import_execute(
+    vault: State<VaultStateHandle>,
+    file_path: String,
+    import_password: String,
+) -> Result<ImportResult, String> {
+    vault.selective_import_execute(&file_path, &import_password)
 }
 
-/// Create a new bastion profile
+// ============================================================================
+// Folder Commands
+// ============================================================================
+
+/// Create a new vault folder
 #[tauri::command]
-pub fn create_bastion(
+pub fn create_vault_folder(
     vault: State<VaultStateHandle>,
     name: String,
-    host: String,
-    port: u16,
-    username: String,
-    auth_type: String,
-    password: Option<String>,
-    key_path: Option<String>,
-    key_passphrase: Option<String>,
-) -> Result<BastionProfileInfo, String> {
-    let auth = match auth_type.as_str() {
-        "password" => BastionAuthType::Password,
-        "key" => BastionAuthType::Key,
-        _ => return Err(format!("Invalid auth type: {}", auth_type)),
-    };
-
-    vault.create_bastion(name, host, port, username, auth, password, key_path, key_passphrase)
+) -> Result<VaultFolder, String> {
+    vault.create_folder(&name)
 }
 
-/// Update a bastion profile
+/// Rename a vault folder
 #[tauri::command]
-pub fn update_bastion(
+pub fn rename_vault_folder(
     vault: State<VaultStateHandle>,
     id: String,
-    name: Option<String>,
-    host: Option<String>,
-    port: Option<u16>,
-    username: Option<String>,
-    auth_type: Option<String>,
-    password: Option<String>,
-    key_path: Option<String>,
-    key_passphrase: Option<String>,
+    name: String,
 ) -> Result<bool, String> {
-    let auth = auth_type.map(|t| match t.as_str() {
-        "password" => BastionAuthType::Password,
-        _ => BastionAuthType::Key,
-    });
-
-    vault.update_bastion(&id, name, host, port, username, auth, password, key_path, key_passphrase)
+    vault.rename_folder(&id, &name)
 }
 
-/// Delete a bastion profile
+/// Delete a vault folder (items become unassigned)
 #[tauri::command]
-pub fn delete_bastion(vault: State<VaultStateHandle>, id: String) -> Result<bool, String> {
-    vault.delete_bastion(&id)
+pub fn delete_vault_folder(
+    vault: State<VaultStateHandle>,
+    id: String,
+) -> Result<bool, String> {
+    vault.delete_folder(&id)
+}
+
+/// List all vault folders
+#[tauri::command]
+pub fn list_vault_folders(
+    vault: State<VaultStateHandle>,
+) -> Result<Vec<VaultFolder>, String> {
+    vault.list_folders()
+}
+
+/// Set an SSH key's folder
+#[tauri::command]
+pub fn set_ssh_key_folder(
+    vault: State<VaultStateHandle>,
+    id: String,
+    folder_id: Option<String>,
+) -> Result<bool, String> {
+    vault.set_ssh_key_folder(&id, folder_id)
 }
 
 // ============================================================================

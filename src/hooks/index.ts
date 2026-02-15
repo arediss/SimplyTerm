@@ -3,6 +3,7 @@ export { useAppSettings } from "./useAppSettings";
 export { useVaultFlow } from "./useVaultFlow";
 export { useVault } from "./useVault";
 export { useSshKeys } from "./useSshKeys";
+export { useVaultFolders } from "./useVaultFolders";
 export { useHostKeyVerification } from "./useHostKeyVerification";
 export type { SshConnectionResult } from "./useHostKeyVerification";
 export { useRegistry } from "./useRegistry";

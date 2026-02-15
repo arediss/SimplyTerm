@@ -62,6 +62,7 @@ export interface SshKeyProfileInfo {
   keyPath: string;
   hasPassphrase: boolean;
   requirePassphrasePrompt: boolean;
+  folderId?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -90,4 +91,5 @@ export interface SavedSession {
   auth_type: "password" | "key";
   key_path?: string;
   ssh_key_id?: string;
+  folder_id?: string;
 }

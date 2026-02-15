@@ -679,6 +679,7 @@ struct SavedSessionResponse {
     auth_type: String,
     key_path: Option<String>,
     ssh_key_id: Option<String>,
+    folder_id: Option<String>,
 }
 
 impl From<SavedSession> for SavedSessionResponse {
@@ -695,6 +696,7 @@ impl From<SavedSession> for SavedSessionResponse {
             },
             key_path: s.key_path,
             ssh_key_id: s.ssh_key_id,
+            folder_id: s.folder_id,
         }
     }
 }
@@ -720,6 +722,7 @@ fn save_session(
     password: Option<String>,
     key_passphrase: Option<String>,
     ssh_key_id: Option<String>,
+    folder_id: Option<String>,
 ) -> Result<(), String> {
     let state = app.state::<AppState>();
 
@@ -740,6 +743,7 @@ fn save_session(
         auth_type: auth,
         key_path,
         ssh_key_id,
+        folder_id,
     };
 
     sessions.push(session);
@@ -781,6 +785,19 @@ fn delete_saved_session(app: AppHandle, id: String) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+/// Set a session's folder
+#[tauri::command]
+fn set_session_folder(id: String, folder_id: Option<String>) -> Result<bool, String> {
+    let mut sessions = load_sessions()?;
+    if let Some(session) = sessions.iter_mut().find(|s| s.id == id) {
+        session.folder_id = folder_id;
+        save_sessions(&sessions)?;
+        Ok(true)
+    } else {
+        Ok(false)
+    }
 }
 
 /// Gets credentials for a session
@@ -1453,6 +1470,7 @@ fn plugin_api_create_session(
         auth_type: auth,
         key_path,
         ssh_key_id: None,
+        folder_id: None,
     };
 
     let mut sessions = load_sessions()?;
@@ -2023,6 +2041,7 @@ pub fn run() {
             load_saved_sessions,
             save_session,
             delete_saved_session,
+            set_session_folder,
             get_session_credentials,
             // Settings
             load_settings,
@@ -2105,19 +2124,24 @@ pub fn run() {
             // Vault Sync
             storage::vault::vault_export_encrypted,
             storage::vault::vault_import_encrypted,
+            storage::vault::vault_export_to_file,
+            storage::vault::vault_import_from_file,
+            // Vault Selective Export/Import
+            storage::vault::vault_selective_export,
+            storage::vault::vault_selective_import_preview,
+            storage::vault::vault_selective_import_execute,
+            // Vault Folders
+            storage::vault::create_vault_folder,
+            storage::vault::rename_vault_folder,
+            storage::vault::delete_vault_folder,
+            storage::vault::list_vault_folders,
+            storage::vault::set_ssh_key_folder,
             // FIDO2 Security Keys
             storage::vault::is_security_key_available,
             storage::vault::detect_security_keys,
             storage::vault::setup_vault_security_key,
             storage::vault::unlock_vault_with_security_key,
             storage::vault::remove_vault_security_key,
-            // Bastion Profiles
-            storage::vault::list_bastions,
-            storage::vault::get_bastion,
-            storage::vault::get_bastion_credentials,
-            storage::vault::create_bastion,
-            storage::vault::update_bastion,
-            storage::vault::delete_bastion,
             // SSH Key Profiles
             storage::vault::list_ssh_keys,
             storage::vault::get_ssh_key,

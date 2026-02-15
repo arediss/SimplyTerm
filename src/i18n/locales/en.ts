@@ -178,30 +178,6 @@ export default {
       deleteWarning: "Click again to confirm. This action is irreversible.",
     },
 
-    // --- Bastions section ---
-    bastions: {
-      // Section title
-      title: "Jump Hosts (Bastions)",
-      // Section description
-      description: "Configure SSH jump hosts for tunneled connections",
-      // No bastions message
-      noBastions: "No jump hosts configured",
-      // Count message
-      count_one: "{{count}} jump host configured",
-      count_other: "{{count}} jump hosts configured",
-      // Add button
-      add: "Add",
-      // Create form title
-      create: "New jump host",
-      // Edit form title
-      edit: "Edit jump host",
-      // Name field
-      name: "Name",
-      // Leave empty to keep current value
-      leaveEmptyToKeep: "leave empty to keep",
-      // Vault locked warning
-      vaultLocked: "Unlock the vault to manage jump hosts",
-    },
 
     // --- Security section ---
     security: {
@@ -376,6 +352,66 @@ export default {
       passwordChangeSuccess: "Password changed successfully",
       // Password change error
       passwordChangeError: "Error changing password",
+      // Delete vault group title
+      // Backup / Restore
+      backupTitle: "Backup & Restore",
+      backupDesc: "Export or import your encrypted vault",
+      exportVault: "Export vault",
+      importVault: "Import vault",
+      exportSuccess: "Exported!",
+      importSuccess: "Imported!",
+      exportError: "Failed to export vault",
+      importError: "Failed to import vault",
+      backupHint: "The exported file is encrypted with your master password.",
+      // Vault Manager
+      vaultContentsTitle: "Vault Contents",
+      vaultItems: "items",
+      vaultLockedTitle: "Vault is locked",
+      vaultLockedDesc: "Unlock your vault to view contents",
+      emptyFolder: "Empty folder",
+      emptyVault: "Your vault is empty",
+      emptyVaultDesc: "Sessions and SSH keys will appear here",
+      settingsLabel: "Settings",
+      selectedCount: "selected",
+      includeCredentials: "Include credentials (passwords)",
+      includeSshKeys: "Include SSH keys",
+      // Import warnings
+      importWarning: "Imported items will be merged with your existing vault",
+      importToFolder: "Import into a new folder",
+      importFolderName: "Folder name",
+      unlock: "Unlock",
+      // Folders
+      foldersTitle: "Folders",
+      foldersDesc: "Organize your vault items into folders",
+      createFolder: "New folder",
+      renameFolder: "Rename",
+      deleteFolder: "Delete",
+      folderNamePlaceholder: "Folder name",
+      folderDeleteConfirm: "Delete this folder? Items will become unassigned.",
+      noFolder: "No folder",
+      itemCount: "{{count}} item(s)",
+      // Selective Export
+      selectiveExportTitle: "Selective Export",
+      selectiveExportDesc: "Choose items to export with a dedicated password",
+      selectAll: "Select all",
+      nothingSelected: "Nothing selected",
+      exportPassword: "Export password",
+      exportPasswordConfirm: "Confirm export password",
+      exportPasswordHint: "This password encrypts the export file. Share it with the recipient.",
+      exporting: "Exporting...",
+      exportSelectiveSuccess: "Export complete!",
+      // Selective Import
+      selectiveImportTitle: "Selective Import",
+      chooseFile: "Choose file",
+      importPassword: "Import password",
+      preview: "Preview",
+      previewDesc: "Content found in the export file:",
+      importConfirm: "Import",
+      importing: "Importing...",
+      importResultTitle: "Import complete",
+      itemsAdded: "{{count}} added",
+      duplicatesSkipped: "{{count}} duplicate(s) skipped",
+      wrongPassword: "Wrong password or corrupted file",
       // Delete vault group title
       deleteVaultTitle: "Delete vault",
       // Delete vault description

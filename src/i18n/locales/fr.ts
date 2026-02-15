@@ -178,30 +178,6 @@ export default {
       deleteWarning: "Cliquez à nouveau pour confirmer. Cette action est irréversible.",
     },
 
-    // --- Section Bastions ---
-    bastions: {
-      // Titre de la section
-      title: "Jump Hosts (Bastions)",
-      // Description de la section
-      description: "Configurer les serveurs de rebond SSH",
-      // Message aucun bastion
-      noBastions: "Aucun serveur de rebond configuré",
-      // Message de comptage
-      count_one: "{{count}} serveur de rebond configuré",
-      count_other: "{{count}} serveurs de rebond configurés",
-      // Bouton ajouter
-      add: "Ajouter",
-      // Titre formulaire création
-      create: "Nouveau serveur de rebond",
-      // Titre formulaire édition
-      edit: "Modifier le serveur de rebond",
-      // Champ nom
-      name: "Nom",
-      // Laisser vide pour garder la valeur actuelle
-      leaveEmptyToKeep: "laisser vide pour garder",
-      // Avertissement vault verrouillé
-      vaultLocked: "Déverrouillez le vault pour gérer les serveurs de rebond",
-    },
 
     // --- Section Sécurité ---
     security: {
@@ -376,6 +352,66 @@ export default {
       passwordChangeSuccess: "Mot de passe modifié avec succès",
       // Erreur changement de mot de passe
       passwordChangeError: "Erreur lors du changement de mot de passe",
+      // Titre du groupe supprimer le vault
+      // Sauvegarde / Restauration
+      backupTitle: "Sauvegarde & Restauration",
+      backupDesc: "Exporter ou importer votre coffre chiffré",
+      exportVault: "Exporter le coffre",
+      importVault: "Importer un coffre",
+      exportSuccess: "Exporté !",
+      importSuccess: "Importé !",
+      exportError: "Erreur lors de l'export du coffre",
+      importError: "Erreur lors de l'import du coffre",
+      backupHint: "Le fichier exporté est chiffré avec votre mot de passe principal.",
+      // Vault Manager
+      vaultContentsTitle: "Contenu du coffre",
+      vaultItems: "éléments",
+      vaultLockedTitle: "Coffre verrouillé",
+      vaultLockedDesc: "Déverrouillez pour voir le contenu",
+      emptyFolder: "Dossier vide",
+      emptyVault: "Votre coffre est vide",
+      emptyVaultDesc: "Les sessions et clés SSH apparaîtront ici",
+      settingsLabel: "Paramètres",
+      selectedCount: "sélectionné(s)",
+      includeCredentials: "Inclure les identifiants (mots de passe)",
+      includeSshKeys: "Inclure les clés SSH",
+      // Avertissements import
+      importWarning: "Les éléments importés seront fusionnés avec votre coffre existant",
+      importToFolder: "Importer dans un nouveau dossier",
+      importFolderName: "Nom du dossier",
+      unlock: "Déverrouiller",
+      // Dossiers
+      foldersTitle: "Dossiers",
+      foldersDesc: "Organisez les éléments de votre coffre en dossiers",
+      createFolder: "Nouveau dossier",
+      renameFolder: "Renommer",
+      deleteFolder: "Supprimer",
+      folderNamePlaceholder: "Nom du dossier",
+      folderDeleteConfirm: "Supprimer ce dossier ? Les éléments seront désassignés.",
+      noFolder: "Sans dossier",
+      itemCount: "{{count}} élément(s)",
+      // Export sélectif
+      selectiveExportTitle: "Export sélectif",
+      selectiveExportDesc: "Choisissez les éléments à exporter avec un mot de passe dédié",
+      selectAll: "Tout sélectionner",
+      nothingSelected: "Aucune sélection",
+      exportPassword: "Mot de passe d'export",
+      exportPasswordConfirm: "Confirmer le mot de passe",
+      exportPasswordHint: "Ce mot de passe chiffre le fichier d'export. Partagez-le avec le destinataire.",
+      exporting: "Export en cours...",
+      exportSelectiveSuccess: "Export terminé !",
+      // Import sélectif
+      selectiveImportTitle: "Import sélectif",
+      chooseFile: "Choisir un fichier",
+      importPassword: "Mot de passe d'import",
+      preview: "Prévisualiser",
+      previewDesc: "Contenu trouvé dans le fichier d'export :",
+      importConfirm: "Importer",
+      importing: "Import en cours...",
+      importResultTitle: "Import terminé",
+      itemsAdded: "{{count}} ajouté(s)",
+      duplicatesSkipped: "{{count}} doublon(s) ignoré(s)",
+      wrongPassword: "Mot de passe incorrect ou fichier corrompu",
       // Titre du groupe supprimer le vault
       deleteVaultTitle: "Supprimer le vault",
       // Description supprimer le vault

@@ -45,3 +45,27 @@ export interface SecurityKeyInfo {
   /** Whether the key has a PIN configured */
   hasPin: boolean;
 }
+
+/** A vault folder for organizing items */
+export interface VaultFolder {
+  id: string;
+  name: string;
+  created_at: number;
+}
+
+/** Preview of a selective import file */
+export interface ImportPreview {
+  folders: string[];
+  sessions: string[];
+  ssh_keys: string[];
+  exported_at: number;
+}
+
+/** Result of a selective import */
+export interface ImportResult {
+  folders_added: number;
+  sessions_added: number;
+  credentials_added: number;
+  ssh_keys_added: number;
+  duplicates_skipped: number;
+}

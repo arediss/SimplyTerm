@@ -5,6 +5,8 @@
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
+use super::super::config::SavedSession;
+
 /// Version of the vault format
 pub const VAULT_VERSION: u32 = 1;
 
@@ -174,148 +176,6 @@ impl VaultCredential {
         }
     }
 
-    /// Get the session ID from the credential ID
-    #[allow(dead_code)]
-    pub fn session_id(&self) -> Option<&str> {
-        self.id.split(':').next()
-    }
-
-    /// Get the credential type from the credential ID
-    #[allow(dead_code)]
-    pub fn credential_type(&self) -> Option<VaultCredentialType> {
-        self.id.split(':').nth(1).and_then(VaultCredentialType::from_str)
-    }
-}
-
-/// Authentication method for bastion profiles
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum BastionAuthType {
-    Password,
-    Key,
-}
-
-/// A bastion/jump host profile stored in the vault
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BastionProfile {
-    /// Unique identifier (UUID)
-    pub id: String,
-    /// Display name for the profile
-    pub name: String,
-    /// Bastion host address
-    pub host: String,
-    /// SSH port (default: 22)
-    pub port: u16,
-    /// Username for authentication
-    pub username: String,
-    /// Authentication type
-    pub auth_type: BastionAuthType,
-    /// Password (if auth_type is Password)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub password: Option<String>,
-    /// Path to SSH key file (if auth_type is Key)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub key_path: Option<String>,
-    /// Passphrase for encrypted key (if auth_type is Key)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub key_passphrase: Option<String>,
-    /// Creation timestamp (Unix seconds)
-    pub created_at: u64,
-    /// Last update timestamp (Unix seconds)
-    pub updated_at: u64,
-}
-
-impl BastionProfile {
-    /// Create a new bastion profile
-    pub fn new(
-        name: String,
-        host: String,
-        port: u16,
-        username: String,
-        auth_type: BastionAuthType,
-        password: Option<String>,
-        key_path: Option<String>,
-        key_passphrase: Option<String>,
-    ) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
-
-        Self {
-            id: uuid::Uuid::new_v4().to_string(),
-            name,
-            host,
-            port,
-            username,
-            auth_type,
-            password,
-            key_path,
-            key_passphrase,
-            created_at: now,
-            updated_at: now,
-        }
-    }
-}
-
-impl Drop for BastionProfile {
-    fn drop(&mut self) {
-        // Zeroize sensitive fields
-        if let Some(ref mut pwd) = self.password {
-            pwd.zeroize();
-        }
-        if let Some(ref mut passphrase) = self.key_passphrase {
-            passphrase.zeroize();
-        }
-    }
-}
-
-/// Partial update for bastion profiles
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct BastionProfileUpdate {
-    pub name: Option<String>,
-    pub host: Option<String>,
-    pub port: Option<u16>,
-    pub username: Option<String>,
-    pub auth_type: Option<BastionAuthType>,
-    pub password: Option<String>,
-    pub key_path: Option<String>,
-    pub key_passphrase: Option<String>,
-}
-
-/// Bastion profile info for frontend (without sensitive data)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BastionProfileInfo {
-    pub id: String,
-    pub name: String,
-    pub host: String,
-    pub port: u16,
-    pub username: String,
-    pub auth_type: BastionAuthType,
-    pub has_password: bool,
-    pub key_path: Option<String>,
-    pub has_key_passphrase: bool,
-    pub created_at: u64,
-    pub updated_at: u64,
-}
-
-impl From<&BastionProfile> for BastionProfileInfo {
-    fn from(profile: &BastionProfile) -> Self {
-        Self {
-            id: profile.id.clone(),
-            name: profile.name.clone(),
-            host: profile.host.clone(),
-            port: profile.port,
-            username: profile.username.clone(),
-            auth_type: profile.auth_type.clone(),
-            has_password: profile.password.is_some(),
-            key_path: profile.key_path.clone(),
-            has_key_passphrase: profile.key_passphrase.is_some(),
-            created_at: profile.created_at,
-            updated_at: profile.updated_at,
-        }
-    }
 }
 
 /// An SSH key profile stored in the vault
@@ -333,6 +193,9 @@ pub struct SshKeyProfile {
     /// Whether to prompt for passphrase on every connection
     #[serde(default)]
     pub require_passphrase_prompt: bool,
+    /// Folder ID (optional)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub folder_id: Option<String>,
     /// Creation timestamp (Unix seconds)
     pub created_at: u64,
     /// Last update timestamp (Unix seconds)
@@ -357,6 +220,7 @@ impl SshKeyProfile {
             key_path,
             passphrase,
             require_passphrase_prompt,
+            folder_id: None,
             created_at: now,
             updated_at: now,
         }
@@ -389,6 +253,7 @@ pub struct SshKeyProfileInfo {
     pub key_path: String,
     pub has_passphrase: bool,
     pub require_passphrase_prompt: bool,
+    pub folder_id: Option<String>,
     pub created_at: u64,
     pub updated_at: u64,
 }
@@ -401,10 +266,22 @@ impl From<&SshKeyProfile> for SshKeyProfileInfo {
             key_path: profile.key_path.clone(),
             has_passphrase: profile.passphrase.is_some(),
             require_passphrase_prompt: profile.require_passphrase_prompt,
+            folder_id: profile.folder_id.clone(),
             created_at: profile.created_at,
             updated_at: profile.updated_at,
         }
     }
+}
+
+/// A folder for organizing vault items
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VaultFolder {
+    /// Unique identifier (UUID)
+    pub id: String,
+    /// Display name
+    pub name: String,
+    /// Creation timestamp (Unix seconds)
+    pub created_at: u64,
 }
 
 /// Vault data (stored encrypted in vault.enc)
@@ -412,12 +289,12 @@ impl From<&SshKeyProfile> for SshKeyProfileInfo {
 pub struct VaultData {
     /// All stored credentials
     pub credentials: Vec<VaultCredential>,
-    /// Bastion/jump host profiles
-    #[serde(default)]
-    pub bastions: Vec<BastionProfile>,
     /// SSH key profiles
     #[serde(default)]
     pub ssh_keys: Vec<SshKeyProfile>,
+    /// Folders for organizing items
+    #[serde(default)]
+    pub folders: Vec<VaultFolder>,
 }
 
 impl Drop for VaultData {
@@ -426,7 +303,6 @@ impl Drop for VaultData {
         for cred in &mut self.credentials {
             cred.value.zeroize();
         }
-        // Bastions are zeroized via their own Drop impl
         // SSH keys are zeroized via their own Drop impl
     }
 }
@@ -466,69 +342,6 @@ impl VaultData {
     pub fn delete_all_credentials(&mut self, session_id: &str) {
         let prefix = format!("{}:", session_id);
         self.credentials.retain(|c| !c.id.starts_with(&prefix));
-    }
-
-    /// Get all bastion profiles
-    pub fn get_bastions(&self) -> &[BastionProfile] {
-        &self.bastions
-    }
-
-    /// Get a bastion profile by ID
-    pub fn get_bastion(&self, id: &str) -> Option<&BastionProfile> {
-        self.bastions.iter().find(|b| b.id == id)
-    }
-
-    /// Store a new bastion profile
-    pub fn store_bastion(&mut self, bastion: BastionProfile) {
-        // Remove existing if updating
-        self.bastions.retain(|b| b.id != bastion.id);
-        self.bastions.push(bastion);
-    }
-
-    /// Update an existing bastion profile
-    pub fn update_bastion(&mut self, id: &str, updates: BastionProfileUpdate) -> bool {
-        if let Some(bastion) = self.bastions.iter_mut().find(|b| b.id == id) {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
-
-            if let Some(name) = updates.name {
-                bastion.name = name;
-            }
-            if let Some(host) = updates.host {
-                bastion.host = host;
-            }
-            if let Some(port) = updates.port {
-                bastion.port = port;
-            }
-            if let Some(username) = updates.username {
-                bastion.username = username;
-            }
-            if let Some(auth_type) = updates.auth_type {
-                bastion.auth_type = auth_type;
-            }
-            if updates.password.is_some() {
-                bastion.password = updates.password;
-            }
-            if updates.key_path.is_some() {
-                bastion.key_path = updates.key_path;
-            }
-            if updates.key_passphrase.is_some() {
-                bastion.key_passphrase = updates.key_passphrase;
-            }
-            bastion.updated_at = now;
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Delete a bastion profile
-    pub fn delete_bastion(&mut self, id: &str) -> bool {
-        let len_before = self.bastions.len();
-        self.bastions.retain(|b| b.id != id);
-        self.bastions.len() < len_before
     }
 
     /// Get all SSH key profiles
@@ -664,4 +477,49 @@ impl std::fmt::Debug for MasterKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MasterKey").field("0", &"[REDACTED]").finish()
     }
+}
+
+// ============================================================================
+// Selective Export / Import Types
+// ============================================================================
+
+/// Selective export file format (.stvault)
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SelectiveExportFile {
+    pub version: u32,
+    /// Base64-encoded Argon2id salt
+    pub salt: String,
+    /// Base64-encoded AES-GCM nonce
+    pub nonce: String,
+    /// Base64-encoded encrypted payload
+    pub encrypted_data: String,
+}
+
+/// Decrypted payload inside a selective export file
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SelectiveExportPayload {
+    pub folders: Vec<VaultFolder>,
+    pub sessions: Vec<SavedSession>,
+    pub credentials: Vec<VaultCredential>,
+    pub ssh_keys: Vec<SshKeyProfile>,
+    pub exported_at: u64,
+}
+
+/// Preview of an import file (no sensitive data)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportPreview {
+    pub folders: Vec<String>,
+    pub sessions: Vec<String>,
+    pub ssh_keys: Vec<String>,
+    pub exported_at: u64,
+}
+
+/// Result counters after an import
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportResult {
+    pub folders_added: u32,
+    pub sessions_added: u32,
+    pub credentials_added: u32,
+    pub ssh_keys_added: u32,
+    pub duplicates_skipped: u32,
 }

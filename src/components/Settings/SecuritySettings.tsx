@@ -5,7 +5,7 @@ import { useVault } from "../../hooks";
 import SshKeyManager from "../SshKeyManager";
 import { SubTabs } from "./SettingsUIComponents";
 import InlineVaultSetup from "./InlineVaultSetup";
-import VaultStatusSection from "./VaultStatusSection";
+import VaultManager from "./VaultManager";
 import AuthenticationSection from "./AuthenticationSection";
 import PasswordChangeSection from "./PasswordChangeSection";
 
@@ -57,7 +57,7 @@ export default function SecuritySettings() {
         onChange={setSecurityTab}
       />
 
-      {securityTab === "vault" && <VaultStatusSection vault={vault} />}
+      {securityTab === "vault" && <VaultManager vault={vault} />}
 
       {securityTab === "sshKeys" && (
         <SshKeyManager isVaultUnlocked={vault.status?.isUnlocked || false} />
