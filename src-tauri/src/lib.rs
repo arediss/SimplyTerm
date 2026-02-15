@@ -2105,6 +2105,8 @@ pub fn run() {
             // Vault Sync
             storage::vault::vault_export_encrypted,
             storage::vault::vault_import_encrypted,
+            storage::vault::vault_export_to_file,
+            storage::vault::vault_import_from_file,
             // FIDO2 Security Keys
             storage::vault::is_security_key_available,
             storage::vault::detect_security_keys,

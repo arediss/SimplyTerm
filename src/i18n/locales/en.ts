@@ -377,6 +377,17 @@ export default {
       // Password change error
       passwordChangeError: "Error changing password",
       // Delete vault group title
+      // Backup / Restore
+      backupTitle: "Backup & Restore",
+      backupDesc: "Export or import your encrypted vault",
+      exportVault: "Export vault",
+      importVault: "Import vault",
+      exportSuccess: "Exported!",
+      importSuccess: "Imported!",
+      exportError: "Failed to export vault",
+      importError: "Failed to import vault",
+      backupHint: "The exported file is encrypted with your master password.",
+      // Delete vault group title
       deleteVaultTitle: "Delete vault",
       // Delete vault description
       deleteVaultDesc: "Permanently delete all your encrypted data",

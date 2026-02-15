@@ -253,6 +253,31 @@ export function useVault() {
     }
   }, [refreshStatus]);
 
+  // Export vault to a .stvault file
+  const exportToFile = useCallback(async (filePath: string) => {
+    try {
+      await invoke('vault_export_to_file', { filePath });
+      return { success: true };
+    } catch (err) {
+      const errorMsg = getErrorMessage(err);
+      setError(errorMsg);
+      return { success: false, error: errorMsg };
+    }
+  }, []);
+
+  // Import vault from a .stvault file (replaces current vault, locks after import)
+  const importFromFile = useCallback(async (filePath: string) => {
+    try {
+      await invoke('vault_import_from_file', { filePath });
+      await refreshStatus();
+      return { success: true };
+    } catch (err) {
+      const errorMsg = getErrorMessage(err);
+      setError(errorMsg);
+      return { success: false, error: errorMsg };
+    }
+  }, [refreshStatus]);
+
   return {
     status,
     isLoading,
@@ -274,5 +299,8 @@ export function useVault() {
     unlockWithSecurityKey,
     removeSecurityKey,
     refreshStatus,
+    // Export / Import
+    exportToFile,
+    importFromFile,
   };
 }

@@ -377,6 +377,17 @@ export default {
       // Erreur changement de mot de passe
       passwordChangeError: "Erreur lors du changement de mot de passe",
       // Titre du groupe supprimer le vault
+      // Sauvegarde / Restauration
+      backupTitle: "Sauvegarde & Restauration",
+      backupDesc: "Exporter ou importer votre coffre chiffré",
+      exportVault: "Exporter le coffre",
+      importVault: "Importer un coffre",
+      exportSuccess: "Exporté !",
+      importSuccess: "Importé !",
+      exportError: "Erreur lors de l'export du coffre",
+      importError: "Erreur lors de l'import du coffre",
+      backupHint: "Le fichier exporté est chiffré avec votre mot de passe principal.",
+      // Titre du groupe supprimer le vault
       deleteVaultTitle: "Supprimer le vault",
       // Description supprimer le vault
       deleteVaultDesc: "Supprime toutes vos données chiffrées de manière irréversible",

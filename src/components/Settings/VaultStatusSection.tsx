@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Lock, ShieldCheck, AlertCircle, Trash2 } from "lucide-react";
+import { Lock, ShieldCheck, AlertCircle, Trash2, Download, Upload, Check, Loader2 } from "lucide-react";
+import { save, open } from "@tauri-apps/plugin-dialog";
 import { getAutoLockOptions } from "../../utils";
 import { SettingGroup, SettingRow, Toggle } from "./SettingsUIComponents";
 import type { useVault } from "../../hooks";
@@ -24,6 +25,11 @@ export default function VaultStatusSection({ vault }: Readonly<VaultStatusSectio
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // Export/Import state
+  const [exportStatus, setExportStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [importStatus, setImportStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [backupError, setBackupError] = useState<string | null>(null);
+
   const handleAutoLockChange = async (value: number) => {
     await vault.updateSettings(value);
   };
@@ -40,6 +46,44 @@ export default function VaultStatusSection({ vault }: Readonly<VaultStatusSectio
       setDeletePassword('');
     } else {
       setDeleteError(result.error || t("settings.security.incorrectPassword"));
+    }
+  };
+
+  const handleExport = async () => {
+    setBackupError(null);
+    const filePath = await save({
+      filters: [{ name: "SimplyTerm Vault", extensions: ["stvault"] }],
+      defaultPath: "vault-backup.stvault",
+    });
+    if (!filePath) return;
+
+    setExportStatus("loading");
+    const result = await vault.exportToFile(filePath);
+    if (result.success) {
+      setExportStatus("success");
+      setTimeout(() => setExportStatus("idle"), 3000);
+    } else {
+      setExportStatus("error");
+      setBackupError(result.error || t("settings.security.exportError"));
+    }
+  };
+
+  const handleImport = async () => {
+    setBackupError(null);
+    const filePath = await open({
+      filters: [{ name: "SimplyTerm Vault", extensions: ["stvault"] }],
+      multiple: false,
+    });
+    if (!filePath) return;
+
+    setImportStatus("loading");
+    const result = await vault.importFromFile(filePath);
+    if (result.success) {
+      setImportStatus("success");
+      setTimeout(() => setImportStatus("idle"), 3000);
+    } else {
+      setImportStatus("error");
+      setBackupError(result.error || t("settings.security.importError"));
     }
   };
 
@@ -107,6 +151,49 @@ export default function VaultStatusSection({ vault }: Readonly<VaultStatusSectio
             {t("settings.security.maxSecurityWarning")}
           </p>
         )}
+      </SettingGroup>
+
+      {/* Backup / Restore */}
+      <SettingGroup title={t("settings.security.backupTitle")} description={t("settings.security.backupDesc")}>
+        <div className="flex gap-2">
+          <button
+            onClick={handleExport}
+            disabled={exportStatus === "loading"}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm rounded-lg bg-surface-0/30 text-text hover:bg-surface-0/50 transition-colors disabled:opacity-50"
+          >
+            {exportStatus === "loading" ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : exportStatus === "success" ? (
+              <Check size={16} className="text-success" />
+            ) : (
+              <Download size={16} />
+            )}
+            {exportStatus === "success" ? t("settings.security.exportSuccess") : t("settings.security.exportVault")}
+          </button>
+          <button
+            onClick={handleImport}
+            disabled={importStatus === "loading"}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm rounded-lg bg-surface-0/30 text-text hover:bg-surface-0/50 transition-colors disabled:opacity-50"
+          >
+            {importStatus === "loading" ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : importStatus === "success" ? (
+              <Check size={16} className="text-success" />
+            ) : (
+              <Upload size={16} />
+            )}
+            {importStatus === "success" ? t("settings.security.importSuccess") : t("settings.security.importVault")}
+          </button>
+        </div>
+        {backupError && (
+          <p className="text-xs text-error mt-2 flex items-center gap-2">
+            <AlertCircle size={14} />
+            {backupError}
+          </p>
+        )}
+        <p className="text-[11px] text-text-muted/60 mt-1">
+          {t("settings.security.backupHint")}
+        </p>
       </SettingGroup>
 
       {/* Delete Vault */}

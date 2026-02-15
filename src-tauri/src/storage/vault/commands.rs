@@ -213,6 +213,34 @@ pub fn vault_import_encrypted(
     vault.import_encrypted(bundle)
 }
 
+/// Export the vault to a .stvault JSON file.
+/// Does NOT require the vault to be unlocked.
+#[tauri::command]
+pub fn vault_export_to_file(
+    vault: State<VaultStateHandle>,
+    file_path: String,
+) -> Result<(), String> {
+    let export = vault.export_encrypted()?;
+    let content = serde_json::to_string_pretty(&export.bundle)
+        .map_err(|e| format!("Failed to serialize vault: {}", e))?;
+    std::fs::write(&file_path, content)
+        .map_err(|e| format!("Failed to write file: {}", e))
+}
+
+/// Import a vault from a .stvault JSON file, replacing the current vault.
+/// After import, the vault is locked and the user must re-unlock.
+#[tauri::command]
+pub fn vault_import_from_file(
+    vault: State<VaultStateHandle>,
+    file_path: String,
+) -> Result<SyncMeta, String> {
+    let content = std::fs::read_to_string(&file_path)
+        .map_err(|e| format!("Failed to read file: {}", e))?;
+    let bundle: VaultBundle = serde_json::from_str(&content)
+        .map_err(|e| format!("Invalid vault file: {}", e))?;
+    vault.import_encrypted(bundle)
+}
+
 // ============================================================================
 // FIDO2 Security Key Commands
 // ============================================================================
