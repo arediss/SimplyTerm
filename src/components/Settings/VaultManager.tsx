@@ -415,16 +415,19 @@ export default function VaultManager({ vault }: Readonly<VaultManagerProps>) {
         title={t("settings.security.autoLockTitle")}
         description={t("settings.security.autoLockDesc")}
       >
-        <select
-          value={vault.status?.autoLockTimeout ?? 300}
-          onChange={(e) => handleAutoLockChange(Number(e.target.value))}
-          disabled={!isUnlocked}
-          className="w-full px-3 py-2.5 bg-surface-0/20 border border-surface-0/30 rounded-lg text-sm text-text focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
-        >
-          {autoLockOptions.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
+        <div className="relative">
+          <select
+            value={vault.status?.autoLockTimeout ?? 300}
+            onChange={(e) => handleAutoLockChange(Number(e.target.value))}
+            disabled={!isUnlocked}
+            className="w-full appearance-none pl-3 pr-9 py-2.5 bg-surface-0/20 border border-surface-0/30 rounded-lg text-sm text-text focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
+          >
+            {autoLockOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+          <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-muted" />
+        </div>
       </SettingGroup>
 
       {/* ── Section 3: Maximum Security ─────────────────────── */}
