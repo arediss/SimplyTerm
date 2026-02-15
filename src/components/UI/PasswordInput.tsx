@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 
 interface PasswordInputProps {
@@ -21,6 +21,15 @@ export function PasswordInput({
   className,
 }: Readonly<PasswordInputProps>) {
   const [show, setShow] = useState<boolean>(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Delayed focus to override modal container focus
+  useEffect(() => {
+    if (autoFocus) {
+      const id = setTimeout(() => inputRef.current?.focus(), 50);
+      return () => clearTimeout(id);
+    }
+  }, [autoFocus]);
 
   return (
     <div className={`relative ${className ?? ''}`}>
@@ -30,12 +39,12 @@ export function PasswordInput({
         </div>
       )}
       <input
+        ref={inputRef}
         type={show ? 'text' : 'password'}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
-        autoFocus={autoFocus}
         className={`w-full ${icon ? 'pl-10' : 'px-4'} pr-10 py-3 bg-surface-0/30 border border-surface-0/50 rounded-xl text-text placeholder-text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent${disabled ? ' disabled:opacity-50' : ''}`}
       />
       <button
