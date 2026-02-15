@@ -64,6 +64,37 @@ export function StyledCheck({ checked, disabled, onClick, className }: {
   );
 }
 
+function FolderCreateInput({ value, onChange, onSubmit, onCancel, placeholder }: {
+  value: string;
+  onChange: (v: string) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+  placeholder: string;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") onSubmit();
+          if (e.key === "Escape") onCancel();
+        }}
+        placeholder={placeholder}
+        autoFocus
+        className="flex-1 px-2.5 py-1.5 bg-surface-0/30 border border-surface-0/50 rounded-lg text-xs text-text placeholder-text-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
+      />
+      <button onClick={onSubmit} disabled={!value.trim()} className="p-1.5 text-accent disabled:opacity-50">
+        <Check size={14} />
+      </button>
+      <button onClick={onCancel} className="p-1.5 text-text-muted">
+        <X size={14} />
+      </button>
+    </div>
+  );
+}
+
 const ITEM_CONFIG: Record<ItemType, { icon: typeof Monitor; colorClass: string }> = {
   session: { icon: Monitor, colorClass: "text-accent" },
   sshKey: { icon: Key, colorClass: "text-success" },
@@ -149,6 +180,7 @@ function FolderNode({
   sshKeys,
   onRename,
   onDelete,
+  confirmingDelete,
   selectionMode,
   selection,
   onToggle,
@@ -166,6 +198,7 @@ function FolderNode({
   onToggle?: (type: "folder" | "session" | "sshKey", id: string) => void;
   dropTargetId?: string | null;
   onDropTargetRef?: (id: string, el: HTMLDivElement | null) => void;
+  confirmingDelete?: boolean;
   onDragStart?: (item: DragItem, e: React.PointerEvent) => void;
 }) {
   const { t } = useTranslation();
@@ -239,8 +272,10 @@ function FolderNode({
             </button>
             <button
               onClick={() => onDelete(folder.id)}
-              className="p-1 text-text-muted hover:text-error rounded transition-colors"
-              title={t("settings.security.deleteFolder")}
+              className={`p-1 rounded transition-colors ${
+                confirmingDelete ? "text-error bg-error/10" : "text-text-muted hover:text-error"
+              }`}
+              title={confirmingDelete ? t("settings.security.folderDeleteConfirm") : t("settings.security.deleteFolder")}
             >
               <X size={12} />
             </button>
@@ -306,6 +341,7 @@ export default function VaultTreeView({
   const { t } = useTranslation();
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [ungroupedExpanded, setUngroupedExpanded] = useState(true);
 
   // ── Custom drag state ──
@@ -395,8 +431,13 @@ export default function VaultTreeView({
   };
 
   const handleDeleteFolder = async (id: string) => {
-    if (confirm(t("settings.security.folderDeleteConfirm"))) {
+    if (confirmDeleteId === id) {
+      setConfirmDeleteId(null);
       await onDeleteFolder(id);
+    } else {
+      setConfirmDeleteId(id);
+      // Auto-reset after 3s
+      setTimeout(() => setConfirmDeleteId(prev => prev === id ? null : prev), 3000);
     }
   };
 
@@ -417,25 +458,14 @@ export default function VaultTreeView({
           {t("settings.security.createFolder")}
         </button>
         {isCreatingFolder && (
-          <div className="flex items-center gap-2 mt-3">
-            <input
-              type="text"
+          <div className="mt-3">
+            <FolderCreateInput
               value={newFolderName}
-              onChange={(e) => setNewFolderName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleCreateFolder();
-                if (e.key === "Escape") { setIsCreatingFolder(false); setNewFolderName(""); }
-              }}
+              onChange={setNewFolderName}
+              onSubmit={handleCreateFolder}
+              onCancel={() => { setIsCreatingFolder(false); setNewFolderName(""); }}
               placeholder={t("settings.security.folderNamePlaceholder")}
-              autoFocus
-              className="px-2.5 py-1.5 bg-surface-0/30 border border-surface-0/50 rounded-lg text-xs text-text placeholder-text-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
             />
-            <button onClick={handleCreateFolder} disabled={!newFolderName.trim()} className="p-1.5 text-accent disabled:opacity-50">
-              <Check size={14} />
-            </button>
-            <button onClick={() => { setIsCreatingFolder(false); setNewFolderName(""); }} className="p-1.5 text-text-muted">
-              <X size={14} />
-            </button>
           </div>
         )}
       </div>
@@ -468,6 +498,7 @@ export default function VaultTreeView({
             sshKeys={g.sshKeys}
             onRename={onRenameFolder}
             onDelete={handleDeleteFolder}
+            confirmingDelete={confirmDeleteId === g.folder.id}
             selectionMode={selectionMode}
             selection={selection}
             onToggle={onToggleSelection}
@@ -539,26 +570,13 @@ export default function VaultTreeView({
       {!selectionMode && (
         <div className="mt-3 pt-3">
           {isCreatingFolder ? (
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleCreateFolder();
-                  if (e.key === "Escape") { setIsCreatingFolder(false); setNewFolderName(""); }
-                }}
-                placeholder={t("settings.security.folderNamePlaceholder")}
-                autoFocus
-                className="flex-1 px-2.5 py-1.5 bg-surface-0/30 border border-surface-0/50 rounded-lg text-xs text-text placeholder-text-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
-              />
-              <button onClick={handleCreateFolder} disabled={!newFolderName.trim()} className="p-1.5 text-accent disabled:opacity-50">
-                <Check size={14} />
-              </button>
-              <button onClick={() => { setIsCreatingFolder(false); setNewFolderName(""); }} className="p-1.5 text-text-muted">
-                <X size={14} />
-              </button>
-            </div>
+            <FolderCreateInput
+              value={newFolderName}
+              onChange={setNewFolderName}
+              onSubmit={handleCreateFolder}
+              onCancel={() => { setIsCreatingFolder(false); setNewFolderName(""); }}
+              placeholder={t("settings.security.folderNamePlaceholder")}
+            />
           ) : (
             <button
               onClick={() => setIsCreatingFolder(true)}

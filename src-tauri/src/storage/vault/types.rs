@@ -176,17 +176,6 @@ impl VaultCredential {
         }
     }
 
-    /// Get the session ID from the credential ID
-    #[allow(dead_code)]
-    pub fn session_id(&self) -> Option<&str> {
-        self.id.split(':').next()
-    }
-
-    /// Get the credential type from the credential ID
-    #[allow(dead_code)]
-    pub fn credential_type(&self) -> Option<VaultCredentialType> {
-        self.id.split(':').nth(1).and_then(VaultCredentialType::from_str)
-    }
 }
 
 /// An SSH key profile stored in the vault

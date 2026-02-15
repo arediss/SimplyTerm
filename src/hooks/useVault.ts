@@ -298,20 +298,6 @@ export function useVault() {
     }
   }, []);
 
-  // Preview a selective import file
-  const selectiveImportPreview = useCallback(async (filePath: string, importPassword: string) => {
-    try {
-      const preview = await invoke<import('../types/vault').ImportPreview>('vault_selective_import_preview', {
-        filePath, importPassword,
-      });
-      return { success: true as const, preview };
-    } catch (err) {
-      const errorMsg = getErrorMessage(err);
-      setError(errorMsg);
-      return { success: false as const, error: errorMsg };
-    }
-  }, []);
-
   // Execute a selective import
   const selectiveImportExecute = useCallback(async (filePath: string, importPassword: string) => {
     try {
@@ -353,7 +339,6 @@ export function useVault() {
     importFromFile,
     // Selective Export / Import
     selectiveExport,
-    selectiveImportPreview,
     selectiveImportExecute,
   };
 }

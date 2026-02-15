@@ -58,7 +58,6 @@ export default function VaultManager({ vault }: Readonly<VaultManagerProps>) {
   // Export modal state
   const [exportPassword, setExportPassword] = useState("");
   const [exportConfirm, setExportConfirm] = useState("");
-  const [includeCredentials, setIncludeCredentials] = useState(true);
   const [includeSshKeys, setIncludeSshKeys] = useState(true);
   const [exportStatus, setExportStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [exportError, setExportError] = useState<string | null>(null);
@@ -97,11 +96,28 @@ export default function VaultManager({ vault }: Readonly<VaultManagerProps>) {
 
   // Map folder id → child item ids (for bulk toggle)
   const folderContents = useMemo(() => {
+    // Index items by folder_id first (O(n+m) instead of O(n*m))
+    const sessionsByFolder = new Map<string, string[]>();
+    for (const s of savedSessions) {
+      if (s.folder_id) {
+        const arr = sessionsByFolder.get(s.folder_id);
+        if (arr) arr.push(s.id);
+        else sessionsByFolder.set(s.folder_id, [s.id]);
+      }
+    }
+    const sshKeysByFolder = new Map<string, string[]>();
+    for (const k of sshKeys) {
+      if (k.folderId) {
+        const arr = sshKeysByFolder.get(k.folderId);
+        if (arr) arr.push(k.id);
+        else sshKeysByFolder.set(k.folderId, [k.id]);
+      }
+    }
     const map = new Map<string, { sessions: string[]; sshKeys: string[] }>();
     for (const f of folders) {
       map.set(f.id, {
-        sessions: savedSessions.filter(s => s.folder_id === f.id).map(s => s.id),
-        sshKeys: sshKeys.filter(k => k.folderId === f.id).map(k => k.id),
+        sessions: sessionsByFolder.get(f.id) || [],
+        sshKeys: sshKeysByFolder.get(f.id) || [],
       });
     }
     return map;
@@ -188,7 +204,6 @@ export default function VaultManager({ vault }: Readonly<VaultManagerProps>) {
   const openExportModal = () => {
     setExportPassword("");
     setExportConfirm("");
-    setIncludeCredentials(true);
     setIncludeSshKeys(true);
     setExportStatus("idle");
     setExportError(null);
@@ -348,8 +363,14 @@ export default function VaultManager({ vault }: Readonly<VaultManagerProps>) {
                         const result = await createFolder(name);
                         if (!result.success) console.error("[VaultFolder] Create failed:", result.error);
                       }}
-                      onRenameFolder={async (id, name) => { await renameFolder(id, name); }}
-                      onDeleteFolder={async (id) => { await deleteFolder(id); }}
+                      onRenameFolder={async (id, name) => {
+                        const result = await renameFolder(id, name);
+                        if (!result.success) console.error("[VaultFolder] Rename failed:", result.error);
+                      }}
+                      onDeleteFolder={async (id) => {
+                        const result = await deleteFolder(id);
+                        if (!result.success) console.error("[VaultFolder] Delete failed:", result.error);
+                      }}
                       onMoveToFolder={handleMoveToFolder}
                       selectionMode={isExporting}
                       selection={selection}
@@ -494,13 +515,6 @@ export default function VaultManager({ vault }: Readonly<VaultManagerProps>) {
 
           {/* Options */}
           <div className="space-y-2.5 pt-3 border-t border-surface-0/20">
-            <div
-              className="flex items-center gap-2.5 text-sm text-text cursor-pointer select-none"
-              onClick={() => setIncludeCredentials(!includeCredentials)}
-            >
-              <StyledCheck checked={includeCredentials} />
-              {t("settings.security.includeCredentials")}
-            </div>
             <div
               className="flex items-center gap-2.5 text-sm text-text cursor-pointer select-none"
               onClick={() => setIncludeSshKeys(!includeSshKeys)}

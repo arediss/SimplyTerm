@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Check, Loader2, AlertCircle, FileSearch, FolderPlus } from "lucide-react";
+import { Check, Loader2, AlertCircle, FileSearch } from "lucide-react";
 import Modal from "../Modal";
 import { PasswordInput } from "../UI/PasswordInput";
 import type { useVault } from "../../hooks";
@@ -19,8 +19,6 @@ export default function SelectiveImportModal({ isOpen, onClose, vault, onImportC
 
   const [filePath, setFilePath] = useState<string | null>(null);
   const [password, setPassword] = useState("");
-  const [importToFolder, setImportToFolder] = useState(false);
-  const [folderName, setFolderName] = useState(() => `Import ${new Date().toISOString().slice(0, 10)}`);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [status, setStatus] = useState<"idle" | "importing" | "done" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -57,8 +55,6 @@ export default function SelectiveImportModal({ isOpen, onClose, vault, onImportC
   const handleClose = () => {
     setFilePath(null);
     setPassword("");
-    setImportToFolder(false);
-    setFolderName(`Import ${new Date().toISOString().slice(0, 10)}`);
     setImportResult(null);
     setStatus("idle");
     setError(null);
@@ -98,31 +94,6 @@ export default function SelectiveImportModal({ isOpen, onClose, vault, onImportC
             onChange={setPassword}
             placeholder={t("settings.security.importPassword")}
           />
-        )}
-
-        {/* Import to folder option */}
-        {filePath && password && status !== "done" && (
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm text-text cursor-pointer">
-              <input
-                type="checkbox"
-                checked={importToFolder}
-                onChange={(e) => setImportToFolder(e.target.checked)}
-                className="accent-accent"
-              />
-              <FolderPlus size={14} className="text-accent" />
-              {t("settings.security.importToFolder")}
-            </label>
-            {importToFolder && (
-              <input
-                type="text"
-                value={folderName}
-                onChange={(e) => setFolderName(e.target.value)}
-                placeholder={t("settings.security.importFolderName")}
-                className="w-full px-3 py-2 bg-surface-0/30 border border-surface-0/50 rounded-lg text-sm text-text placeholder-text-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
-              />
-            )}
-          </div>
         )}
 
         {/* Import result */}
