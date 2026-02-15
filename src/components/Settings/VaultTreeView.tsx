@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
   ChevronRight,
@@ -444,8 +445,8 @@ export default function VaultTreeView({
   // Tree view
   return (
     <div className="flex-1 flex flex-col overflow-y-auto p-3">
-      {/* Drag ghost */}
-      {drag && <DragGhost drag={drag} />}
+      {/* Drag ghost (portal to body to avoid transform offset) */}
+      {drag && createPortal(<DragGhost drag={drag} />, document.body)}
 
       {/* Header */}
       <div className="flex items-center justify-between mb-3 px-1">
