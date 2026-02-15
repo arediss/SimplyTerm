@@ -51,6 +51,7 @@ function Modal({ isOpen, onClose, title, children, width = "md" }: Readonly<Moda
 
       {/* Drag zone — allows moving the window even with modal open */}
       <div
+        role="presentation"
         className="absolute top-0 left-0 right-0 h-10 z-[51] cursor-default"
         onMouseDown={(e) => {
           if (e.buttons === 1) {
