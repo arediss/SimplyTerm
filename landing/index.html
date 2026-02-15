@@ -357,19 +357,25 @@
       z-index: -1;
       filter: blur(40px);
     }
-    .screenshot-label {
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      opacity: 0.7;
+    .hero-screenshot-img {
+      width: 100%;
+      border-radius: 5px;
+      border: 1px solid rgba(69, 71, 90, 0.4);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4), 0 0 60px rgba(137, 180, 250, 0.06);
     }
-    .screenshot-desc {
-      font-size: 0.85rem;
-      color: var(--overlay-0);
+
+    /* Remove dashed border when placeholder contains an image */
+    .screenshot-placeholder:has(img) {
+      border: none;
+      background: none;
     }
-    .screenshot-icon { color: var(--surface-2); }
+
+    .screenshot-img {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid rgba(69, 71, 90, 0.3);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+    }
 
     /* ── Features Grid ─────────────────────────────────── */
     .features { padding: var(--section-py) 0; }
@@ -819,11 +825,7 @@
       </div>
 
       <div class="hero-screenshot reveal reveal-delay-5">
-        <div class="hero-screenshot-inner">
-          <svg class="screenshot-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-          <span class="screenshot-label">App Screenshot</span>
-          <span class="screenshot-desc">Main terminal view with split panes and sidebar</span>
-        </div>
+        <img src="screenshot_1.png" alt="SimplyTerm — Main terminal view with sidebar and saved sessions" class="hero-screenshot-img" />
       </div>
     </div>
   </section>
@@ -929,9 +931,7 @@
         </ul>
 
         <div class="screenshot-placeholder reveal">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--surface-2)"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          <span class="screenshot-label">Screenshot</span>
-          <span class="screenshot-desc" style="color:var(--overlay-0);font-size:0.85rem">Vault security settings</span>
+          <img src="screenshot_2.png" alt="SimplyTerm — Vault security settings" class="screenshot-img" />
         </div>
       </div>
     </div>
@@ -945,9 +945,7 @@
 
       <div class="terminal-layout">
         <div class="screenshot-placeholder reveal">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--surface-2)"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-          <span class="screenshot-label">Screenshot</span>
-          <span class="screenshot-desc" style="color:var(--overlay-0);font-size:0.85rem">Command palette open</span>
+          <img src="screenshot_3.png" alt="SimplyTerm — Command palette" class="screenshot-img" />
         </div>
 
         <ul class="terminal-features reveal">
@@ -1020,9 +1018,7 @@
 
       <div class="plugins-screenshot">
         <div class="screenshot-placeholder reveal">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--surface-2)"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82 1.18V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 7.18 19.4"/></svg>
-          <span class="screenshot-label">Screenshot</span>
-          <span class="screenshot-desc" style="color:var(--overlay-0);font-size:0.85rem">Plugin registry browser</span>
+          <img src="screenshot_4.png" alt="SimplyTerm — Plugin registry" class="screenshot-img" />
         </div>
       </div>
     </div>
