@@ -14,7 +14,7 @@ export function useVaultFolders() {
       const result = await invoke<VaultFolder[]>("list_vault_folders");
       setFolders(result);
       setError(null);
-    } catch (err) {
+    } catch {
       // Vault might be locked — silently ignore
       setFolders([]);
     } finally {

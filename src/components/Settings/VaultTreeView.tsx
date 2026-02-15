@@ -41,18 +41,22 @@ interface VaultTreeViewProps {
 }
 
 /** Styled checkbox matching Catppuccin theme */
-export function StyledCheck({ checked, disabled, onClick, className }: {
+export function StyledCheck({ checked, disabled, onClick, className }: Readonly<{
   checked: boolean;
   disabled?: boolean;
   onClick?: (e: React.MouseEvent) => void;
   className?: string;
-}) {
+}>) {
   return (
     <span
       role="checkbox"
       aria-checked={checked}
       aria-disabled={disabled}
+      tabIndex={disabled ? -1 : 0}
       onClick={disabled ? undefined : onClick}
+      onKeyDown={disabled ? undefined : (e) => {
+        if (e.key === " " || e.key === "Enter") { e.preventDefault(); onClick?.(e as unknown as React.MouseEvent); }
+      }}
       className={`inline-flex items-center justify-center w-[16px] h-[16px] rounded-[4px] border-[1.5px] transition-all duration-150 shrink-0 ${
         checked
           ? "bg-accent border-accent text-white"
@@ -64,13 +68,13 @@ export function StyledCheck({ checked, disabled, onClick, className }: {
   );
 }
 
-function FolderCreateInput({ value, onChange, onSubmit, onCancel, placeholder }: {
+function FolderCreateInput({ value, onChange, onSubmit, onCancel, placeholder }: Readonly<{
   value: string;
   onChange: (v: string) => void;
   onSubmit: () => void;
   onCancel: () => void;
   placeholder: string;
-}) {
+}>) {
   return (
     <div className="flex items-center gap-2">
       <input
@@ -115,7 +119,7 @@ interface DragState {
 }
 
 /** Floating ghost element while dragging */
-function DragGhost({ drag }: { drag: DragState }) {
+function DragGhost({ drag }: Readonly<{ drag: DragState }>) {
   const { icon: Icon, colorClass } = ITEM_CONFIG[drag.item.type];
   return (
     <div
@@ -132,7 +136,7 @@ function TreeItem({
   id, type, name, subtitle,
   selectionMode, checked, disabled, onToggle,
   onDragStart,
-}: {
+}: Readonly<{
   id: string;
   type: ItemType;
   name: string;
@@ -142,14 +146,19 @@ function TreeItem({
   disabled?: boolean;
   onToggle?: () => void;
   onDragStart?: (item: DragItem, e: React.PointerEvent) => void;
-}) {
+}>) {
   const { icon: Icon, colorClass } = ITEM_CONFIG[type];
   return (
     <div
       className={`group/item flex items-center gap-2.5 px-3 py-1.5 rounded-md hover:bg-surface-0/20 transition-colors ${
         selectionMode && !disabled ? "cursor-pointer" : ""
       }`}
+      role={selectionMode && !disabled ? "button" : undefined}
+      tabIndex={selectionMode && !disabled ? 0 : undefined}
       onClick={selectionMode && !disabled ? onToggle : undefined}
+      onKeyDown={selectionMode && !disabled ? (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle?.(); }
+      } : undefined}
     >
       {selectionMode && (
         <StyledCheck checked={checked || false} disabled={disabled} />
@@ -187,7 +196,7 @@ function FolderNode({
   dropTargetId,
   onDropTargetRef,
   onDragStart,
-}: {
+}: Readonly<{
   folder: VaultFolder;
   sessions: SavedSession[];
   sshKeys: SshKeyProfileInfo[];
@@ -200,7 +209,7 @@ function FolderNode({
   onDropTargetRef?: (id: string, el: HTMLDivElement | null) => void;
   confirmingDelete?: boolean;
   onDragStart?: (item: DragItem, e: React.PointerEvent) => void;
-}) {
+}>) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(true);
   const [isRenaming, setIsRenaming] = useState(false);
@@ -396,11 +405,11 @@ export default function VaultTreeView({
       setDropTargetId(undefined);
     };
 
-    window.addEventListener("pointermove", handleMove);
-    window.addEventListener("pointerup", handleUp);
+    globalThis.addEventListener("pointermove", handleMove);
+    globalThis.addEventListener("pointerup", handleUp);
     return () => {
-      window.removeEventListener("pointermove", handleMove);
-      window.removeEventListener("pointerup", handleUp);
+      globalThis.removeEventListener("pointermove", handleMove);
+      globalThis.removeEventListener("pointerup", handleUp);
     };
   }, [drag, dropTargetId, onMoveToFolder]);
 

@@ -39,6 +39,32 @@ function emptySelection(): TreeSelectionState {
   return { folders: new Set(), sessions: new Set(), sshKeys: new Set() };
 }
 
+function toggleFolderInSelection(
+  prev: TreeSelectionState,
+  folderId: string,
+  contents?: { sessions: string[]; sshKeys: string[] },
+): TreeSelectionState {
+  const next = { folders: new Set(prev.folders), sessions: new Set(prev.sessions), sshKeys: new Set(prev.sshKeys) };
+  if (next.folders.has(folderId)) {
+    next.folders.delete(folderId);
+    for (const sid of contents?.sessions ?? []) next.sessions.delete(sid);
+    for (const kid of contents?.sshKeys ?? []) next.sshKeys.delete(kid);
+  } else {
+    next.folders.add(folderId);
+    for (const sid of contents?.sessions ?? []) next.sessions.add(sid);
+    for (const kid of contents?.sshKeys ?? []) next.sshKeys.add(kid);
+  }
+  return next;
+}
+
+function toggleItemInSelection(prev: TreeSelectionState, type: "session" | "sshKey", id: string): TreeSelectionState {
+  const key = type === "session" ? "sessions" : "sshKeys";
+  const next = { ...prev, [key]: new Set(prev[key]) };
+  if (next[key].has(id)) next[key].delete(id);
+  else next[key].add(id);
+  return next;
+}
+
 export default function VaultManager({ vault }: Readonly<VaultManagerProps>) {
   const { t } = useTranslation();
   const isUnlocked = vault.status?.isUnlocked || false;
@@ -125,33 +151,8 @@ export default function VaultManager({ vault }: Readonly<VaultManagerProps>) {
 
   const toggleSelection = useCallback((type: "folder" | "session" | "sshKey", id: string) => {
     setSelection(prev => {
-      if (type === "folder") {
-        const next = {
-          folders: new Set(prev.folders),
-          sessions: new Set(prev.sessions),
-          sshKeys: new Set(prev.sshKeys),
-        };
-        const contents = folderContents.get(id);
-        if (next.folders.has(id)) {
-          next.folders.delete(id);
-          if (contents) {
-            for (const sid of contents.sessions) next.sessions.delete(sid);
-            for (const kid of contents.sshKeys) next.sshKeys.delete(kid);
-          }
-        } else {
-          next.folders.add(id);
-          if (contents) {
-            for (const sid of contents.sessions) next.sessions.add(sid);
-            for (const kid of contents.sshKeys) next.sshKeys.add(kid);
-          }
-        }
-        return next;
-      }
-      const key = type === "session" ? "sessions" : "sshKeys";
-      const next = { ...prev, [key]: new Set(prev[key]) };
-      if (next[key].has(id)) next[key].delete(id);
-      else next[key].add(id);
-      return next;
+      if (type === "folder") return toggleFolderInSelection(prev, id, folderContents.get(id));
+      return toggleItemInSelection(prev, type, id);
     });
   }, [folderContents]);
 
@@ -212,11 +213,11 @@ export default function VaultManager({ vault }: Readonly<VaultManagerProps>) {
 
   // ── Export handler ─────────────────────────────────────
 
-  const passwordError = exportPassword.length > 0 && exportPassword.length < 8
-    ? t("settings.security.passwordTooShort")
-    : exportPassword !== exportConfirm && exportConfirm.length > 0
-      ? t("settings.security.passwordMismatchError")
-      : null;
+  const passwordError = (() => {
+    if (exportPassword.length > 0 && exportPassword.length < 8) return t("settings.security.passwordTooShort");
+    if (exportPassword !== exportConfirm && exportConfirm.length > 0) return t("settings.security.passwordMismatchError");
+    return null;
+  })();
 
   const canExport = totalSelected > 0 && !passwordError && exportPassword.length >= 8;
 
@@ -516,8 +517,14 @@ export default function VaultManager({ vault }: Readonly<VaultManagerProps>) {
           {/* Options */}
           <div className="space-y-2.5 pt-3 border-t border-surface-0/20">
             <div
+              role="checkbox"
+              aria-checked={includeSshKeys}
+              tabIndex={0}
               className="flex items-center gap-2.5 text-sm text-text cursor-pointer select-none"
               onClick={() => setIncludeSshKeys(!includeSshKeys)}
+              onKeyDown={(e) => {
+                if (e.key === " " || e.key === "Enter") { e.preventDefault(); setIncludeSshKeys(v => !v); }
+              }}
             >
               <StyledCheck checked={includeSshKeys} />
               {t("settings.security.includeSshKeys")}
@@ -545,11 +552,13 @@ export default function VaultManager({ vault }: Readonly<VaultManagerProps>) {
               disabled={!canExport || exportStatus === "loading"}
               className="flex-1 py-2.5 bg-accent text-white text-sm font-medium rounded-lg hover:bg-accent/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {exportStatus === "loading" ? (
+              {exportStatus === "loading" && (
                 <><Loader2 size={16} className="animate-spin" />{t("settings.security.exporting")}</>
-              ) : exportStatus === "success" ? (
+              )}
+              {exportStatus === "success" && (
                 <><Check size={16} />{t("settings.security.exportSelectiveSuccess")}</>
-              ) : (
+              )}
+              {exportStatus !== "loading" && exportStatus !== "success" && (
                 <><Download size={16} />{t("settings.security.exportVault")}</>
               )}
             </button>
