@@ -6,6 +6,11 @@
 pub use super::config::{SavedSession, AuthType};
 use super::config::{load_sessions as load_all, save_sessions as save_all};
 
+/// Re-export save_sessions for use by vault import
+pub fn save_sessions(sessions: &[SavedSession]) -> Result<(), String> {
+    save_all(sessions)
+}
+
 /// Loads all saved sessions
 pub fn load_sessions() -> Result<Vec<SavedSession>, String> {
     load_all()
@@ -37,6 +42,7 @@ pub fn save_session(
         auth_type: auth,
         key_path,
         ssh_key_id: None,
+        folder_id: None,
     };
 
     sessions.push(session.clone());

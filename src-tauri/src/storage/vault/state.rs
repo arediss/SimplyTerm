@@ -952,6 +952,428 @@ impl VaultState {
         Ok(deleted)
     }
 
+    // ============================================================================
+    // Folder Operations
+    // ============================================================================
+
+    /// Create a new folder
+    pub fn create_folder(&self, name: &str) -> Result<super::types::VaultFolder, String> {
+        if !self.is_unlocked() {
+            return Err("Vault is locked".to_string());
+        }
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        let folder = super::types::VaultFolder {
+            id: uuid::Uuid::new_v4().to_string(),
+            name: name.to_string(),
+            created_at: now,
+        };
+
+        {
+            let mut data = self.data.write();
+            let data = data.as_mut().ok_or("Vault data not loaded")?;
+            data.folders.push(folder.clone());
+        }
+
+        self.save_data()?;
+        self.touch();
+        Ok(folder)
+    }
+
+    /// Rename an existing folder
+    pub fn rename_folder(&self, id: &str, name: &str) -> Result<bool, String> {
+        if !self.is_unlocked() {
+            return Err("Vault is locked".to_string());
+        }
+
+        let found = {
+            let mut data = self.data.write();
+            let data = data.as_mut().ok_or("Vault data not loaded")?;
+            if let Some(folder) = data.folders.iter_mut().find(|f| f.id == id) {
+                folder.name = name.to_string();
+                true
+            } else {
+                false
+            }
+        };
+
+        if found {
+            self.save_data()?;
+        }
+        self.touch();
+        Ok(found)
+    }
+
+    /// Delete a folder and unassign items that referenced it
+    pub fn delete_folder(&self, id: &str) -> Result<bool, String> {
+        if !self.is_unlocked() {
+            return Err("Vault is locked".to_string());
+        }
+
+        let deleted = {
+            let mut data = self.data.write();
+            let data = data.as_mut().ok_or("Vault data not loaded")?;
+
+            let len_before = data.folders.len();
+            data.folders.retain(|f| f.id != id);
+            let was_deleted = data.folders.len() < len_before;
+
+            if was_deleted {
+                // Unassign items that referenced this folder
+                for bastion in &mut data.bastions {
+                    if bastion.folder_id.as_deref() == Some(id) {
+                        bastion.folder_id = None;
+                    }
+                }
+                for ssh_key in &mut data.ssh_keys {
+                    if ssh_key.folder_id.as_deref() == Some(id) {
+                        ssh_key.folder_id = None;
+                    }
+                }
+            }
+
+            was_deleted
+        };
+
+        if deleted {
+            self.save_data()?;
+        }
+        self.touch();
+        Ok(deleted)
+    }
+
+    /// List all folders
+    pub fn list_folders(&self) -> Result<Vec<super::types::VaultFolder>, String> {
+        if !self.is_unlocked() {
+            return Err("Vault is locked".to_string());
+        }
+
+        let data = self.data.read();
+        let data = data.as_ref().ok_or("Vault data not loaded")?;
+        Ok(data.folders.clone())
+    }
+
+    // ============================================================================
+    // Selective Export / Import
+    // ============================================================================
+
+    /// Export selected items encrypted with a dedicated password
+    pub fn selective_export(
+        &self,
+        folder_ids: &[String],
+        session_ids: &[String],
+        bastion_ids: &[String],
+        ssh_key_ids: &[String],
+        export_password: &str,
+    ) -> Result<Vec<u8>, String> {
+        use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+
+        if !self.is_unlocked() {
+            return Err("Vault is locked".to_string());
+        }
+
+        let data = self.data.read();
+        let data = data.as_ref().ok_or("Vault data not loaded")?;
+
+        // Collect selected folders
+        let selected_folders: Vec<super::types::VaultFolder> = data
+            .folders
+            .iter()
+            .filter(|f| folder_ids.contains(&f.id))
+            .cloned()
+            .collect();
+
+        // Build set of IDs explicitly selected + IDs in selected folders
+        let mut bastion_id_set: std::collections::HashSet<String> =
+            bastion_ids.iter().cloned().collect();
+        let mut ssh_key_id_set: std::collections::HashSet<String> =
+            ssh_key_ids.iter().cloned().collect();
+        let mut session_id_set: std::collections::HashSet<String> =
+            session_ids.iter().cloned().collect();
+
+        // If a folder is selected, include all items in that folder
+        for folder_id in folder_ids {
+            for b in &data.bastions {
+                if b.folder_id.as_deref() == Some(folder_id) {
+                    bastion_id_set.insert(b.id.clone());
+                }
+            }
+            for k in &data.ssh_keys {
+                if k.folder_id.as_deref() == Some(folder_id) {
+                    ssh_key_id_set.insert(k.id.clone());
+                }
+            }
+        }
+
+        // Collect selected bastions and SSH keys
+        let selected_bastions: Vec<super::types::BastionProfile> = data
+            .bastions
+            .iter()
+            .filter(|b| bastion_id_set.contains(&b.id))
+            .cloned()
+            .collect();
+
+        let selected_ssh_keys: Vec<super::types::SshKeyProfile> = data
+            .ssh_keys
+            .iter()
+            .filter(|k| ssh_key_id_set.contains(&k.id))
+            .cloned()
+            .collect();
+
+        // Load sessions from sessions.json
+        let all_sessions = super::super::sessions::load_sessions()
+            .unwrap_or_default();
+
+        // Include sessions in selected folders
+        for folder_id in folder_ids {
+            for s in &all_sessions {
+                if s.folder_id.as_deref() == Some(folder_id) {
+                    session_id_set.insert(s.id.clone());
+                }
+            }
+        }
+
+        let selected_sessions: Vec<super::super::config::SavedSession> = all_sessions
+            .into_iter()
+            .filter(|s| session_id_set.contains(&s.id))
+            .collect();
+
+        // Collect credentials for selected sessions
+        let selected_credentials: Vec<super::types::VaultCredential> = data
+            .credentials
+            .iter()
+            .filter(|c| {
+                if let Some(sid) = c.id.split(':').next() {
+                    session_id_set.contains(sid)
+                } else {
+                    false
+                }
+            })
+            .cloned()
+            .collect();
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        let payload = super::types::SelectiveExportPayload {
+            folders: selected_folders,
+            sessions: selected_sessions,
+            credentials: selected_credentials,
+            bastions: selected_bastions,
+            ssh_keys: selected_ssh_keys,
+            exported_at: now,
+        };
+
+        // Serialize payload
+        let json = serde_json::to_vec(&payload)
+            .map_err(|e| format!("Failed to serialize export payload: {}", e))?;
+
+        // Encrypt with export password
+        let salt = crypto::generate_salt();
+        let nonce = crypto::generate_nonce();
+        let key = crypto::derive_key(export_password, &salt)?;
+        let encrypted = crypto::encrypt(&json, &key, &nonce)?;
+
+        let export_file = super::types::SelectiveExportFile {
+            version: 1,
+            salt,
+            nonce,
+            encrypted_data: BASE64.encode(encrypted),
+        };
+
+        serde_json::to_vec_pretty(&export_file)
+            .map_err(|e| format!("Failed to serialize export file: {}", e))
+    }
+
+    /// Preview a selective import file (decrypt and return names only)
+    pub fn selective_import_preview(
+        file_path: &str,
+        import_password: &str,
+    ) -> Result<super::types::ImportPreview, String> {
+        let payload = Self::decrypt_export_file(file_path, import_password)?;
+
+        Ok(super::types::ImportPreview {
+            folders: payload.folders.iter().map(|f| f.name.clone()).collect(),
+            sessions: payload.sessions.iter().map(|s| s.name.clone()).collect(),
+            bastions: payload.bastions.iter().map(|b| b.name.clone()).collect(),
+            ssh_keys: payload.ssh_keys.iter().map(|k| k.name.clone()).collect(),
+            exported_at: payload.exported_at,
+        })
+    }
+
+    /// Execute a selective import (merge into current vault)
+    pub fn selective_import_execute(
+        &self,
+        file_path: &str,
+        import_password: &str,
+    ) -> Result<super::types::ImportResult, String> {
+        if !self.is_unlocked() {
+            return Err("Vault is locked".to_string());
+        }
+
+        let payload = Self::decrypt_export_file(file_path, import_password)?;
+        let mut result = super::types::ImportResult {
+            folders_added: 0,
+            sessions_added: 0,
+            credentials_added: 0,
+            bastions_added: 0,
+            ssh_keys_added: 0,
+            duplicates_skipped: 0,
+        };
+
+        // Build ID remap tables
+        let mut folder_remap: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+        let mut session_remap: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+        let mut bastion_remap: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+        let mut ssh_key_remap: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+
+        // Load existing sessions for dedup
+        let mut all_sessions = super::super::sessions::load_sessions().unwrap_or_default();
+
+        {
+            let mut data = self.data.write();
+            let data = data.as_mut().ok_or("Vault data not loaded")?;
+
+            // 1. Import folders (dedup by name)
+            for folder in &payload.folders {
+                if let Some(existing) = data.folders.iter().find(|f| f.name == folder.name) {
+                    // Folder exists — remap to existing ID
+                    folder_remap.insert(folder.id.clone(), existing.id.clone());
+                    result.duplicates_skipped += 1;
+                } else {
+                    let new_id = uuid::Uuid::new_v4().to_string();
+                    folder_remap.insert(folder.id.clone(), new_id.clone());
+                    data.folders.push(super::types::VaultFolder {
+                        id: new_id,
+                        name: folder.name.clone(),
+                        created_at: folder.created_at,
+                    });
+                    result.folders_added += 1;
+                }
+            }
+
+            // 2. Import bastions (dedup by name + host)
+            for bastion in &payload.bastions {
+                let is_dup = data.bastions.iter().any(|b| b.name == bastion.name && b.host == bastion.host);
+                if is_dup {
+                    result.duplicates_skipped += 1;
+                } else {
+                    let new_id = uuid::Uuid::new_v4().to_string();
+                    bastion_remap.insert(bastion.id.clone(), new_id.clone());
+                    let mut new_bastion = bastion.clone();
+                    new_bastion.id = new_id;
+                    // Remap folder_id
+                    new_bastion.folder_id = bastion.folder_id.as_ref().and_then(|fid| folder_remap.get(fid).cloned());
+                    data.bastions.push(new_bastion);
+                    result.bastions_added += 1;
+                }
+            }
+
+            // 3. Import SSH keys (dedup by name + key_path)
+            for ssh_key in &payload.ssh_keys {
+                let is_dup = data.ssh_keys.iter().any(|k| k.name == ssh_key.name && k.key_path == ssh_key.key_path);
+                if is_dup {
+                    result.duplicates_skipped += 1;
+                } else {
+                    let new_id = uuid::Uuid::new_v4().to_string();
+                    ssh_key_remap.insert(ssh_key.id.clone(), new_id.clone());
+                    let mut new_key = ssh_key.clone();
+                    new_key.id = new_id;
+                    // Remap folder_id
+                    new_key.folder_id = ssh_key.folder_id.as_ref().and_then(|fid| folder_remap.get(fid).cloned());
+                    data.ssh_keys.push(new_key);
+                    result.ssh_keys_added += 1;
+                }
+            }
+
+            // 4. Import sessions (dedup by name + host + port + username)
+            for session in &payload.sessions {
+                let is_dup = all_sessions.iter().any(|s| {
+                    s.name == session.name
+                        && s.host == session.host
+                        && s.port == session.port
+                        && s.username == session.username
+                });
+                if is_dup {
+                    result.duplicates_skipped += 1;
+                } else {
+                    let new_id = uuid::Uuid::new_v4().to_string();
+                    session_remap.insert(session.id.clone(), new_id.clone());
+                    let mut new_session = session.clone();
+                    new_session.id = new_id;
+                    // Remap folder_id
+                    new_session.folder_id = session.folder_id.as_ref().and_then(|fid| folder_remap.get(fid).cloned());
+                    // Remap ssh_key_id
+                    new_session.ssh_key_id = session.ssh_key_id.as_ref().and_then(|kid| ssh_key_remap.get(kid).cloned());
+                    all_sessions.push(new_session);
+                    result.sessions_added += 1;
+                }
+            }
+
+            // 5. Import credentials (remap session IDs)
+            for cred in &payload.credentials {
+                // Parse old session_id from credential ID (format: "session_id:type")
+                let parts: Vec<&str> = cred.id.splitn(2, ':').collect();
+                if parts.len() != 2 {
+                    continue;
+                }
+                let old_session_id = parts[0];
+                let cred_type = parts[1];
+
+                if let Some(new_session_id) = session_remap.get(old_session_id) {
+                    let new_cred_id = format!("{}:{}", new_session_id, cred_type);
+                    // Only add if not already present
+                    if !data.credentials.iter().any(|c| c.id == new_cred_id) {
+                        let mut new_cred = cred.clone();
+                        new_cred.id = new_cred_id;
+                        data.credentials.push(new_cred);
+                        result.credentials_added += 1;
+                    }
+                }
+            }
+        }
+
+        // Save vault data and sessions
+        self.save_data()?;
+        super::super::sessions::save_sessions(&all_sessions)?;
+        self.touch();
+
+        Ok(result)
+    }
+
+    /// Helper: decrypt a selective export file
+    fn decrypt_export_file(
+        file_path: &str,
+        password: &str,
+    ) -> Result<super::types::SelectiveExportPayload, String> {
+        use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+
+        let content = std::fs::read_to_string(file_path)
+            .map_err(|e| format!("Failed to read export file: {}", e))?;
+
+        let export_file: super::types::SelectiveExportFile = serde_json::from_str(&content)
+            .map_err(|e| format!("Invalid export file format: {}", e))?;
+
+        if export_file.version != 1 {
+            return Err(format!("Unsupported export version: {}", export_file.version));
+        }
+
+        let encrypted = BASE64.decode(&export_file.encrypted_data)
+            .map_err(|e| format!("Failed to decode encrypted data: {}", e))?;
+
+        let key = crypto::derive_key(password, &export_file.salt)?;
+        let plaintext = crypto::decrypt(&encrypted, &key, &export_file.nonce)?;
+
+        serde_json::from_slice(&plaintext)
+            .map_err(|e| format!("Failed to parse decrypted payload: {}", e))
+    }
+
     /// Update vault settings
     pub fn update_settings(&self, auto_lock_timeout: u32) -> Result<(), String> {
         if !self.is_unlocked() {

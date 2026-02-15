@@ -278,6 +278,56 @@ export function useVault() {
     }
   }, [refreshStatus]);
 
+  // Selective export to encrypted .stvault file
+  const selectiveExport = useCallback(async (
+    filePath: string,
+    folderIds: string[],
+    sessionIds: string[],
+    bastionIds: string[],
+    sshKeyIds: string[],
+    exportPassword: string,
+  ) => {
+    try {
+      await invoke('vault_selective_export', {
+        filePath, folderIds, sessionIds, bastionIds, sshKeyIds, exportPassword,
+      });
+      return { success: true as const };
+    } catch (err) {
+      const errorMsg = getErrorMessage(err);
+      setError(errorMsg);
+      return { success: false as const, error: errorMsg };
+    }
+  }, []);
+
+  // Preview a selective import file
+  const selectiveImportPreview = useCallback(async (filePath: string, importPassword: string) => {
+    try {
+      const preview = await invoke<import('../types/vault').ImportPreview>('vault_selective_import_preview', {
+        filePath, importPassword,
+      });
+      return { success: true as const, preview };
+    } catch (err) {
+      const errorMsg = getErrorMessage(err);
+      setError(errorMsg);
+      return { success: false as const, error: errorMsg };
+    }
+  }, []);
+
+  // Execute a selective import
+  const selectiveImportExecute = useCallback(async (filePath: string, importPassword: string) => {
+    try {
+      const result = await invoke<import('../types/vault').ImportResult>('vault_selective_import_execute', {
+        filePath, importPassword,
+      });
+      await refreshStatus();
+      return { success: true as const, result };
+    } catch (err) {
+      const errorMsg = getErrorMessage(err);
+      setError(errorMsg);
+      return { success: false as const, error: errorMsg };
+    }
+  }, [refreshStatus]);
+
   return {
     status,
     isLoading,
@@ -302,5 +352,9 @@ export function useVault() {
     // Export / Import
     exportToFile,
     importFromFile,
+    // Selective Export / Import
+    selectiveExport,
+    selectiveImportPreview,
+    selectiveImportExecute,
   };
 }

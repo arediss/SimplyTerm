@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Lock, ShieldCheck, AlertCircle, Trash2, Download, Upload, Check, Loader2 } from "lucide-react";
+import { Lock, ShieldCheck, AlertCircle, Trash2, Download, Upload, Check, Loader2, FolderPlus, Pencil, X, Folder } from "lucide-react";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { getAutoLockOptions } from "../../utils";
 import { SettingGroup, SettingRow, Toggle } from "./SettingsUIComponents";
 import type { useVault } from "../../hooks";
+import { useVaultFolders } from "../../hooks";
+import SelectiveExportModal from "./SelectiveExportModal";
+import SelectiveImportModal from "./SelectiveImportModal";
 
 function getMethodLabel(method: string, t: (key: string) => string): string {
   if (method === 'master_password') return t("settings.security.methodPassword");
@@ -20,15 +23,26 @@ interface VaultStatusSectionProps {
 export default function VaultStatusSection({ vault }: Readonly<VaultStatusSectionProps>) {
   const { t } = useTranslation();
   const autoLockOptions = getAutoLockOptions(t);
+  const { folders, createFolder, renameFolder, deleteFolder } = useVaultFolders();
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // Export/Import state
+  // Export/Import full vault state
   const [exportStatus, setExportStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [importStatus, setImportStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [backupError, setBackupError] = useState<string | null>(null);
+
+  // Selective export/import modals
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+
+  // Folder inline editing state
+  const [newFolderName, setNewFolderName] = useState("");
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
+  const [renamingFolderName, setRenamingFolderName] = useState("");
 
   const handleAutoLockChange = async (value: number) => {
     await vault.updateSettings(value);
@@ -87,6 +101,26 @@ export default function VaultStatusSection({ vault }: Readonly<VaultStatusSectio
     }
   };
 
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim()) return;
+    await createFolder(newFolderName.trim());
+    setNewFolderName("");
+    setIsCreatingFolder(false);
+  };
+
+  const handleRenameFolder = async (id: string) => {
+    if (!renamingFolderName.trim()) return;
+    await renameFolder(id, renamingFolderName.trim());
+    setRenamingFolderId(null);
+    setRenamingFolderName("");
+  };
+
+  const handleDeleteFolder = async (id: string) => {
+    if (confirm(t("settings.security.folderDeleteConfirm"))) {
+      await deleteFolder(id);
+    }
+  };
+
   return (
     <>
       {/* Vault Status */}
@@ -126,6 +160,87 @@ export default function VaultStatusSection({ vault }: Readonly<VaultStatusSectio
         </select>
       </SettingGroup>
 
+      {/* Folders */}
+      {vault.status?.isUnlocked && (
+        <SettingGroup title={t("settings.security.foldersTitle")} description={t("settings.security.foldersDesc")}>
+          <div className="space-y-2">
+            {folders.map(folder => (
+              <div key={folder.id} className="flex items-center gap-2 px-3 py-2 bg-surface-0/20 rounded-lg">
+                <Folder size={16} className="text-accent shrink-0" />
+                {renamingFolderId === folder.id ? (
+                  <input
+                    type="text"
+                    value={renamingFolderName}
+                    onChange={(e) => setRenamingFolderName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleRenameFolder(folder.id);
+                      if (e.key === "Escape") setRenamingFolderId(null);
+                    }}
+                    onBlur={() => handleRenameFolder(folder.id)}
+                    autoFocus
+                    className="flex-1 px-2 py-1 bg-surface-0/30 border border-surface-0/50 rounded text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent"
+                  />
+                ) : (
+                  <span className="flex-1 text-sm text-text">{folder.name}</span>
+                )}
+                <button
+                  onClick={() => { setRenamingFolderId(folder.id); setRenamingFolderName(folder.name); }}
+                  className="p-1 text-text-muted hover:text-text transition-colors"
+                  title={t("settings.security.renameFolder")}
+                >
+                  <Pencil size={14} />
+                </button>
+                <button
+                  onClick={() => handleDeleteFolder(folder.id)}
+                  className="p-1 text-text-muted hover:text-error transition-colors"
+                  title={t("settings.security.deleteFolder")}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+
+            {isCreatingFolder ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleCreateFolder();
+                    if (e.key === "Escape") setIsCreatingFolder(false);
+                  }}
+                  placeholder={t("settings.security.folderNamePlaceholder")}
+                  autoFocus
+                  className="flex-1 px-3 py-2 bg-surface-0/30 border border-surface-0/50 rounded-lg text-sm text-text placeholder-text-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+                <button
+                  onClick={handleCreateFolder}
+                  disabled={!newFolderName.trim()}
+                  className="px-3 py-2 bg-accent text-white text-xs rounded-lg hover:bg-accent/90 transition-colors disabled:opacity-50"
+                >
+                  <Check size={14} />
+                </button>
+                <button
+                  onClick={() => { setIsCreatingFolder(false); setNewFolderName(""); }}
+                  className="px-3 py-2 bg-surface-0/50 text-text-muted text-xs rounded-lg hover:bg-surface-0 transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setIsCreatingFolder(true)}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-accent hover:bg-surface-0/20 rounded-lg transition-colors"
+              >
+                <FolderPlus size={16} />
+                {t("settings.security.createFolder")}
+              </button>
+            )}
+          </div>
+        </SettingGroup>
+      )}
+
       {/* Maximum Security Mode */}
       <SettingGroup title={t("settings.security.maxSecurityTitle")} description={t("settings.security.maxSecurityDesc")}>
         <SettingRow
@@ -155,6 +270,7 @@ export default function VaultStatusSection({ vault }: Readonly<VaultStatusSectio
 
       {/* Backup / Restore */}
       <SettingGroup title={t("settings.security.backupTitle")} description={t("settings.security.backupDesc")}>
+        {/* Full vault export/import */}
         <div className="flex gap-2">
           <button
             onClick={handleExport}
@@ -185,6 +301,27 @@ export default function VaultStatusSection({ vault }: Readonly<VaultStatusSectio
             {importStatus === "success" ? t("settings.security.importSuccess") : t("settings.security.importVault")}
           </button>
         </div>
+
+        {/* Selective export/import */}
+        {vault.status?.isUnlocked && (
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+            >
+              <Download size={16} />
+              {t("settings.security.selectiveExportTitle")}
+            </button>
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+            >
+              <Upload size={16} />
+              {t("settings.security.selectiveImportTitle")}
+            </button>
+          </div>
+        )}
+
         {backupError && (
           <p className="text-xs text-error mt-2 flex items-center gap-2">
             <AlertCircle size={14} />
@@ -237,6 +374,20 @@ export default function VaultStatusSection({ vault }: Readonly<VaultStatusSectio
           </button>
         )}
       </SettingGroup>
+
+      {/* Selective Export Modal */}
+      <SelectiveExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        vault={vault}
+      />
+
+      {/* Selective Import Modal */}
+      <SelectiveImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        vault={vault}
+      />
     </>
   );
 }

@@ -679,6 +679,7 @@ struct SavedSessionResponse {
     auth_type: String,
     key_path: Option<String>,
     ssh_key_id: Option<String>,
+    folder_id: Option<String>,
 }
 
 impl From<SavedSession> for SavedSessionResponse {
@@ -695,6 +696,7 @@ impl From<SavedSession> for SavedSessionResponse {
             },
             key_path: s.key_path,
             ssh_key_id: s.ssh_key_id,
+            folder_id: s.folder_id,
         }
     }
 }
@@ -720,6 +722,7 @@ fn save_session(
     password: Option<String>,
     key_passphrase: Option<String>,
     ssh_key_id: Option<String>,
+    folder_id: Option<String>,
 ) -> Result<(), String> {
     let state = app.state::<AppState>();
 
@@ -740,6 +743,7 @@ fn save_session(
         auth_type: auth,
         key_path,
         ssh_key_id,
+        folder_id,
     };
 
     sessions.push(session);
@@ -1453,6 +1457,7 @@ fn plugin_api_create_session(
         auth_type: auth,
         key_path,
         ssh_key_id: None,
+        folder_id: None,
     };
 
     let mut sessions = load_sessions()?;
@@ -2107,6 +2112,15 @@ pub fn run() {
             storage::vault::vault_import_encrypted,
             storage::vault::vault_export_to_file,
             storage::vault::vault_import_from_file,
+            // Vault Selective Export/Import
+            storage::vault::vault_selective_export,
+            storage::vault::vault_selective_import_preview,
+            storage::vault::vault_selective_import_execute,
+            // Vault Folders
+            storage::vault::create_vault_folder,
+            storage::vault::rename_vault_folder,
+            storage::vault::delete_vault_folder,
+            storage::vault::list_vault_folders,
             // FIDO2 Security Keys
             storage::vault::is_security_key_available,
             storage::vault::detect_security_keys,

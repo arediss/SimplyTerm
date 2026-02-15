@@ -10,8 +10,9 @@ use super::state::VaultState;
 use super::types::{
     BastionAuthType, BastionProfile, BastionProfileInfo,
     SshKeyProfile, SshKeyProfileInfo,
-    VaultBundle, VaultCredentialType,
+    VaultBundle, VaultCredentialType, VaultFolder,
     VaultExportResult, VaultStatus, SyncMeta,
+    ImportPreview, ImportResult,
 };
 
 /// Store the vault state in Tauri's managed state
@@ -281,6 +282,85 @@ pub fn unlock_vault_with_security_key(
 #[tauri::command]
 pub fn remove_vault_security_key(vault: State<VaultStateHandle>) -> Result<(), String> {
     vault.remove_security_key()
+}
+
+// ============================================================================
+// Selective Export / Import Commands
+// ============================================================================
+
+/// Export selected items to an encrypted .stvault file
+#[tauri::command]
+pub fn vault_selective_export(
+    vault: State<VaultStateHandle>,
+    file_path: String,
+    folder_ids: Vec<String>,
+    session_ids: Vec<String>,
+    bastion_ids: Vec<String>,
+    ssh_key_ids: Vec<String>,
+    export_password: String,
+) -> Result<(), String> {
+    let data = vault.selective_export(&folder_ids, &session_ids, &bastion_ids, &ssh_key_ids, &export_password)?;
+    std::fs::write(&file_path, data)
+        .map_err(|e| format!("Failed to write export file: {}", e))
+}
+
+/// Preview the contents of a selective export file
+#[tauri::command]
+pub fn vault_selective_import_preview(
+    file_path: String,
+    import_password: String,
+) -> Result<ImportPreview, String> {
+    VaultState::selective_import_preview(&file_path, &import_password)
+}
+
+/// Import items from a selective export file into the current vault
+#[tauri::command]
+pub fn vault_selective_import_execute(
+    vault: State<VaultStateHandle>,
+    file_path: String,
+    import_password: String,
+) -> Result<ImportResult, String> {
+    vault.selective_import_execute(&file_path, &import_password)
+}
+
+// ============================================================================
+// Folder Commands
+// ============================================================================
+
+/// Create a new vault folder
+#[tauri::command]
+pub fn create_vault_folder(
+    vault: State<VaultStateHandle>,
+    name: String,
+) -> Result<VaultFolder, String> {
+    vault.create_folder(&name)
+}
+
+/// Rename a vault folder
+#[tauri::command]
+pub fn rename_vault_folder(
+    vault: State<VaultStateHandle>,
+    id: String,
+    name: String,
+) -> Result<bool, String> {
+    vault.rename_folder(&id, &name)
+}
+
+/// Delete a vault folder (items become unassigned)
+#[tauri::command]
+pub fn delete_vault_folder(
+    vault: State<VaultStateHandle>,
+    id: String,
+) -> Result<bool, String> {
+    vault.delete_folder(&id)
+}
+
+/// List all vault folders
+#[tauri::command]
+pub fn list_vault_folders(
+    vault: State<VaultStateHandle>,
+) -> Result<Vec<VaultFolder>, String> {
+    vault.list_folders()
 }
 
 // ============================================================================
