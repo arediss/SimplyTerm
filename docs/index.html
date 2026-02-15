@@ -652,15 +652,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-family: var(--font-mono);
-      font-weight: 700;
-      font-size: 1.1rem;
     }
-    .tech-icon.rust { color: var(--peach); }
-    .tech-icon.tauri { color: var(--yellow); }
-    .tech-icon.react { color: var(--blue); }
-    .tech-icon.ts { color: var(--blue); }
-    .tech-icon.xterm { color: var(--green); }
 
     .tech-name {
       font-size: 0.85rem;
@@ -715,6 +707,74 @@
       position: relative;
     }
     .cta-inner .btn-primary { position: relative; }
+
+    /* ── Acknowledgments ──────────────────────────────── */
+    .acknowledgments {
+      padding: 60px 0;
+      text-align: center;
+      position: relative;
+    }
+    .acknowledgments::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--surface-1), transparent);
+    }
+    .ack-title {
+      font-size: 0.8rem;
+      font-family: var(--font-mono);
+      font-weight: 500;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 32px;
+    }
+    .ack-grid {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: clamp(32px, 5vw, 56px);
+      flex-wrap: wrap;
+    }
+    .ack-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      padding: 16px 20px;
+      border-radius: 14px;
+      transition: background 0.2s;
+    }
+    .ack-item:hover { background: rgba(49, 50, 68, 0.3); }
+    .ack-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+    }
+    .ack-icon.jetbrains { background: rgba(250, 179, 135, 0.1); color: var(--peach); }
+    .ack-icon.sonar { background: rgba(137, 180, 250, 0.1); color: var(--blue); }
+    .ack-icon.claude { background: rgba(203, 166, 247, 0.1); color: var(--mauve); }
+    .ack-name {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--text-sub);
+    }
+    .ack-desc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      max-width: 160px;
+      line-height: 1.4;
+    }
 
     /* ── Footer ────────────────────────────────────────── */
     footer {
@@ -964,7 +1024,7 @@
             </div>
           </li>
           <li>
-            <span class="tf-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82 1.18V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 7.18 19.4"/></svg></span>
+            <span class="tf-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="19" cy="11.5" r="2.5"/><circle cx="6.5" cy="8" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/><path d="M2.5 21.5s2-3 4.5-3c1.5 0 2.5 1 4 1s3-1.5 4.5-1.5 3.5 1.5 3.5 1.5"/></svg></span>
             <div class="tf-text">
               <strong>Customizable Appearance</strong>
               <span>Themes, fonts, cursor styles, window effects (Acrylic, Mica)</span>
@@ -1032,29 +1092,23 @@
 
       <div class="tech-grid reveal reveal-delay-2">
         <div class="tech-item">
-          <div class="tech-icon rust">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M23.835 11.703a1.252 1.252 0 00-.665-.665l-.381-.162c.004-.053.012-.106.012-.16V10.5a1.239 1.239 0 00-.078-.425l.003-.009-.34-.28a.53.53 0 00.008-.085c0-.116-.037-.224-.1-.312l.1-.361a1.268 1.268 0 00-.318-.633l-.174-.175a.546.546 0 00.016-.128.54.54 0 00-.058-.243l.196-.42a1.26 1.26 0 00-.495-.735l-.23-.133a.534.534 0 00-.057-.377l.262-.465a1.26 1.26 0 00-.636-.788h-.001l-.27-.094a.536.536 0 00-.123-.352l.315-.492a1.26 1.26 0 00-.745-.793l-.289-.054a.536.536 0 00-.186-.31l.356-.503a1.26 1.26 0 00-.826-.75l-.296-.012a.535.535 0 00-.243-.257l.386-.497a1.26 1.26 0 00-.879-.661l-.293.032a.536.536 0 00-.294-.194l.404-.475a1.256 1.256 0 00-.91-.534l-.28.073a.537.537 0 00-.336-.125L18.34.825a1.256 1.256 0 00-.92-.373l-.258.113a.536.536 0 00-.369-.054l.402-.427a1.257 1.257 0 00-.906-.184l-.231.15a.537.537 0 00-.39.018l.374-.394A1.26 1.26 0 0015.17.005l-.198.181a.535.535 0 00-.4.088l.335-.348a1.258 1.258 0 00-.83.305l-.16.209a.536.536 0 00-.399.155l.287-.293a1.259 1.259 0 00-.75.526l-.118.231a.534.534 0 00-.387.216l.233-.231a1.26 1.26 0 00-.641.712l-.073.248a.536.536 0 00-.362.273l.171-.164a1.257 1.257 0 00-.505.858l-.027.256a.536.536 0 00-.328.32l.106-.093a1.258 1.258 0 00-.347.96l.02.255a.536.536 0 00-.282.358l.038-.02a1.256 1.256 0 00-.173 1.013l.067.245a.536.536 0 00-.227.387v.054A1.259 1.259 0 009.9 7.15l.112.226a.534.534 0 00-.166.402l-.025.038a1.259 1.259 0 00.17 1.004l.153.2a.536.536 0 00-.099.406l-.06.025a1.259 1.259 0 00.346.95l.19.167a.536.536 0 00-.03.398l-.09.014a1.26 1.26 0 00.506.85l.22.13a.534.534 0 00.038.387l-.116.003a1.257 1.257 0 00.644.71l.244.087a.534.534 0 00.104.366l-.136-.006a1.26 1.26 0 00.76.534l.26.043a.535.535 0 00.166.335h-.15a1.26 1.26 0 00.846.327l.268-.003a.536.536 0 00.222.293l-.158.014a1.259 1.259 0 00.907.098l.267-.049a.537.537 0 00.271.24l-.155.032a1.257 1.257 0 00.933-.137l.256-.095a.537.537 0 00.31.179l-.142.049a1.257 1.257 0 00.929-.365l.238-.138a.536.536 0 00.341.112l-.12.064a1.259 1.259 0 00.893-.573l.21-.178a.536.536 0 00.36.04l-.09.076a1.256 1.256 0 00.828-.756l.176-.213a.537.537 0 00.367-.032l-.056.085a1.258 1.258 0 00.735-.904l.136-.241a.537.537 0 00.362-.104l-.017.09a1.258 1.258 0 00.618-1.014l.091-.264a.536.536 0 00.344-.17l.026.09a1.258 1.258 0 00.482-1.08l.044-.275a.536.536 0 00.315-.233l.066.083a1.257 1.257 0 00.33-1.1l-.005-.28a.536.536 0 00.275-.289l.103.073a1.255 1.255 0 00.165-1.073z"/></svg>
-          </div>
+          <div class="tech-icon"><img src="icons/rust.svg" alt="Rust" width="28" height="28"></div>
           <span class="tech-name">Rust</span>
         </div>
         <div class="tech-item">
-          <div class="tech-icon tauri">T</div>
+          <div class="tech-icon"><img src="icons/tauri.svg" alt="Tauri" width="28" height="28"></div>
           <span class="tech-name">Tauri 2</span>
         </div>
         <div class="tech-item">
-          <div class="tech-icon react">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M14.23 12.004a2.236 2.236 0 0 1-2.235 2.236 2.236 2.236 0 0 1-2.236-2.236 2.236 2.236 0 0 1 2.235-2.236 2.236 2.236 0 0 1 2.236 2.236zm2.648-10.69c-1.346 0-3.107.96-4.888 2.622-1.78-1.653-3.542-2.602-4.887-2.602-.31 0-.592.06-.84.176C4.78 2.19 4.234 4.07 4.66 6.73c-2.588.96-4.16 2.45-4.16 3.835 0 1.387 1.577 2.88 4.17 3.84-.426 2.657.12 4.533 1.607 5.212.248.113.53.173.84.173 1.345 0 3.106-.958 4.887-2.618 1.78 1.654 3.54 2.603 4.886 2.603.31 0 .592-.06.84-.176 1.486-.679 2.033-2.555 1.607-5.212 2.593-.96 4.17-2.453 4.17-3.84s-1.577-2.876-4.17-3.836c.425-2.658-.121-4.538-1.607-5.216a1.92 1.92 0 0 0-.84-.176zm-.002 1.06c.175 0 .323.04.448.097.88.4 1.244 1.778.894 3.77a17.01 17.01 0 0 0-.21 1.64 22.453 22.453 0 0 0-2.535-.565 22.433 22.433 0 0 0-1.655-1.992c1.498-1.397 2.89-2.195 3.754-2.195zM9.88 2.37c.175 0 .324.04.448.097.88.4 1.243 1.778.893 3.77-.02.11-.044.224-.07.34a22.357 22.357 0 0 0-2.535.564 22.573 22.573 0 0 0-1.655 1.993c-1.497-1.4-2.888-2.196-3.753-2.196-.175 0-.323-.038-.447-.095-.88-.402-1.244-1.78-.894-3.772.02-.11.044-.224.07-.34.57-.174 1.21-.32 1.91-.43a14.092 14.092 0 0 1 2.32-.14c.856 0 1.69.046 2.484.135.252.03.5.066.742.108l.217-.035zm.007 1.61a20.46 20.46 0 0 1 2.115 2.25 20.473 20.473 0 0 1-2.116-.002 20.563 20.563 0 0 1 0-2.249zM5.01 6.665c.088.413.19.84.308 1.28a20.4 20.4 0 0 1 1.233-2.13 20.46 20.46 0 0 1-1.54.85zm13.98 0c-.526-.304-1.07-.59-1.633-.855a20.46 20.46 0 0 1 1.326 2.14c.118-.44.22-.867.308-1.285zM12 8.07a18.36 18.36 0 0 1 1.813 1.93A18.266 18.266 0 0 1 12 9.986a18.32 18.32 0 0 1-1.813.015A18.354 18.354 0 0 1 12 8.07zm-3.29.843a18.466 18.466 0 0 0-.993 1.776 18.442 18.442 0 0 0 .993-1.776zm6.58 0a18.472 18.472 0 0 0-.993 1.776 18.472 18.472 0 0 0 .993-1.776zM1.56 10.565c0 .798 1.133 1.88 3.158 2.636-.197-.752-.362-1.545-.49-2.37a17.096 17.096 0 0 1-.49-2.37C1.695 9.123 1.56 9.97 1.56 10.565zm20.88 0c0-.594-.134-1.442-2.178-2.104.128.825.293 1.618.49 2.37.128.825.293 1.618.49 2.37 2.025-.756 3.158-1.838 3.158-2.636z"/></svg>
-          </div>
+          <div class="tech-icon"><img src="icons/react.svg" alt="React" width="28" height="28"></div>
           <span class="tech-name">React 19</span>
         </div>
         <div class="tech-item">
-          <div class="tech-icon ts">TS</div>
+          <div class="tech-icon"><img src="icons/typescript.svg" alt="TypeScript" width="28" height="28"></div>
           <span class="tech-name">TypeScript</span>
         </div>
         <div class="tech-item">
-          <div class="tech-icon xterm">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-          </div>
+          <div class="tech-icon"><img src="icons/xterm.svg" alt="xterm.js" width="28" height="28"></div>
           <span class="tech-name">xterm.js</span>
         </div>
       </div>
@@ -1072,6 +1126,36 @@
         <a href="https://github.com/arediss/SimplyTerm" target="_blank" class="btn-primary">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
           Get SimplyTerm
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Acknowledgments ────────────────────────────── -->
+  <section class="acknowledgments">
+    <div class="container">
+      <p class="ack-title reveal">Special thanks to</p>
+      <div class="ack-grid">
+        <a href="https://www.jetbrains.com/" target="_blank" class="ack-item reveal">
+          <div class="ack-icon jetbrains">
+            <img src="icons/jetbrains.svg" alt="JetBrains" width="24" height="24">
+          </div>
+          <span class="ack-name">JetBrains</span>
+          <span class="ack-desc">Development tools & IDE support</span>
+        </a>
+        <a href="https://sonarcloud.io/" target="_blank" class="ack-item reveal reveal-delay-1">
+          <div class="ack-icon sonar">
+            <img src="icons/sonarqube.svg" alt="SonarCloud" width="24" height="24">
+          </div>
+          <span class="ack-name">SonarCloud</span>
+          <span class="ack-desc">Continuous code quality & security analysis</span>
+        </a>
+        <a href="https://claude.ai/" target="_blank" class="ack-item reveal reveal-delay-2">
+          <div class="ack-icon claude">
+            <img src="icons/anthropic.svg" alt="Claude by Anthropic" width="24" height="24">
+          </div>
+          <span class="ack-name">Claude</span>
+          <span class="ack-desc">AI pair programming by Anthropic</span>
         </a>
       </div>
     </div>
