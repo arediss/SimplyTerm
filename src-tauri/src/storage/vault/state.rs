@@ -687,147 +687,6 @@ impl VaultState {
     }
 
     // ========================================================================
-    // Bastion Profile Methods
-    // ========================================================================
-
-    /// List all bastion profiles (info only, no credentials)
-    pub fn list_bastions(&self) -> Result<Vec<super::types::BastionProfileInfo>, String> {
-        if !self.is_unlocked() {
-            return Err("Vault is locked".to_string());
-        }
-
-        let data = self.data.read();
-        let data = data.as_ref().ok_or("Vault data not loaded")?;
-
-        Ok(data.get_bastions().iter().map(|b| b.into()).collect())
-    }
-
-    /// Get a bastion profile info (without sensitive data)
-    pub fn get_bastion_info(&self, id: &str) -> Result<Option<super::types::BastionProfileInfo>, String> {
-        if !self.is_unlocked() {
-            return Err("Vault is locked".to_string());
-        }
-
-        let data = self.data.read();
-        let data = data.as_ref().ok_or("Vault data not loaded")?;
-
-        Ok(data.get_bastion(id).map(|b| b.into()))
-    }
-
-    /// Get a bastion profile with credentials (for actual connection use)
-    pub fn get_bastion_with_credentials(&self, id: &str) -> Result<Option<super::types::BastionProfile>, String> {
-        if !self.is_unlocked() {
-            return Err("Vault is locked".to_string());
-        }
-
-        let data = self.data.read();
-        let data = data.as_ref().ok_or("Vault data not loaded")?;
-
-        self.touch();
-        Ok(data.get_bastion(id).cloned())
-    }
-
-    /// Create a new bastion profile
-    pub fn create_bastion(
-        &self,
-        name: String,
-        host: String,
-        port: u16,
-        username: String,
-        auth_type: super::types::BastionAuthType,
-        password: Option<String>,
-        key_path: Option<String>,
-        key_passphrase: Option<String>,
-    ) -> Result<super::types::BastionProfileInfo, String> {
-        if !self.is_unlocked() {
-            return Err("Vault is locked".to_string());
-        }
-
-        let bastion = super::types::BastionProfile::new(
-            name,
-            host,
-            port,
-            username,
-            auth_type,
-            password,
-            key_path,
-            key_passphrase,
-        );
-        let info: super::types::BastionProfileInfo = (&bastion).into();
-
-        {
-            let mut data = self.data.write();
-            let data = data.as_mut().ok_or("Vault data not loaded")?;
-            data.store_bastion(bastion);
-        }
-
-        self.save_data()?;
-        self.touch();
-        Ok(info)
-    }
-
-    /// Update an existing bastion profile
-    pub fn update_bastion(
-        &self,
-        id: &str,
-        name: Option<String>,
-        host: Option<String>,
-        port: Option<u16>,
-        username: Option<String>,
-        auth_type: Option<super::types::BastionAuthType>,
-        password: Option<String>,
-        key_path: Option<String>,
-        key_passphrase: Option<String>,
-    ) -> Result<bool, String> {
-        if !self.is_unlocked() {
-            return Err("Vault is locked".to_string());
-        }
-
-        let updated = {
-            let mut data = self.data.write();
-            let data = data.as_mut().ok_or("Vault data not loaded")?;
-            data.update_bastion(
-                id,
-                super::types::BastionProfileUpdate {
-                    name,
-                    host,
-                    port,
-                    username,
-                    auth_type,
-                    password,
-                    key_path,
-                    key_passphrase,
-                },
-            )
-        };
-
-        if updated {
-            self.save_data()?;
-        }
-        self.touch();
-        Ok(updated)
-    }
-
-    /// Delete a bastion profile
-    pub fn delete_bastion(&self, id: &str) -> Result<bool, String> {
-        if !self.is_unlocked() {
-            return Err("Vault is locked".to_string());
-        }
-
-        let deleted = {
-            let mut data = self.data.write();
-            let data = data.as_mut().ok_or("Vault data not loaded")?;
-            data.delete_bastion(id)
-        };
-
-        if deleted {
-            self.save_data()?;
-        }
-        self.touch();
-        Ok(deleted)
-    }
-
-    // ========================================================================
     // SSH Key Profile Methods
     // ========================================================================
 
@@ -1024,11 +883,6 @@ impl VaultState {
 
             if was_deleted {
                 // Unassign items that referenced this folder
-                for bastion in &mut data.bastions {
-                    if bastion.folder_id.as_deref() == Some(id) {
-                        bastion.folder_id = None;
-                    }
-                }
                 for ssh_key in &mut data.ssh_keys {
                     if ssh_key.folder_id.as_deref() == Some(id) {
                         ssh_key.folder_id = None;
@@ -1044,6 +898,31 @@ impl VaultState {
         }
         self.touch();
         Ok(deleted)
+    }
+
+    /// Set the folder for an SSH key profile
+    pub fn set_ssh_key_folder(&self, id: &str, folder_id: Option<String>) -> Result<bool, String> {
+        if !self.is_unlocked() {
+            return Err("Vault is locked".to_string());
+        }
+
+        let found = {
+            let mut data = self.data.write();
+            let data = data.as_mut().ok_or("Vault data not loaded")?;
+
+            if let Some(ssh_key) = data.ssh_keys.iter_mut().find(|k| k.id == id) {
+                ssh_key.folder_id = folder_id;
+                true
+            } else {
+                false
+            }
+        };
+
+        if found {
+            self.save_data()?;
+        }
+        self.touch();
+        Ok(found)
     }
 
     /// List all folders
@@ -1066,7 +945,6 @@ impl VaultState {
         &self,
         folder_ids: &[String],
         session_ids: &[String],
-        bastion_ids: &[String],
         ssh_key_ids: &[String],
         export_password: &str,
     ) -> Result<Vec<u8>, String> {
@@ -1088,8 +966,6 @@ impl VaultState {
             .collect();
 
         // Build set of IDs explicitly selected + IDs in selected folders
-        let mut bastion_id_set: std::collections::HashSet<String> =
-            bastion_ids.iter().cloned().collect();
         let mut ssh_key_id_set: std::collections::HashSet<String> =
             ssh_key_ids.iter().cloned().collect();
         let mut session_id_set: std::collections::HashSet<String> =
@@ -1097,11 +973,6 @@ impl VaultState {
 
         // If a folder is selected, include all items in that folder
         for folder_id in folder_ids {
-            for b in &data.bastions {
-                if b.folder_id.as_deref() == Some(folder_id) {
-                    bastion_id_set.insert(b.id.clone());
-                }
-            }
             for k in &data.ssh_keys {
                 if k.folder_id.as_deref() == Some(folder_id) {
                     ssh_key_id_set.insert(k.id.clone());
@@ -1109,14 +980,7 @@ impl VaultState {
             }
         }
 
-        // Collect selected bastions and SSH keys
-        let selected_bastions: Vec<super::types::BastionProfile> = data
-            .bastions
-            .iter()
-            .filter(|b| bastion_id_set.contains(&b.id))
-            .cloned()
-            .collect();
-
+        // Collect selected SSH keys
         let selected_ssh_keys: Vec<super::types::SshKeyProfile> = data
             .ssh_keys
             .iter()
@@ -1165,7 +1029,6 @@ impl VaultState {
             folders: selected_folders,
             sessions: selected_sessions,
             credentials: selected_credentials,
-            bastions: selected_bastions,
             ssh_keys: selected_ssh_keys,
             exported_at: now,
         };
@@ -1201,7 +1064,6 @@ impl VaultState {
         Ok(super::types::ImportPreview {
             folders: payload.folders.iter().map(|f| f.name.clone()).collect(),
             sessions: payload.sessions.iter().map(|s| s.name.clone()).collect(),
-            bastions: payload.bastions.iter().map(|b| b.name.clone()).collect(),
             ssh_keys: payload.ssh_keys.iter().map(|k| k.name.clone()).collect(),
             exported_at: payload.exported_at,
         })
@@ -1222,7 +1084,6 @@ impl VaultState {
             folders_added: 0,
             sessions_added: 0,
             credentials_added: 0,
-            bastions_added: 0,
             ssh_keys_added: 0,
             duplicates_skipped: 0,
         };
@@ -1230,7 +1091,6 @@ impl VaultState {
         // Build ID remap tables
         let mut folder_remap: std::collections::HashMap<String, String> = std::collections::HashMap::new();
         let mut session_remap: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-        let mut bastion_remap: std::collections::HashMap<String, String> = std::collections::HashMap::new();
         let mut ssh_key_remap: std::collections::HashMap<String, String> = std::collections::HashMap::new();
 
         // Load existing sessions for dedup
@@ -1258,24 +1118,7 @@ impl VaultState {
                 }
             }
 
-            // 2. Import bastions (dedup by name + host)
-            for bastion in &payload.bastions {
-                let is_dup = data.bastions.iter().any(|b| b.name == bastion.name && b.host == bastion.host);
-                if is_dup {
-                    result.duplicates_skipped += 1;
-                } else {
-                    let new_id = uuid::Uuid::new_v4().to_string();
-                    bastion_remap.insert(bastion.id.clone(), new_id.clone());
-                    let mut new_bastion = bastion.clone();
-                    new_bastion.id = new_id;
-                    // Remap folder_id
-                    new_bastion.folder_id = bastion.folder_id.as_ref().and_then(|fid| folder_remap.get(fid).cloned());
-                    data.bastions.push(new_bastion);
-                    result.bastions_added += 1;
-                }
-            }
-
-            // 3. Import SSH keys (dedup by name + key_path)
+            // 2. Import SSH keys (dedup by name + key_path)
             for ssh_key in &payload.ssh_keys {
                 let is_dup = data.ssh_keys.iter().any(|k| k.name == ssh_key.name && k.key_path == ssh_key.key_path);
                 if is_dup {
@@ -1292,7 +1135,7 @@ impl VaultState {
                 }
             }
 
-            // 4. Import sessions (dedup by name + host + port + username)
+            // 3. Import sessions (dedup by name + host + port + username)
             for session in &payload.sessions {
                 let is_dup = all_sessions.iter().any(|s| {
                     s.name == session.name
@@ -1316,7 +1159,7 @@ impl VaultState {
                 }
             }
 
-            // 5. Import credentials (remap session IDs)
+            // 4. Import credentials (remap session IDs)
             for cred in &payload.credentials {
                 // Parse old session_id from credential ID (format: "session_id:type")
                 let parts: Vec<&str> = cred.id.splitn(2, ':').collect();

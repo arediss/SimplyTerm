@@ -283,13 +283,12 @@ export function useVault() {
     filePath: string,
     folderIds: string[],
     sessionIds: string[],
-    bastionIds: string[],
     sshKeyIds: string[],
     exportPassword: string,
   ) => {
     try {
       await invoke('vault_selective_export', {
-        filePath, folderIds, sessionIds, bastionIds, sshKeyIds, exportPassword,
+        filePath, folderIds, sessionIds, sshKeyIds, exportPassword,
       });
       return { success: true as const };
     } catch (err) {

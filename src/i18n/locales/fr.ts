@@ -178,30 +178,6 @@ export default {
       deleteWarning: "Cliquez à nouveau pour confirmer. Cette action est irréversible.",
     },
 
-    // --- Section Bastions ---
-    bastions: {
-      // Titre de la section
-      title: "Jump Hosts (Bastions)",
-      // Description de la section
-      description: "Configurer les serveurs de rebond SSH",
-      // Message aucun bastion
-      noBastions: "Aucun serveur de rebond configuré",
-      // Message de comptage
-      count_one: "{{count}} serveur de rebond configuré",
-      count_other: "{{count}} serveurs de rebond configurés",
-      // Bouton ajouter
-      add: "Ajouter",
-      // Titre formulaire création
-      create: "Nouveau serveur de rebond",
-      // Titre formulaire édition
-      edit: "Modifier le serveur de rebond",
-      // Champ nom
-      name: "Nom",
-      // Laisser vide pour garder la valeur actuelle
-      leaveEmptyToKeep: "laisser vide pour garder",
-      // Avertissement vault verrouillé
-      vaultLocked: "Déverrouillez le vault pour gérer les serveurs de rebond",
-    },
 
     // --- Section Sécurité ---
     security: {
@@ -387,6 +363,23 @@ export default {
       exportError: "Erreur lors de l'export du coffre",
       importError: "Erreur lors de l'import du coffre",
       backupHint: "Le fichier exporté est chiffré avec votre mot de passe principal.",
+      // Vault Manager
+      vaultContentsTitle: "Contenu du coffre",
+      vaultItems: "éléments",
+      vaultLockedTitle: "Coffre verrouillé",
+      vaultLockedDesc: "Déverrouillez pour voir le contenu",
+      emptyFolder: "Dossier vide",
+      emptyVault: "Votre coffre est vide",
+      emptyVaultDesc: "Les sessions et clés SSH apparaîtront ici",
+      settingsLabel: "Paramètres",
+      selectedCount: "sélectionné(s)",
+      includeCredentials: "Inclure les identifiants (mots de passe)",
+      includeSshKeys: "Inclure les clés SSH",
+      // Avertissements import
+      importWarning: "Les éléments importés seront fusionnés avec votre coffre existant",
+      importToFolder: "Importer dans un nouveau dossier",
+      importFolderName: "Nom du dossier",
+      unlock: "Déverrouiller",
       // Dossiers
       foldersTitle: "Dossiers",
       foldersDesc: "Organisez les éléments de votre coffre en dossiers",

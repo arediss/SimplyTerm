@@ -1,26 +1,28 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Folder, Server, Key, Check, Loader2, AlertCircle, FileSearch } from "lucide-react";
+import { Check, Loader2, AlertCircle, FileSearch, FolderPlus } from "lucide-react";
 import Modal from "../Modal";
 import { PasswordInput } from "../UI/PasswordInput";
 import type { useVault } from "../../hooks";
-import type { ImportPreview, ImportResult } from "../../types/vault";
+import type { ImportResult } from "../../types/vault";
 
 interface SelectiveImportModalProps {
   isOpen: boolean;
   onClose: () => void;
   vault: ReturnType<typeof useVault>;
+  onImportComplete?: () => void;
 }
 
-export default function SelectiveImportModal({ isOpen, onClose, vault }: Readonly<SelectiveImportModalProps>) {
+export default function SelectiveImportModal({ isOpen, onClose, vault, onImportComplete }: Readonly<SelectiveImportModalProps>) {
   const { t } = useTranslation();
 
   const [filePath, setFilePath] = useState<string | null>(null);
   const [password, setPassword] = useState("");
-  const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [importToFolder, setImportToFolder] = useState(false);
+  const [folderName, setFolderName] = useState(() => `Import ${new Date().toISOString().slice(0, 10)}`);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
-  const [status, setStatus] = useState<"idle" | "previewing" | "previewed" | "importing" | "done" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "importing" | "done" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
 
   const handleChooseFile = async () => {
@@ -30,25 +32,9 @@ export default function SelectiveImportModal({ isOpen, onClose, vault }: Readonl
     });
     if (path) {
       setFilePath(path);
-      setPreview(null);
       setImportResult(null);
       setStatus("idle");
       setError(null);
-    }
-  };
-
-  const handlePreview = async () => {
-    if (!filePath || !password) return;
-    setStatus("previewing");
-    setError(null);
-
-    const result = await vault.selectiveImportPreview(filePath, password);
-    if (result.success) {
-      setPreview(result.preview);
-      setStatus("previewed");
-    } else {
-      setStatus("error");
-      setError(t("settings.security.wrongPassword"));
     }
   };
 
@@ -61,6 +47,7 @@ export default function SelectiveImportModal({ isOpen, onClose, vault }: Readonl
     if (result.success) {
       setImportResult(result.result);
       setStatus("done");
+      onImportComplete?.();
     } else {
       setStatus("error");
       setError(result.error || t("settings.security.importError"));
@@ -70,20 +57,24 @@ export default function SelectiveImportModal({ isOpen, onClose, vault }: Readonl
   const handleClose = () => {
     setFilePath(null);
     setPassword("");
-    setPreview(null);
+    setImportToFolder(false);
+    setFolderName(`Import ${new Date().toISOString().slice(0, 10)}`);
     setImportResult(null);
     setStatus("idle");
     setError(null);
     onClose();
   };
 
-  const totalPreviewItems = preview
-    ? preview.folders.length + preview.sessions.length + preview.bastions.length + preview.ssh_keys.length
-    : 0;
+  const canImport = filePath && password.length > 0 && status !== "importing" && status !== "done";
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title={t("settings.security.selectiveImportTitle")} width="lg">
+    <Modal isOpen={isOpen} onClose={handleClose} title={t("settings.security.selectiveImportTitle")} width="md">
       <div className="space-y-4">
+        {/* Warning */}
+        <p className="text-xs text-text-muted bg-warning/5 border border-warning/20 rounded-lg px-3 py-2">
+          {t("settings.security.importWarning")}
+        </p>
+
         {/* File selection */}
         <div className="flex items-center gap-3">
           <button
@@ -109,42 +100,28 @@ export default function SelectiveImportModal({ isOpen, onClose, vault }: Readonl
           />
         )}
 
-        {/* Preview button */}
-        {filePath && password && status !== "previewed" && status !== "done" && (
-          <button
-            onClick={handlePreview}
-            disabled={status === "previewing"}
-            className="w-full py-2.5 bg-surface-0/30 text-text text-sm rounded-lg hover:bg-surface-0/50 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {status === "previewing" ? (
-              <><Loader2 size={16} className="animate-spin" />{t("settings.security.preview")}...</>
-            ) : (
-              t("settings.security.preview")
+        {/* Import to folder option */}
+        {filePath && password && status !== "done" && (
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm text-text cursor-pointer">
+              <input
+                type="checkbox"
+                checked={importToFolder}
+                onChange={(e) => setImportToFolder(e.target.checked)}
+                className="accent-accent"
+              />
+              <FolderPlus size={14} className="text-accent" />
+              {t("settings.security.importToFolder")}
+            </label>
+            {importToFolder && (
+              <input
+                type="text"
+                value={folderName}
+                onChange={(e) => setFolderName(e.target.value)}
+                placeholder={t("settings.security.importFolderName")}
+                className="w-full px-3 py-2 bg-surface-0/30 border border-surface-0/50 rounded-lg text-sm text-text placeholder-text-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
+              />
             )}
-          </button>
-        )}
-
-        {/* Preview results */}
-        {preview && status === "previewed" && (
-          <div className="bg-surface-0/20 rounded-lg p-4 space-y-2">
-            <p className="text-sm font-medium text-text">{t("settings.security.previewDesc")}</p>
-            <div className="space-y-1">
-              {preview.folders.length > 0 && (
-                <PreviewGroup icon={<Folder size={14} className="text-accent" />} items={preview.folders} />
-              )}
-              {preview.sessions.length > 0 && (
-                <PreviewGroup icon={<Server size={14} className="text-blue" />} items={preview.sessions} />
-              )}
-              {preview.bastions.length > 0 && (
-                <PreviewGroup icon={<Server size={14} className="text-peach" />} items={preview.bastions} />
-              )}
-              {preview.ssh_keys.length > 0 && (
-                <PreviewGroup icon={<Key size={14} className="text-green" />} items={preview.ssh_keys} />
-              )}
-            </div>
-            <p className="text-xs text-text-muted mt-1">
-              {totalPreviewItems} item(s)
-            </p>
           </div>
         )}
 
@@ -158,7 +135,6 @@ export default function SelectiveImportModal({ isOpen, onClose, vault }: Readonl
             <div className="text-xs text-text-muted space-y-1">
               {importResult.folders_added > 0 && <p>{t("settings.security.itemsAdded", { count: importResult.folders_added })} (folders)</p>}
               {importResult.sessions_added > 0 && <p>{t("settings.security.itemsAdded", { count: importResult.sessions_added })} (sessions)</p>}
-              {importResult.bastions_added > 0 && <p>{t("settings.security.itemsAdded", { count: importResult.bastions_added })} (bastions)</p>}
               {importResult.ssh_keys_added > 0 && <p>{t("settings.security.itemsAdded", { count: importResult.ssh_keys_added })} (SSH keys)</p>}
               {importResult.credentials_added > 0 && <p>{t("settings.security.itemsAdded", { count: importResult.credentials_added })} (credentials)</p>}
               {importResult.duplicates_skipped > 0 && (
@@ -184,40 +160,21 @@ export default function SelectiveImportModal({ isOpen, onClose, vault }: Readonl
           >
             {status === "done" ? t("common.close") : t("common.cancel")}
           </button>
-          {status === "previewed" && (
+          {status !== "done" && (
             <button
               onClick={handleImport}
-              className="flex-1 py-2.5 bg-accent text-white text-sm font-medium rounded-lg hover:bg-accent/90 transition-colors flex items-center justify-center gap-2"
+              disabled={!canImport}
+              className="flex-1 py-2.5 bg-accent text-white text-sm font-medium rounded-lg hover:bg-accent/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {t("settings.security.importConfirm")}
-            </button>
-          )}
-          {status === "importing" && (
-            <button
-              disabled
-              className="flex-1 py-2.5 bg-accent/50 text-white text-sm font-medium rounded-lg flex items-center justify-center gap-2"
-            >
-              <Loader2 size={16} className="animate-spin" />
-              {t("settings.security.importing")}
+              {status === "importing" ? (
+                <><Loader2 size={16} className="animate-spin" />{t("settings.security.importing")}</>
+              ) : (
+                t("settings.security.importConfirm")
+              )}
             </button>
           )}
         </div>
       </div>
     </Modal>
-  );
-}
-
-function PreviewGroup({ icon, items }: Readonly<{ icon: React.ReactNode; items: string[] }>) {
-  return (
-    <div className="flex items-start gap-2">
-      <span className="mt-0.5">{icon}</span>
-      <div className="flex flex-wrap gap-1">
-        {items.map((item) => (
-          <span key={item} className="px-2 py-0.5 bg-surface-0/30 rounded text-xs text-text">
-            {item}
-          </span>
-        ))}
-      </div>
-    </div>
   );
 }

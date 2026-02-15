@@ -57,7 +57,6 @@ export interface VaultFolder {
 export interface ImportPreview {
   folders: string[];
   sessions: string[];
-  bastions: string[];
   ssh_keys: string[];
   exported_at: number;
 }
@@ -67,7 +66,6 @@ export interface ImportResult {
   folders_added: number;
   sessions_added: number;
   credentials_added: number;
-  bastions_added: number;
   ssh_keys_added: number;
   duplicates_skipped: number;
 }

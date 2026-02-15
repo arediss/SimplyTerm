@@ -8,7 +8,6 @@ use tauri::State;
 use super::fido2::{self, SecurityKeyInfo};
 use super::state::VaultState;
 use super::types::{
-    BastionAuthType, BastionProfile, BastionProfileInfo,
     SshKeyProfile, SshKeyProfileInfo,
     VaultBundle, VaultCredentialType, VaultFolder,
     VaultExportResult, VaultStatus, SyncMeta,
@@ -295,11 +294,10 @@ pub fn vault_selective_export(
     file_path: String,
     folder_ids: Vec<String>,
     session_ids: Vec<String>,
-    bastion_ids: Vec<String>,
     ssh_key_ids: Vec<String>,
     export_password: String,
 ) -> Result<(), String> {
-    let data = vault.selective_export(&folder_ids, &session_ids, &bastion_ids, &ssh_key_ids, &export_password)?;
+    let data = vault.selective_export(&folder_ids, &session_ids, &ssh_key_ids, &export_password)?;
     std::fs::write(&file_path, data)
         .map_err(|e| format!("Failed to write export file: {}", e))
 }
@@ -363,76 +361,14 @@ pub fn list_vault_folders(
     vault.list_folders()
 }
 
-// ============================================================================
-// Bastion Profile Commands
-// ============================================================================
-
-/// List all bastion profiles (without sensitive data)
+/// Set an SSH key's folder
 #[tauri::command]
-pub fn list_bastions(vault: State<VaultStateHandle>) -> Result<Vec<BastionProfileInfo>, String> {
-    vault.list_bastions()
-}
-
-/// Get a bastion profile by ID (without sensitive data)
-#[tauri::command]
-pub fn get_bastion(vault: State<VaultStateHandle>, id: String) -> Result<Option<BastionProfileInfo>, String> {
-    vault.get_bastion_info(&id)
-}
-
-/// Get full bastion profile including credentials (for connection use)
-#[tauri::command]
-pub fn get_bastion_credentials(vault: State<VaultStateHandle>, id: String) -> Result<Option<BastionProfile>, String> {
-    vault.get_bastion_with_credentials(&id)
-}
-
-/// Create a new bastion profile
-#[tauri::command]
-pub fn create_bastion(
-    vault: State<VaultStateHandle>,
-    name: String,
-    host: String,
-    port: u16,
-    username: String,
-    auth_type: String,
-    password: Option<String>,
-    key_path: Option<String>,
-    key_passphrase: Option<String>,
-) -> Result<BastionProfileInfo, String> {
-    let auth = match auth_type.as_str() {
-        "password" => BastionAuthType::Password,
-        "key" => BastionAuthType::Key,
-        _ => return Err(format!("Invalid auth type: {}", auth_type)),
-    };
-
-    vault.create_bastion(name, host, port, username, auth, password, key_path, key_passphrase)
-}
-
-/// Update a bastion profile
-#[tauri::command]
-pub fn update_bastion(
+pub fn set_ssh_key_folder(
     vault: State<VaultStateHandle>,
     id: String,
-    name: Option<String>,
-    host: Option<String>,
-    port: Option<u16>,
-    username: Option<String>,
-    auth_type: Option<String>,
-    password: Option<String>,
-    key_path: Option<String>,
-    key_passphrase: Option<String>,
+    folder_id: Option<String>,
 ) -> Result<bool, String> {
-    let auth = auth_type.map(|t| match t.as_str() {
-        "password" => BastionAuthType::Password,
-        _ => BastionAuthType::Key,
-    });
-
-    vault.update_bastion(&id, name, host, port, username, auth, password, key_path, key_passphrase)
-}
-
-/// Delete a bastion profile
-#[tauri::command]
-pub fn delete_bastion(vault: State<VaultStateHandle>, id: String) -> Result<bool, String> {
-    vault.delete_bastion(&id)
+    vault.set_ssh_key_folder(&id, folder_id)
 }
 
 // ============================================================================
