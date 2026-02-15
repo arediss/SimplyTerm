@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 const widthClasses: Record<string, string> = {
   sm: "max-w-sm",
@@ -46,6 +47,17 @@ function Modal({ isOpen, onClose, title, children, width = "md" }: Readonly<Moda
         className="absolute inset-0 bg-black/70"
         aria-hidden="true"
         onClick={onClose}
+      />
+
+      {/* Drag zone — allows moving the window even with modal open */}
+      <div
+        className="absolute top-0 left-0 right-0 h-10 z-[51] cursor-default"
+        onMouseDown={(e) => {
+          if (e.buttons === 1) {
+            e.preventDefault();
+            getCurrentWindow().startDragging();
+          }
+        }}
       />
 
       {/* Modal with floating title */}
