@@ -48,23 +48,23 @@ export function StyledCheck({ checked, disabled, onClick, className }: Readonly<
   className?: string;
 }>) {
   return (
-    <span
-      role="checkbox"
-      aria-checked={checked}
-      aria-disabled={disabled}
-      tabIndex={disabled ? -1 : 0}
-      onClick={disabled ? undefined : onClick}
-      onKeyDown={disabled ? undefined : (e) => {
-        if (e.key === " " || e.key === "Enter") { e.preventDefault(); onClick?.(e as unknown as React.MouseEvent); }
-      }}
+    <label
       className={`inline-flex items-center justify-center w-[16px] h-[16px] rounded-[4px] border-[1.5px] transition-all duration-150 shrink-0 ${
         checked
           ? "bg-accent border-accent text-white"
           : "border-text-muted/30 bg-surface-0/10"
       } ${disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer hover:border-accent/60"} ${className || ""}`}
     >
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={() => { /* handled by parent onClick */ }}
+        onClick={disabled ? undefined : onClick}
+        className="sr-only"
+      />
       {checked && <Check size={10} strokeWidth={3} />}
-    </span>
+    </label>
   );
 }
 

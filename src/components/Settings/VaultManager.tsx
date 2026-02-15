@@ -516,19 +516,16 @@ export default function VaultManager({ vault }: Readonly<VaultManagerProps>) {
 
           {/* Options */}
           <div className="space-y-2.5 pt-3 border-t border-surface-0/20">
-            <div
-              role="checkbox"
-              aria-checked={includeSshKeys}
-              tabIndex={0}
-              className="flex items-center gap-2.5 text-sm text-text cursor-pointer select-none"
-              onClick={() => setIncludeSshKeys(!includeSshKeys)}
-              onKeyDown={(e) => {
-                if (e.key === " " || e.key === "Enter") { e.preventDefault(); setIncludeSshKeys(v => !v); }
-              }}
-            >
+            <label className="flex items-center gap-2.5 text-sm text-text cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={includeSshKeys}
+                onChange={() => setIncludeSshKeys(v => !v)}
+                className="sr-only"
+              />
               <StyledCheck checked={includeSshKeys} />
               {t("settings.security.includeSshKeys")}
-            </div>
+            </label>
           </div>
 
           {/* Error */}
