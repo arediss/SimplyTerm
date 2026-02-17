@@ -34,6 +34,12 @@ src-tauri/Cargo.lock
 .serena/
 BRAINSTORM.md
 
+# SonarQube local
+sonar-project.properties
+docker-compose.yml
+src-tauri/clippy-sonar.json
+.scannerwork/
+
 # Local files (not for repo)
 AUDIT.md
 ETA.md

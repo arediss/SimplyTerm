@@ -664,6 +664,70 @@ fn get_home_dir() -> Result<String, String> {
 }
 
 // ============================================================================
+// Commandes Local File System (for LocalFileBrowser)
+// ============================================================================
+
+#[derive(serde::Serialize)]
+struct LocalFileEntry {
+    name: String,
+    path: String,
+    is_dir: bool,
+    size: u64,
+    modified: Option<u64>,
+}
+
+#[tauri::command]
+fn local_list_dir(path: String) -> Result<Vec<LocalFileEntry>, String> {
+    let entries = std::fs::read_dir(&path)
+        .map_err(|e| format!("Failed to read directory: {}", e))?;
+    let mut result = Vec::new();
+    for entry in entries.flatten() {
+        let metadata = entry.metadata().map_err(|e| format!("Failed to read metadata: {}", e))?;
+        let modified = metadata.modified().ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs());
+        result.push(LocalFileEntry {
+            name: entry.file_name().to_string_lossy().to_string(),
+            path: entry.path().to_string_lossy().to_string(),
+            is_dir: metadata.is_dir(),
+            size: metadata.len(),
+            modified,
+        });
+    }
+    Ok(result)
+}
+
+#[tauri::command]
+fn local_mkdir(path: String) -> Result<(), String> {
+    std::fs::create_dir_all(&path)
+        .map_err(|e| format!("Failed to create directory: {}", e))
+}
+
+#[tauri::command]
+fn local_create_file(path: String) -> Result<(), String> {
+    std::fs::File::create(&path)
+        .map_err(|e| format!("Failed to create file: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
+fn local_delete(path: String, is_dir: bool) -> Result<(), String> {
+    if is_dir {
+        std::fs::remove_dir_all(&path)
+            .map_err(|e| format!("Failed to delete directory: {}", e))
+    } else {
+        std::fs::remove_file(&path)
+            .map_err(|e| format!("Failed to delete file: {}", e))
+    }
+}
+
+#[tauri::command]
+fn local_rename(old_path: String, new_path: String) -> Result<(), String> {
+    std::fs::rename(&old_path, &new_path)
+        .map_err(|e| format!("Failed to rename: {}", e))
+}
+
+// ============================================================================
 // Commandes Storage (Sessions sauvegardées)
 // ============================================================================
 
@@ -2022,6 +2086,12 @@ pub fn run() {
             close_pty_session,
             ssh_exec_command,
             get_home_dir,
+            // Local file system
+            local_list_dir,
+            local_mkdir,
+            local_create_file,
+            local_delete,
+            local_rename,
             // SFTP
             register_sftp_session,
             sftp_list,

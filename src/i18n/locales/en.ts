@@ -1127,7 +1127,17 @@ export default {
     itemsHidden: "{{count}} items ({{hidden}} hidden)",
     editing: "{{count}} editing",
     folder: "Folder",
+    // File operations
+    delete: "Delete",
+    newFile: "New file",
+    fileNamePlaceholder: "File name",
+    folderNamePlaceholder: "Folder name",
+    confirmDelete: "Confirm deletion",
+    deleteConfirmMessage: "Are you sure you want to delete:",
+    deleteFolderWarning: "This will permanently delete the folder and all its contents.",
+    dropToDownload: "Release here to download",
     // Download notice
+    downloading: "Downloading {{name}}...",
     downloaded: "Downloaded {{name}}",
   },
 };

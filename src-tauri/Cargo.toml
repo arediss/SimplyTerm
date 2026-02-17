@@ -1,6 +1,6 @@
 [package]
 name = "simplyterm"
-version = "0.7.1"
+version = "0.8.0"
 description = "A modern, fast, cross-platform terminal"
 authors = ["SimplyTerm"]
 edition = "2021"
