@@ -1121,7 +1121,17 @@ export default {
     itemsHidden: "{{count}} éléments ({{hidden}} masqués)",
     editing: "{{count}} en édition",
     folder: "Dossier",
+    // Opérations fichiers
+    delete: "Supprimer",
+    newFile: "Nouveau fichier",
+    fileNamePlaceholder: "Nom du fichier",
+    folderNamePlaceholder: "Nom du dossier",
+    confirmDelete: "Confirmer la suppression",
+    deleteConfirmMessage: "Voulez-vous vraiment supprimer :",
+    deleteFolderWarning: "Ceci supprimera définitivement le dossier et tout son contenu.",
+    dropToDownload: "Relâchez ici pour télécharger",
     // Notification de téléchargement
+    downloading: "Téléchargement de {{name}}...",
     downloaded: "{{name}} téléchargé",
   },
 };
