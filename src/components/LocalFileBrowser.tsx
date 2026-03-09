@@ -22,6 +22,7 @@ import {
   Edit3,
   Trash2,
   AlertTriangle,
+  Upload,
 } from "lucide-react";
 import { getFileIcon } from "../utils/fileIcons";
 
@@ -40,12 +41,13 @@ interface LocalFileBrowserProps {
   remoteDragging: { path: string; name: string; isDir: boolean } | null;
   localCurrentPathRef: React.RefObject<string>;
   refreshTrigger: number;
+  onUploadSelected?: (localPaths: string[]) => void;
 }
 
 
 const TOOLBAR_BTN = "p-1.5 rounded hover:bg-surface-0/50 text-text-muted hover:text-text transition-colors";
 
-export function LocalFileBrowser({ onDragStartFile, onClose, remoteDragging, localCurrentPathRef, refreshTrigger }: Readonly<LocalFileBrowserProps>) {
+export function LocalFileBrowser({ onDragStartFile, onClose, remoteDragging, localCurrentPathRef, refreshTrigger, onUploadSelected }: Readonly<LocalFileBrowserProps>) {
   const { t } = useTranslation();
   const [currentPath, setCurrentPath] = useState("");
   const [entries, setEntries] = useState<LocalFileEntry[]>([]);
@@ -55,6 +57,10 @@ export function LocalFileBrowser({ onDragStartFile, onClose, remoteDragging, loc
   const [editingPath, setEditingPath] = useState(false);
   const [pathInputValue, setPathInputValue] = useState("");
   const [pathCopied, setPathCopied] = useState(false);
+
+  // Multi-select state
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
+  const lastClickedRef = useRef<number>(-1);
 
   // Context menu
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; entry: LocalFileEntry | null } | null>(null);
@@ -80,6 +86,8 @@ export function LocalFileBrowser({ onDragStartFile, onClose, remoteDragging, loc
   const loadDirectory = useCallback(async (path: string) => {
     setLoading(true);
     setError(null);
+    setSelectedPaths(new Set());
+    lastClickedRef.current = -1;
     try {
       const result = await invoke<LocalFileEntry[]>("local_list_dir", { path });
       setEntries(result);
@@ -220,6 +228,41 @@ export function LocalFileBrowser({ onDragStartFile, onClose, remoteDragging, loc
     });
   }, [entries, showHidden, sortColumn, sortAsc]);
 
+  const selectedFiles = useMemo(() =>
+    visibleEntries.filter((e) => !e.is_dir && selectedPaths.has(e.path)),
+    [visibleEntries, selectedPaths],
+  );
+
+  const handleRowClick = useCallback((e: React.MouseEvent, entry: LocalFileEntry, index: number) => {
+    if (e.ctrlKey || e.metaKey) {
+      setSelectedPaths((prev) => {
+        const next = new Set(prev);
+        if (next.has(entry.path)) next.delete(entry.path);
+        else next.add(entry.path);
+        return next;
+      });
+      lastClickedRef.current = index;
+    } else if (e.shiftKey && lastClickedRef.current >= 0) {
+      const start = Math.min(lastClickedRef.current, index);
+      const end = Math.max(lastClickedRef.current, index);
+      setSelectedPaths((prev) => {
+        const next = new Set(prev);
+        for (let i = start; i <= end; i++) {
+          next.add(visibleEntries[i].path);
+        }
+        return next;
+      });
+    } else {
+      setSelectedPaths(new Set([entry.path]));
+      lastClickedRef.current = index;
+    }
+  }, [visibleEntries]);
+
+  const handleUploadSelected = useCallback(() => {
+    if (!onUploadSelected || selectedFiles.length === 0) return;
+    onUploadSelected(selectedFiles.map((f) => f.path));
+  }, [onUploadSelected, selectedFiles]);
+
   const formatSize = (bytes: number): string => {
     if (bytes === 0) return "-";
     const units = ["B", "KB", "MB", "GB", "TB"];
@@ -299,6 +342,19 @@ export function LocalFileBrowser({ onDragStartFile, onClose, remoteDragging, loc
         <button onClick={() => { setShowNewFileDialog(true); setNewFileName(""); }} className={TOOLBAR_BTN} title={t("sftp.newFile", "New file")}>
           <FilePlus size={14} />
         </button>
+        {selectedFiles.length > 0 && onUploadSelected && (
+          <>
+            <div className="w-px h-4 bg-surface-0/30 mx-1" />
+            <button
+              onClick={handleUploadSelected}
+              className="flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium text-blue bg-blue/10 hover:bg-blue/20 transition-colors"
+              title={t("sftp.uploadSelected", "Upload selected files to server")}
+            >
+              <Upload size={12} />
+              {t("sftp.uploadCount", "Upload ({{count}})", { count: selectedFiles.length })}
+            </button>
+          </>
+        )}
 
         {/* Path breadcrumb */}
         <div className="flex-1 mx-2 px-2 py-1 bg-surface-0/10 rounded border border-surface-0/20 text-xs text-text-muted flex items-center gap-0 min-w-0">
@@ -401,22 +457,33 @@ export function LocalFileBrowser({ onDragStartFile, onClose, remoteDragging, loc
               </tr>
             </thead>
             <tbody>
-              {visibleEntries.map((entry, index) => (
+              {visibleEntries.map((entry, index) => {
+                const isSelected = selectedPaths.has(entry.path);
+                return (
                 <tr
                   key={entry.path}
                   draggable={!entry.is_dir}
                   onDragStart={(e) => {
                     if (entry.is_dir) return;
-                    e.dataTransfer.setData("text/x-local-path", entry.path);
-                    e.dataTransfer.setData("text/x-local-name", entry.name);
+                    // If dragging a selected file, drag all selected files
+                    if (isSelected && selectedFiles.length > 1) {
+                      const paths = selectedFiles.map((f) => f.path);
+                      e.dataTransfer.setData("text/x-local-paths", JSON.stringify(paths));
+                      e.dataTransfer.setData("text/x-local-path", paths[0]);
+                      e.dataTransfer.setData("text/x-local-name", entry.name);
+                    } else {
+                      e.dataTransfer.setData("text/x-local-path", entry.path);
+                      e.dataTransfer.setData("text/x-local-name", entry.name);
+                    }
                     e.dataTransfer.effectAllowed = "copy";
                     onDragStartFile(entry.path, entry.name);
                   }}
                   onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }}
                   className={`
                     border-b border-surface-0/10 cursor-pointer transition-colors
-${index % 2 === 1 ? "bg-surface-0/5" : ""} hover:bg-surface-0/30
+                    ${isSelected ? "bg-blue/15 hover:bg-blue/20" : `${index % 2 === 1 ? "bg-surface-0/5" : ""} hover:bg-surface-0/30`}
                   `}
+                  onClick={(e) => handleRowClick(e, entry, index)}
                   onDoubleClick={() => { if (entry.is_dir) loadDirectory(entry.path); }}
                   onContextMenu={(e) => handleContextMenu(e, entry)}
                 >
@@ -454,15 +521,21 @@ ${index % 2 === 1 ? "bg-surface-0/5" : ""} hover:bg-surface-0/30
                     {formatDate(entry.modified)}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         )}
       </div>
 
       {/* Status bar */}
-      <div className="px-3 py-1 border-t border-surface-0/30 text-xs text-text-muted">
-        {visibleEntries.length} {t("sftp.items", { count: visibleEntries.length })}
+      <div className="px-3 py-1 border-t border-surface-0/30 text-xs text-text-muted flex items-center justify-between">
+        <span>{visibleEntries.length} {t("sftp.items", { count: visibleEntries.length })}</span>
+        {selectedPaths.size > 0 && (
+          <span className="text-blue">
+            {t("sftp.selectedCount", "{{count}} selected", { count: selectedPaths.size })}
+          </span>
+        )}
       </div>
 
       {/* Context menu */}
