@@ -124,6 +124,10 @@ export function useHostKeyVerification(): HostKeyVerification {
         await pendingHostKeyAction();
       }
     } catch (error) {
+      // Close the host key modal so the user doesn't have to dismiss it manually
+      // (which would trigger handleHostKeyReject and overwrite the real error)
+      setIsHostKeyModalOpen(false);
+      setHostKeyResult(null);
       setConnectionError(`Failed to finalize connection: ${error}`);
     } finally {
       setHostKeyLoading(false);

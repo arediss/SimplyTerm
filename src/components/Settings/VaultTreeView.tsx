@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
+import { invoke } from "@tauri-apps/api/core";
 import {
   ChevronRight,
   Folder,
@@ -13,6 +14,7 @@ import {
   Check,
   Package,
   GripVertical,
+  Fingerprint,
 } from "lucide-react";
 import type { SavedSession, SshKeyProfileInfo } from "../../types";
 import type { VaultFolder } from "../../types/vault";
@@ -133,7 +135,7 @@ function DragGhost({ drag }: Readonly<{ drag: DragState }>) {
 }
 
 function TreeItem({
-  id, type, name, subtitle,
+  id, type, name, subtitle, fingerprint,
   selectionMode, checked, disabled, onToggle,
   onDragStart,
 }: Readonly<{
@@ -141,6 +143,7 @@ function TreeItem({
   type: ItemType;
   name: string;
   subtitle?: string;
+  fingerprint?: string;
   selectionMode?: boolean;
   checked?: boolean;
   disabled?: boolean;
@@ -177,7 +180,18 @@ function TreeItem({
       <Icon size={14} className={`${colorClass} shrink-0`} />
       <div className="min-w-0 flex-1">
         <div className="text-xs text-text truncate">{name}</div>
-        {subtitle && <div className="text-[10px] text-text-muted/70 truncate">{subtitle}</div>}
+        {subtitle && (
+          <div className="flex items-center gap-1.5 text-[10px] text-text-muted/70">
+            <span className="shrink-0">{subtitle}</span>
+            {fingerprint && (
+              <>
+                <span className="text-text-muted/40">|</span>
+                <Fingerprint size={9} className="shrink-0" />
+                <span className="font-mono truncate">{fingerprint}</span>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -187,6 +201,7 @@ function FolderNode({
   folder,
   sessions,
   sshKeys,
+  fingerprints,
   onRename,
   onDelete,
   confirmingDelete,
@@ -200,6 +215,7 @@ function FolderNode({
   folder: VaultFolder;
   sessions: SavedSession[];
   sshKeys: SshKeyProfileInfo[];
+  fingerprints: Record<string, string>;
   onRename: (id: string, name: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   selectionMode?: boolean;
@@ -309,6 +325,7 @@ function FolderNode({
                   <TreeItem
                     key={s.id} id={s.id} type="session" name={s.name}
                     subtitle={`${s.username}@${s.host}:${s.port}`}
+                    fingerprint={fingerprints[`${s.host}:${s.port}`]}
                     selectionMode={selectionMode}
                     checked={(selection?.sessions.has(s.id) || folderSelected)}
                     disabled={folderSelected}
@@ -352,6 +369,24 @@ export default function VaultTreeView({
   const [newFolderName, setNewFolderName] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [ungroupedExpanded, setUngroupedExpanded] = useState(true);
+
+  // ── Fingerprint lookup from known_hosts ──
+  const [fingerprints, setFingerprints] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (sessions.length === 0) return;
+
+    const targets: [string, number][] = sessions.map((s) => [s.host, s.port]);
+    invoke<Record<string, [string, string]>>("get_known_hosts_fingerprints", { targets })
+      .then((result) => {
+        const mapped: Record<string, string> = {};
+        for (const [key, [, fp]] of Object.entries(result)) {
+          mapped[key] = fp;
+        }
+        setFingerprints(mapped);
+      })
+      .catch(() => { /* silently ignore */ });
+  }, [sessions]);
 
   // ── Custom drag state ──
   const [drag, setDrag] = useState<DragState | null>(null);
@@ -505,6 +540,7 @@ export default function VaultTreeView({
             folder={g.folder}
             sessions={g.sessions}
             sshKeys={g.sshKeys}
+            fingerprints={fingerprints}
             onRename={onRenameFolder}
             onDelete={handleDeleteFolder}
             confirmingDelete={confirmDeleteId === g.folder.id}
@@ -552,6 +588,7 @@ export default function VaultTreeView({
                       <TreeItem
                         key={s.id} id={s.id} type="session" name={s.name}
                         subtitle={`${s.username}@${s.host}:${s.port}`}
+                        fingerprint={fingerprints[`${s.host}:${s.port}`]}
                         selectionMode={selectionMode}
                         checked={selection?.sessions.has(s.id)}
                         onToggle={() => onToggleSelection?.("session", s.id)}
