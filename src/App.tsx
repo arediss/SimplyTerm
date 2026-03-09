@@ -148,6 +148,13 @@ function App() {
   const [initialSerialConfig, setInitialSerialConfig] = useState<Partial<SerialConnectionConfig> | null>(null);
   const [connectionType, setConnectionType] = useState<ConnectionType>("ssh");
 
+  // If a connection error is set (e.g. from host key reject/failure), stop the connecting state
+  useEffect(() => {
+    if (connectionError) {
+      setIsConnecting(false);
+    }
+  }, [connectionError]);
+
   // Save session modal state
   const [pendingSaveConfig, setPendingSaveConfig] = useState<SshConnectionConfig | null>(null);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);

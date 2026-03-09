@@ -386,6 +386,58 @@ pub fn accept_and_update_pending_key(pending_id: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Lookup fingerprints from known_hosts for a list of (host, port) pairs.
+/// Returns a map: "host:port" → { key_type, fingerprint }.
+pub fn lookup_fingerprints(targets: &[(String, u16)]) -> HashMap<String, (String, String)> {
+    let mut result = HashMap::new();
+
+    let known_hosts_path = match get_known_hosts_path() {
+        Ok(p) => p,
+        Err(_) => return result,
+    };
+
+    if !known_hosts_path.exists() {
+        return result;
+    }
+
+    let file = match fs::File::open(&known_hosts_path) {
+        Ok(f) => f,
+        Err(_) => return result,
+    };
+
+    let reader = BufReader::new(file);
+
+    for line in reader.lines() {
+        let line = match line {
+            Ok(l) => l,
+            Err(_) => continue,
+        };
+
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+
+        if let Some((hosts, key_type, key_data)) = parse_known_hosts_line(trimmed) {
+            for (host, port) in targets {
+                let key = format!("{}:{}", host, port);
+                if result.contains_key(&key) {
+                    continue; // already found
+                }
+                for stored_host in &hosts {
+                    if host_matches(stored_host, host, *port) {
+                        let fingerprint = calculate_fingerprint_from_base64(&key_data);
+                        result.insert(key.clone(), (key_type.clone(), fingerprint));
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

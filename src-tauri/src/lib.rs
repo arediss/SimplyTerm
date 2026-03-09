@@ -19,7 +19,7 @@ use connectors::{
     create_local_session,
     ssh_exec::{ssh_exec, get_server_stats, ServerStats}, SshAuth, SshConfig, SshConnectionResult,
     HostKeyCheckResult, FileEntry, sftp_read_file, sftp_upload_file, disconnect_sftp,
-    accept_pending_key, accept_and_update_pending_key, remove_pending_key,
+    accept_pending_key, accept_and_update_pending_key, remove_pending_key, lookup_fingerprints,
     connect_telnet, connect_serial, list_serial_ports, SerialConfig, SerialPortInfo,
 };
 use plugins::{PluginManager, InstalledPlugin, PluginState, RegistrySource, RegistryPlugin, PluginUpdate};
@@ -295,6 +295,14 @@ async fn reject_host_key(host: String, port: u16) -> Result<(), String> {
     let pending_id = format!("{}:{}", host, port);
     remove_pending_key(&pending_id);
     Ok(())
+}
+
+/// Lookup known_hosts fingerprints for a batch of (host, port) pairs
+#[tauri::command]
+async fn get_known_hosts_fingerprints(
+    targets: Vec<(String, u16)>,
+) -> std::collections::HashMap<String, (String, String)> {
+    lookup_fingerprints(&targets)
 }
 
 #[tauri::command]
@@ -2080,6 +2088,7 @@ pub fn run() {
             check_host_key,
             trust_host_key,
             update_host_key,
+            get_known_hosts_fingerprints,
             reject_host_key,
             write_to_pty,
             resize_pty,
