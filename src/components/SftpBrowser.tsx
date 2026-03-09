@@ -1153,8 +1153,23 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: Readonly<SftpBrows
     }
   }, [sessionId, t]);
 
-  // Handle drop from local panel onto remote SFTP
+  // Handle drop from local panel onto remote SFTP (single or multi-file)
   const handleLocalToRemoteDrop = useCallback(async (e: React.DragEvent) => {
+    // Check for multi-file drag first
+    const multiPaths = e.dataTransfer.getData("text/x-local-paths");
+    if (multiPaths) {
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        const paths = JSON.parse(multiPaths) as string[];
+        if (paths.length > 0) {
+          invoke("sftp_upload_files", { sessionId, remoteDir: currentPath, localPaths: paths })
+            .catch((err: unknown) => setError(getErrorMessage(err)));
+        }
+      } catch { /* invalid JSON, fall through */ }
+      return;
+    }
+    // Single file fallback
     const localPath = e.dataTransfer.getData("text/x-local-path");
     if (!localPath) return;
     e.preventDefault();
@@ -1163,8 +1178,15 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: Readonly<SftpBrows
       .catch((err: unknown) => setError(getErrorMessage(err)));
   }, [sessionId, currentPath]);
 
+  // Handle "Upload selected" button from local file browser
+  const handleUploadSelected = useCallback((localPaths: string[]) => {
+    if (localPaths.length === 0) return;
+    invoke("sftp_upload_files", { sessionId, remoteDir: currentPath, localPaths })
+      .catch((err: unknown) => setError(getErrorMessage(err)));
+  }, [sessionId, currentPath]);
+
   const handleLocalDragOver = useCallback((e: React.DragEvent) => {
-    if (e.dataTransfer.types.includes("text/x-local-path")) {
+    if (e.dataTransfer.types.includes("text/x-local-path") || e.dataTransfer.types.includes("text/x-local-paths")) {
       e.preventDefault();
       e.dataTransfer.dropEffect = "copy";
     }
@@ -1181,6 +1203,7 @@ export function SftpBrowser({ sessionId, initialPath = "/" }: Readonly<SftpBrows
             remoteDragging={remoteDragging}
             localCurrentPathRef={localCurrentPathRef}
             refreshTrigger={localRefreshTrigger}
+            onUploadSelected={handleUploadSelected}
           />
         </div>
       ) : (
